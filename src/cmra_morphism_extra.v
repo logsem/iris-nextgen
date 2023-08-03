@@ -6,7 +6,8 @@ From iris.prelude Require Import options.
 
 (* For this we require [CmraTotal A] and [CoreId b]. We could add weaker
  * requirements, but these are convenient as t.c. search can solver them. *)
-Global Instance cmra_morphism_const {A B : cmra} `{CmraTotal A} (b : B) `{!CoreId b} :
+Global Instance cmra_morphism_const {A B : cmra} `{CmraTotal A}
+    (b : B) `{!CoreId b} :
   b ⋅ b ≡ b →
   ✓ b →
   CmraMorphism (A := A) (const b).
@@ -23,7 +24,7 @@ Instance cmra_morphism_const_agree {A B : ofe} (b : B) :
   CmraMorphism (A := agree A) (const (to_agree b)).
 Proof. apply cmra_morphism_const; [apply _|apply agree_idemp|done]. Qed.
 
-(* A [CmraMorphism] over [auth]. *)
+(* A [CmraMorphism] for [view]. *)
 
 Definition fmap_pair A {B C} (f : B → C) (p : A * B) : (A * C) :=
   (p.1, f p.2).
@@ -33,41 +34,41 @@ Instance fmap_pair_ne {A B C : ofe} (f : B → C) `{NonExpansive f} :
   NonExpansive (@fmap_pair A _ _ f).
 Proof. solve_proper. Qed.
 
-Definition fmap_auth {A : ucmra} (t : A → A) (a : auth A) : auth A :=
-  View
-    (fmap_pair dfrac (agree_map t) <$> a.(view_auth_proj))
-    (t a.(view_frag_proj)).
+Section fmap_view.
+  Context {A B} {rel : view_rel A B}.
+  Implicit Types a : A.
+  Implicit Types ag : option (dfrac * agree A).
+  Implicit Types b : B.
+  Implicit Types x y : view rel.
+  Implicit Types q : frac.
+  Implicit Types dq : dfrac.
 
-Section fmap_auth.
-  Context {A : ucmra}.
-  Implicit Types (t : A → A).
+  Definition fmap_view (am : A → A) (fm : B → B) (x : view rel) : view rel :=
+    View
+      (fmap_pair dfrac (agree_map am) <$> x.(view_auth_proj))
+      (fm x.(view_frag_proj)).
 
   #[global]
-  Instance fmap_auth_ne `{NonExpansive t} : NonExpansive (fmap_auth t).
-  Proof. unfold fmap_auth. solve_proper. Qed.
+  Instance fmap_view_ne am fm `{NonExpansive am, NonExpansive fm} :
+    NonExpansive (fmap_view am fm).
+  Proof. unfold fmap_view. solve_proper. Qed.
 
-  #[global]
-  Instance fmap_auth_gentrans `{!CmraMorphism t} : CmraMorphism (fmap_auth t).
+  (* [fmap_view] is a [CmraMorphism] if the two mappings preserve the relation.
+  * *)
+  Lemma fmap_view_cmra_morphism am fm `{NonExpansive am} `{!CmraMorphism fm} :
+    (∀ n a b, rel n a b → rel n (am a) (fm b)) →
+    CmraMorphism (fmap_view am fm).
   Proof.
-    unfold fmap_auth.
-    split.
+    intros pres. unfold fmap_view. split.
     - apply _.
-    - rewrite view.view_validN_eq /= /auth_view_rel_raw.
+    - rewrite view.view_validN_eq /=.
       intros ? [[[??]|]?]; simpl.
-      * intros [? (a' & eq & ? & ?)].
+      * intros [? (a' & eq & ?)].
         split; first done.
-        exists (t a').
-        rewrite eq.
-        rewrite agree_map_to_agree.
-        split; first done.
-        split.
-        + apply: cmra_morphism_monotoneN. done.
-        + apply: cmra_morphism_validN. done.
-      * intros (a' & ? & ?).
-        exists (t a').
-        split.
-        + apply: cmra_morphism_monotoneN. done.
-        + apply: cmra_morphism_validN. done.
+        exists (am a').
+        rewrite eq agree_map_to_agree.
+        naive_solver.
+      * intros (a' & ?). exists (am a'). apply pres. done.
     - rewrite view.view_pcore_eq.
       intros [[[??]|]?]; simpl;
         rewrite cmra_morphism_core; last done.
@@ -86,12 +87,39 @@ Section fmap_auth.
       solve_proper.
   Qed.
 
+End fmap_view.
+
+(* A [CmraMorphism] over [auth]. *)
+
+Definition fmap_auth {A : ucmra} (t : A → A) : auth A → auth A := fmap_view t t.
+
+Section fmap_auth.
+  Context {A : ucmra}.
+  Implicit Types (t : A → A).
+
+  #[global]
+  Instance fmap_auth_ne `{NonExpansive t} : NonExpansive (fmap_auth t).
+  Proof. apply _. Qed.
+
+  #[global]
+  Instance fmap_auth_gentrans `{!CmraMorphism t} : CmraMorphism (fmap_auth t).
+  Proof.
+    unfold fmap_auth.
+    apply: fmap_view_cmra_morphism.
+    intros ???.
+    rewrite /auth_view_rel /= /auth_view_rel_raw.
+    intros [??]. split.
+    - apply: cmra_morphism_monotoneN. done.
+    - apply: cmra_morphism_validN. done.
+  Qed.
+
   Lemma fmap_auth_frag a t :
     fmap_auth t (◯ a) = ◯ (t a).
   Proof. done. Qed.
 
 End fmap_auth.
 
+(* NOTE: Neither [core] nor [pcore] is a [CmraMorphism]. *)
 #[global]
 Instance core_cmra_morphism `{CmraTotal A} : @CmraMorphism A _ core.
 Proof.
