@@ -1,0 +1,9 @@
+[submodule "external/stdpp"]
+	path = external/stdpp
+	url = git-rts@gitlab.mpi-sws.org:iris/stdpp.git
+[submodule "external/iris"]
+	path = external/iris
+	url = git-rts@gitlab.mpi-sws.org:iris/iris.git
+[submodule "external/iris-named-props"]
+	path = external/iris-named-props
+	url = git@github.com:tchajed/iris-named-props.git
