@@ -60,6 +60,13 @@ Section bnextgen_rules.
     unseal. split. simpl. intros n x Hv ?. apply: gen_trans_monoN. done.
   Qed.
 
+  (* If the transformation is contractive, ie. _only_ removes things, then
+   * we can eliminate it in from own [ownM]. *)
+  Lemma bnextgen_elim_ownM (a : M) :
+    (∀ x n, f x ≼{n} x) →
+    (⚡={f}=> uPred_ownM a) ⊢ uPred_ownM a.
+  Proof. intros ?. unseal. split. simpl. intros. etrans; done. Qed.
+
   Lemma bnextgen_ownM_inv' (a : M) b :
     (∀ x n, b ≼{n} f x → a ≼{n} x) →
     (⚡={f}=> uPred_ownM b) ⊢ uPred_ownM a.
