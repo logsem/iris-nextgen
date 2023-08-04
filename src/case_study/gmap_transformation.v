@@ -4,7 +4,7 @@ From iris.base_logic Require Import ghost_map.
 From iris.base_logic.lib Require Export iprop own invariants.
 From iris.algebra Require Import gmap gmap_view view.
 
-From self Require Import nextgen_basic gen_trans.
+From self Require Import nextgen_basic gen_trans cmra_morphism_extra.
 
 (** [mapTrans] defines a valid map transformation to be applied on a
     gmap resource algebra *)
@@ -495,10 +495,13 @@ Section agree_option_map.
       rewrite -Heq Hin in Hfg. inversion Hfg.
   Qed.
 
-  Lemma agree_option_map_validN x n x' :
-    ✓{n} x -> agree_option_map f x = Some x' -> ✓{n} x'.
+  Lemma agree_option_map_validN x n :
+    ✓{n} x -> ✓{n} agree_option_map f x.
   Proof.
-    intros Hv Hx.
+    intros Hv.
+    destruct (agree_option_map f x) eqn:Hx;cycle 1.
+    { rewrite /validN /cmra_validN /= //. }
+    rename a into x'.
     apply agree_option_eq_some in Hx.
     pose proof (option_list_collapse_spec _ _ Hx) as Hspec1.
     rewrite agree_validN_def in Hv.
@@ -513,11 +516,6 @@ Section agree_option_map.
     inversion Ha';auto.
   Qed.
 
-  (* NB: option_map is not a CmraMorphism: validN is not preserved,
-  since resources can be discarded. Instead, we have the above weaker
-  lemma: validity of the non-discarded elements is preserved. This can
-  then be used to show that the overall function is a CmraMorphism *)         
-  
   Lemma agree_option_map_op v1 v2 :
     agree_option_map f (v1 ⋅ v2) = agree_option_map f v1 ⋅ agree_option_map f v2.
   Proof.
@@ -566,15 +564,21 @@ Definition map_trans_frag_lift {L : Type} {V : ofe} `{EqDecision L, Countable L}
   L -> prodR dfracR (agreeR V) -> option (prodR dfracR (agreeR V)) :=
   λ l dv, let '(d,v) := dv in agree_option_map (f l) v ≫= λ v', Some (d,v').
 
-Definition gmapTrans_lift {K : Type} {V : ofe} {eqK : EqDecision K} {countK : Countable K}
-  (gt : mapTrans K V) : gmap_viewR K (V) -> gmap_viewR K (V) :=
-  λ m, let '{| view_auth_proj := auth_view;
-              view_frag_proj := frag_view |} := m in
-       let trans_view_auth := auth_view ≫= λ dv, Some (dv.1,agree_map gt.(map_trans_auth) dv.2) in
-       let trans_view_frag := map_imap (map_trans_frag_lift gt.(map_trans_frag)) frag_view in
-       {| view_auth_proj := trans_view_auth ; view_frag_proj := trans_view_frag |}.
+Definition gmapTrans_auth_lift {K : Type} {V : ofe} {eqK : EqDecision K} {countK : Countable K}
+  (gt : mapTrans K V) : gmapO K V -> gmapO K V := map_trans_auth.
 
-Global Instance gmap_map_imap_ne {K : Type} {A B : ofe} `{EqDecision K, Countable K} (f : K -> (prodR dfracR (agreeR A)) -> option (prodR dfracR (agreeR B))) :
+Definition gmapTrans_frag_lift {K : Type} {V : ofe} {eqK : EqDecision K} {countK : Countable K}
+  (gt : mapTrans K V) : (gmap_view.gmap_view_fragUR K V) → (gmap_view.gmap_view_fragUR K V) :=
+  λ frag_view, map_imap (map_trans_frag_lift gt.(map_trans_frag)) frag_view.
+
+
+Definition gmapTrans_lift {K : Type} {V : ofe} {eqK : EqDecision K} {countK : Countable K}
+  (gt : mapTrans K V) : gmap_viewR K (V) -> gmap_viewR K (V) := fmap_view (gmapTrans_auth_lift gt) (gmapTrans_frag_lift gt).
+
+
+
+Global Instance gmap_map_imap_ne {K : Type} {A B : ofe} `{EqDecision K, Countable K}
+  (f : K -> (prodR dfracR (agreeR A)) -> option (prodR dfracR (agreeR B))) :
   (forall k, NonExpansive (f k)) -> NonExpansive (λ (m1 : gmap_view.gmap_view_fragUR K A), (map_imap f m1) : gmap_view.gmap_view_fragUR K B).
 Proof.
   intros Hf n m1 m2 Hne. intros k.
@@ -607,10 +611,6 @@ Proof.
   apply H in H1. rewrite H0. auto.
 Qed.
 
-(* Lemma None_elem_of_agree : *)
-(*   ✓{n} w' -> *)
-(*   None ∈ map_trans_frag i <$> agree_car w' *)
-
 Lemma map_trans_auth_frag_rel {K : Type} {V : ofe} {eqK : EqDecision K} {countK : Countable K} (gt : mapTrans K V) (n : nat)
   (m1 : gmap K V) (view_frag_proj : gmap_view.gmap_view_fragUR K V) :
   gmap_view.gmap_view_rel_raw K V n m1 view_frag_proj ->
@@ -623,7 +623,8 @@ Proof.
   destruct (agree_option_map (map_trans_frag i) w') eqn:Hsome;simpl in *;simplify_eq.
   destruct (Hv2 i (d',w') Hlook2) as [w [Hag [Hd Hw]]];simpl in *.
   apply dist_to_agree_validN in Hag as Hval.
-  eapply agree_option_map_validN in Hval as Hval';eauto;[|apply gt.(map_trans_frag_ne)].
+  apply agree_option_map_validN with (f:=map_trans_frag i) in Hval as Hval';eauto;[|apply gt.(map_trans_frag_ne)].
+  rewrite Hsome in Hval'. rewrite Some_validN in Hval'.
   apply agree_option_eq_some in Hsome.
   apply option_list_collapse_spec in Hsome as Hspec.
   pose proof (collapse_rel_iff _ _ Hspec) as Hiff.
@@ -672,77 +673,67 @@ Proof.
   apply elem_of_list_fmap in Ha0 as [? [Hcontr ?]].
   rewrite H0 in Hcontr. done.
 Qed.
-
-
-Global Instance gmapTrans_lift_CmraMorphism {K : Type} {V : ofe} {eqK : EqDecision K} {countK : Countable K} (gt : mapTrans K V)
-  : CmraMorphism (gmapTrans_lift gt).
+  
+Global Instance gmapTrans_frag_lift_CmraMorphism {K : Type} (V : ofe) (eqK : EqDecision K) {countK : Countable K}
+  (gt : mapTrans K V) :  CmraMorphism (gmapTrans_frag_lift gt).
 Proof.
   split.
-  - intros n x y Hne. split.
-    + destruct x,y =>/=.
-      destruct view_auth_proj,view_auth_proj0 =>// /=.
-      * destruct p,p0;simpl in *.
-        inversion Hne as [Hne1 Hne2]; inversion Hne1;simpl in *;simplify_eq.
-        inversion H1;simpl in *;simplify_eq. inversion H;subst.
-        constructor. constructor =>// /=. apply agree_map_ne;auto.
-        apply gt.(map_trans_auth_ne).
-      * inversion Hne as [Hne1 Hne2]; inversion Hne1;simpl in *;simplify_eq.
-      * inversion Hne as [Hne1 Hne2]; inversion Hne1;simpl in *;simplify_eq.
-    + destruct x,y =>/=. inversion Hne;simpl in *.
-      apply gmap_map_imap_ne =>//.
-      intros k m [d1 v1] [d2 v2] Hne2. simpl. inversion Hne2 as [Hne1 Hne2'];simpl in *; simplify_eq.
-      apply option_mbind_ne. (* f_equiv. *)
-      * intros a1 a2 Ha. constructor. split;auto.
-      * apply agree_option_map_ne =>//. apply gt.(map_trans_frag_ne).
-  - rewrite !view.view_validN_eq. intros n x Hv.
-    destruct x,view_auth_proj; simpl in *.
-    + destruct p;simpl in *. destruct Hv as [Hv1 [m1 [Hne Hv2]]]. split;auto.
-      exists (gt.(map_trans_auth) m1).
-      split.
-      * pose proof (@agree_map_ne _ _ map_trans_auth map_trans_auth_ne n (to_agree m1)).
-        rewrite -H =>//. rewrite agree_map_to_agree //.
-      * apply map_trans_auth_frag_rel. auto. 
-    + destruct Hv as [a Ha].
-      exists (map_trans_auth a). apply map_trans_auth_frag_rel. auto.
-  - intros m. rewrite !view.view_pcore_eq. simpl. f_equiv. f_equiv.
-    + destruct m;simpl in *.
-      destruct view_auth_proj;simpl;auto.
-      destruct p;simpl. destruct d =>//.
-    + destruct m;simpl in *.
-      intros i.
-      rewrite map_lookup_imap.
-      destruct (core view_frag_proj !! i) eqn:Hlook;rewrite Hlook => /=.
-      * destruct c as [d v];simpl in *.
-        rewrite lookup_core in Hlook. rewrite lookup_core.
-        unfold map_trans_frag_lift.
-        destruct (view_frag_proj !! i) eqn:Hi; rewrite Hi in Hlook;[|inversion Hlook].
-        destruct c as [d' v'].
-        rewrite map_lookup_imap Hi /=.
-        assert (v = v') as ->.
-        { destruct d,d'; inversion Hlook;auto. }
-        destruct (agree_option_map (map_trans_frag i) v') eqn:Hv1 => /= //.
-        destruct d,d';auto;inversion Hlook.
-      * rewrite lookup_core in Hlook.
-        destruct (view_frag_proj !! i) eqn:Hi;rewrite Hi in Hlook.
-        { destruct c as [d v];simpl in *. destruct d;inversion Hlook.
-          rewrite lookup_core map_lookup_imap Hi /=.
-          destruct (agree_option_map (map_trans_frag i) v) =>//. }
-        { rewrite lookup_core map_lookup_imap Hi /= //. }
-  - intros x y. split.
-    + destruct x,y =>//. destruct view_auth_proj,view_auth_proj0 =>// /=.
-      destruct p,p0;simpl in *. rewrite - Some_op.
-      rewrite - pair_op. f_equiv. f_equiv.
-      pose proof (@agree_map_morphism (gmapO K V) (gmapO K V) map_trans_auth map_trans_auth_ne) as Morph.
-      destruct Morph. apply cmra_morphism_op.
-    + destruct x,y =>// /=.
-      intros i.
-      rewrite !lookup_op !map_lookup_imap. rewrite lookup_op.
-      destruct (view_frag_proj !! i) eqn:Hlook1,(view_frag_proj0 !! i) eqn:Hlook2;rewrite Hlook1 Hlook2; simpl in *=>//.
-      * destruct c as [d1 v1],c0 as [d2 v2];simpl in *.
-        rewrite agree_option_map_op.
-        destruct (agree_option_map (map_trans_frag i) v1) eqn:Hag1, (agree_option_map (map_trans_frag i) v2) eqn:Hag2;simpl in *;auto.
-        ** exfalso. eapply agree_option_map_discard_all;eauto.
-        ** exfalso. eapply agree_option_map_discard_all;eauto.
-      * rewrite op_None_right_id. auto.
-      * rewrite op_None_left_id. auto.
+  - intros n x y Hne.
+    destruct x,y =>/=.
+    apply gmap_map_imap_ne =>//.
+    intros k m [d1 v1] [d2 v2] Hne2. simpl. inversion Hne2 as [Hne1 Hne2'];simpl in *; simplify_eq.
+    apply option_mbind_ne.
+    + intros a1 a2 Ha. constructor. split;auto.
+    + apply agree_option_map_ne =>//. apply gt.(map_trans_frag_ne).
+  - intros n x Hx i.
+    specialize (Hx i).
+    rewrite /gmapTrans_frag_lift map_lookup_imap.
+    destruct (x !! i) eqn:Hsome;[|rewrite Hsome //].
+    rewrite Hsome in Hx. rewrite Hsome /=.
+    rewrite Some_validN in Hx. inversion Hx as [Hx1 Hx2].
+    destruct c as [q v]; simpl in *.
+    destruct (agree_option_map (map_trans_frag i) v) eqn:Hv =>// /=.
+    apply Some_validN. split => // /=. rewrite -Some_validN -Hv.
+    apply agree_option_map_validN =>//. apply map_trans_frag_ne.
+  - intros view_frag_proj. rewrite /gmapTrans_frag_lift /=.
+    rewrite !cmra_pcore_core. f_equiv.
+    intros i.
+    rewrite map_lookup_imap.
+    destruct (core view_frag_proj !! i) eqn:Hlook;rewrite Hlook => /=.
+    * destruct c as [d v];simpl in *.
+      rewrite lookup_core in Hlook. rewrite lookup_core.
+      unfold map_trans_frag_lift.
+      destruct (view_frag_proj !! i) eqn:Hi; rewrite Hi in Hlook;[|inversion Hlook].
+      destruct c as [d' v'].
+      rewrite map_lookup_imap Hi /=.
+      assert (v = v') as ->.
+      { destruct d,d'; inversion Hlook;auto. }
+      destruct (agree_option_map (map_trans_frag i) v') eqn:Hv1 => /= //.
+      destruct d,d';auto;inversion Hlook.
+    * rewrite lookup_core in Hlook.
+      destruct (view_frag_proj !! i) eqn:Hi;rewrite Hi in Hlook.
+      { destruct c as [d v];simpl in *. destruct d;inversion Hlook.
+        rewrite lookup_core map_lookup_imap Hi /=.
+        destruct (agree_option_map (map_trans_frag i) v) =>//. }
+      { rewrite lookup_core map_lookup_imap Hi /= //. }
+  - intros view_frag_proj view_frag_proj0.
+    intros i.
+    rewrite !lookup_op !map_lookup_imap. rewrite lookup_op.
+    destruct (view_frag_proj !! i) eqn:Hlook1,(view_frag_proj0 !! i) eqn:Hlook2;rewrite Hlook1 Hlook2; simpl in *=>//.
+    * destruct c as [d1 v1],c0 as [d2 v2];simpl in *.
+      rewrite agree_option_map_op.
+      destruct (agree_option_map (map_trans_frag i) v1) eqn:Hag1, (agree_option_map (map_trans_frag i) v2) eqn:Hag2;simpl in *;auto.
+      ** exfalso. eapply agree_option_map_discard_all;eauto.
+      ** exfalso. eapply agree_option_map_discard_all;eauto.
+    * rewrite op_None_right_id. auto.
+    * rewrite op_None_left_id. auto.
+Qed.      
+
+Global Instance gmapTrans_lift_CmraMorphism {K : Type} {V : ofe} {eqK : EqDecision K} {countK : Countable K}
+  (gt : mapTrans K V) : CmraMorphism (gmapTrans_lift gt).
+Proof.
+  apply fmap_view_cmra_morphism.
+  - apply map_trans_auth_ne.
+  - apply gmapTrans_frag_lift_CmraMorphism.
+  - intros. apply map_trans_auth_frag_rel. auto.
 Qed.
