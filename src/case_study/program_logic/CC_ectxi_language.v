@@ -7,8 +7,8 @@
     a proof that these are instances of general ectx-based languages. *)
 From iris.algebra Require Export ofe.
 From iris.program_logic Require Import language.
-From self.case_study Require Import prelude.
-From self.case_study.program_logic Require Import CC_ectx_language.
+From nextgen.case_study Require Import prelude.
+From nextgen.case_study.program_logic Require Import CC_ectx_language.
 Set Default Proof Using "Type".
 
 (* We need to make thos arguments indices that we want canonical structure

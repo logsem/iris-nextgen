@@ -1,7 +1,7 @@
-From self.case_study Require Export stack_lang.
 From stdpp Require Import fin_maps.
 From iris.algebra Require Import gmap.
-From self Require Import nextgen_basic gen_trans gmap_view_transformation.
+From nextgen Require Import nextgen_basic gen_trans gmap_view_transformation.
+From nextgen.case_study Require Export stack_lang.
 Set Default Proof Using "Type".
 
 

@@ -6,7 +6,7 @@ From iris.program_logic Require Export language.
 From iris.bi Require Export weakestpre.
 From iris.prelude Require Import options.
 Import uPred.
-From self Require Export nextgen_basic.
+From nextgen Require Export nextgen_basic.
 
 Class irisGS_gen (hlc : has_lc) (Λ : language) (Σ : gFunctors) := IrisG {
   iris_invGS :> invGS_gen hlc Σ;

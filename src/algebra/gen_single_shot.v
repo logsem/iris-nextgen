@@ -1,6 +1,6 @@
 From iris.algebra Require Import csum excl.
 
-From self Require Import cmra_morphism_extra.
+From nextgen Require Import cmra_morphism_extra.
 
 (******************************************************************************)
 (* Generational single-shot stream.

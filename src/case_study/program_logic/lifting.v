@@ -2,7 +2,7 @@
 semantics to the program logic. *)
 
 From iris.proofmode Require Import proofmode.
-From self.case_study.program_logic Require Export weakestpre.
+From nextgen.case_study.program_logic Require Export weakestpre.
 From iris.prelude Require Import options.
 
 Section lifting.

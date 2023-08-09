@@ -4,7 +4,7 @@ From iris.base_logic Require Import ghost_map.
 From iris.base_logic.lib Require Export iprop own invariants.
 From iris.algebra Require Import gmap gmap_view view.
 
-From self Require Import nextgen_basic gen_trans cmra_morphism_extra.
+From nextgen Require Import nextgen_basic gen_trans cmra_morphism_extra.
 
 (** [MapTrans] defines a valid map transformation to be applied on a
     gmap resource algebra *)

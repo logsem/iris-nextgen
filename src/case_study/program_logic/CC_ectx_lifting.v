@@ -4,8 +4,9 @@
     Original author: Amin Timany *)
 
 (** Some derived lemmas for ectx-based languages with continuations *)
-From self.case_study.program_logic Require Export lifting weakestpre.
-From self.case_study Require Export CC_ectx_language.
+From iris.program_logic Require Export weakestpre.
+From iris.program_logic Require Export lifting.
+From nextgen.case_study Require Export CC_ectx_language.
 From iris.proofmode Require Import tactics.
 Set Default Proof Using "Type".
 

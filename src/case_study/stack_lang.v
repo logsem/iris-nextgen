@@ -1,7 +1,7 @@
 Require Export Logic.FunctionalExtensionality.
 From iris.program_logic Require Import language.
-From self.case_study.program_logic Require Import CC_ectx_lifting CC_ectxi_language. 
-From self.case_study Require Import prelude.
+From nextgen.case_study.program_logic Require Import CC_ectx_lifting CC_ectxi_language.
+From nextgen.case_study Require Import prelude.
 From stdpp Require Import binders strings gmap.
 
 Definition loc := positive.
