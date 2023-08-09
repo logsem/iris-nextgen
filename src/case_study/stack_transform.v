@@ -60,7 +60,7 @@ Section pop_func.
   Definition stack_location_cut (n : nat) (nl : nat * loc) (v : leibnizO val) :=
     if (bool_decide (stack_cond n (nl,v))) then Some v else None.
 
-  Lemma map_trans_incl (n : nat) : forall (l : nat * loc) (v : leibnizO val) (m : gmapO (nat * loc) (leibnizO val)),
+  Lemma stack_map_trans_incl (n : nat) : forall (l : nat * loc) (v : leibnizO val) (m : gmapO (nat * loc) (leibnizO val)),
       m !! l = Some v -> (stack_location_cut n) l v = (stack_cut n) m !! l.
   Proof.
     intros l v m Hl.
@@ -74,7 +74,7 @@ Section pop_func.
         rewrite /stack_location_cut bool_decide_false //.
   Qed.
 
-  Lemma map_trans_frag_discard_all (n : nat) : forall (l : nat * loc) (v1 : leibnizO val),
+  Lemma stack_map_trans_frag_discard_all (n : nat) : forall (l : nat * loc) (v1 : leibnizO val),
       (stack_location_cut n) l v1 = None -> forall (v2 : leibnizO val), (stack_location_cut n) l v2 = None.
   Proof.
     rewrite /stack_location_cut.
@@ -103,6 +103,23 @@ Section pop_func.
     - apply bool_decide_eq_false in H.
       rewrite bool_decide_false //.
   Qed.
+
+  Program Definition stack_mapTrans (n : nat) : mapTrans (nat * loc) (leibnizO val) :=
+    {|
+      map_trans_auth := (stack_cut n);
+      map_trans_frag := (stack_location_cut n);
+
+      map_trans_incl := (stack_map_trans_incl n);
+
+      map_trans_frag_discard_all := (stack_map_trans_frag_discard_all n);
+  
+      map_trans_auth_ne := (stack_cut_ne n);
+      map_trans_frag_ne := (stack_location_cut_ne n);
+      
+      v_leibniz := _;
+      v_discrete := _
+    |}.
+  
     
   Inductive stack_cut_rel : nat -> gmap (nat * loc) val -> gmap (nat * loc) val -> Prop :=
   | stack_cut_rel_cond (n : nat) (σ : gmap (nat * loc) val) (σ' : gmap (nat * loc) val) :
@@ -110,13 +127,18 @@ Section pop_func.
     (forall m l v, σ !! (m,l) = Some v -> m >= n -> σ' !! (m,l) = None) ->
     stack_cut_rel n σ σ'.
 
-  Lemma stack_cut_0 s : stack_cut 0 s = [].
-  Proof. rewrite /stack_cut PeanoNat.Nat.sub_0_r. apply popN_stack_empty. Qed.
+  Lemma stack_cut_0 s : stack_cut 0 s = ∅.
+  Proof.
+    rewrite /stack_cut /stack_cond.
+    rewrite map_filter_empty_iff. apply map_Forall_lookup.
+    intros. simpl. lia.
+  Qed.
   
-  Lemma stack_cut_full s n : n >= length s -> stack_cut n s = s.
+  Lemma stack_cut_full s n : (forall l, l ∈ dom s -> l.1 < n) -> stack_cut n s = s.
   Proof.
     intros Hgt.
-    rewrite /stack_cut. assert (length s - n = 0) as ->;[lia|auto].
+    rewrite /stack_cut /stack_cond. rewrite map_filter_id//.
+    intros [m l] x Hx. apply elem_of_dom_2 in Hx. apply Hgt in Hx. auto.
   Qed.
   
   Lemma list_to_gmap_stack_fix_snoc_mid s x n :
@@ -136,22 +158,23 @@ Section pop_func.
     apply list_to_gmap_stack_fix_snoc_mid.
   Qed.
 
-  Lemma stack_cut_snoc s n x :
-    n <= length s ->
-    stack_cut n (s ++ [x]) = stack_cut n s.
+  Lemma stack_cut_snoc s n m x l :
+    n <= m ->
+    stack_cut n (<[(m,l) := x]> s) = stack_cut n s.
   Proof.
     intros Hle.
-    rewrite /stack_cut /= app_length.
-    assert (length s + length [x] - n = (length s - n) + length [x]) as ->; [lia|].
-    rewrite popN_stack_spec;auto.
+    rewrite /stack_cut /stack_cond.
+    rewrite map_filter_insert_not//.
+    intros y. simpl. lia.
   Qed.
 
-  Lemma stac_cut_snoc_gt s n x :
-    n > length s ->
-    stack_cut n (s ++ [x]) = s ++ [x].
+  Lemma stac_cut_snoc_gt s n m x l :
+    n > m ->
+    stack_cut n (<[(m,l) := x]> s) = <[(m,l) := x]> (stack_cut n s).
   Proof.
-    intros Hgt.
-    apply stack_cut_full. rewrite app_length /=. lia.
+    intros Hgt. rewrite /stack_cut /stack_cond.
+    rewrite map_filter_insert. simpl.
+    rewrite decide_True//.
   Qed.
 
   Lemma list_to_gmap_stack_fix_lookup_is_Some s n m :
@@ -212,40 +235,40 @@ Section pop_func.
         auto.
   Qed.
 
-  Lemma list_to_gmap_lookup_stack_cut n s m l :
-    m < n ->
-    (list_to_gmap_stack (stack_cut n s)) !! (m, l) = (list_to_gmap_stack s) !! (m, l).
-  Proof.
-    intros Hlt.
-    destruct (list_to_gmap_stack s !! (m, l)) eqn:Hsome.
-    - apply list_to_gmap_stack_lookup_Some in Hsome as Hlt'.
-      rewrite /list_to_gmap_stack lookup_gmap_uncurry.
-      rewrite /list_to_gmap_stack lookup_gmap_uncurry in Hsome.
-      destruct (list_to_gmap_stack_fix s 0 !! m) eqn:Hsome';[|done].
-      simpl in Hsome. 
+  (* Lemma list_to_gmap_lookup_stack_cut n s m l : *)
+  (*   m < n -> *)
+  (*   (list_to_gmap_stack (stack_cut n s)) !! (m, l) = (list_to_gmap_stack s) !! (m, l). *)
+  (* Proof. *)
+  (*   intros Hlt. *)
+  (*   destruct (list_to_gmap_stack s !! (m, l)) eqn:Hsome. *)
+  (*   - apply list_to_gmap_stack_lookup_Some in Hsome as Hlt'. *)
+  (*     rewrite /list_to_gmap_stack lookup_gmap_uncurry. *)
+  (*     rewrite /list_to_gmap_stack lookup_gmap_uncurry in Hsome. *)
+  (*     destruct (list_to_gmap_stack_fix s 0 !! m) eqn:Hsome';[|done]. *)
+  (*     simpl in Hsome.  *)
 
       
-  Admitted.
+  (* Admitted. *)
 
-  Lemma stack_cut_list_to_gmap_stack (s : stack) (n : nat) :
-    stack_cut_rel n (list_to_gmap_stack s) (list_to_gmap_stack (stack_cut n s)).
-  Proof.
-    revert n; induction s using rev_ind;intros n.
-    - unfold list_to_gmap_stack.
-      constructor;auto.
-    - (* unfold list_to_gmap_stack. *)
-      (* rewrite list_to_gmap_stack_fix_snoc. *)
-      (* rewrite stack_cut_snoc. *)
-      constructor.
-      + intros m l v Hsome Hlt.
-        apply list_to_gmap_stack_lookup_Some in Hsome as Hlt'.
-        (* unfold list_to_gmap_stack. *)
-        rewrite app_length /= in Hlt'.
-        destruct (decide (n <= length s)).
-        * rewrite stack_cut_snoc//.
-          assert (m < length s);[lia|].
-          rewrite list_to_gmap_lookup_snoc// in Hsome.
-  Admitted.
+  (* Lemma stack_cut_list_to_gmap_stack (s : stack) (n : nat) : *)
+  (*   stack_cut_rel n (list_to_gmap_stack s) (list_to_gmap_stack (stack_cut n s)). *)
+  (* Proof. *)
+  (*   revert n; induction s using rev_ind;intros n. *)
+  (*   - unfold list_to_gmap_stack. *)
+  (*     constructor;auto. *)
+  (*   - (* unfold list_to_gmap_stack. *) *)
+  (*     (* rewrite list_to_gmap_stack_fix_snoc. *) *)
+  (*     (* rewrite stack_cut_snoc. *) *)
+  (*     constructor. *)
+  (*     + intros m l v Hsome Hlt. *)
+  (*       apply list_to_gmap_stack_lookup_Some in Hsome as Hlt'. *)
+  (*       (* unfold list_to_gmap_stack. *) *)
+  (*       rewrite app_length /= in Hlt'. *)
+  (*       destruct (decide (n <= length s)). *)
+  (*       * rewrite stack_cut_snoc//. *)
+  (*         assert (m < length s);[lia|]. *)
+  (*         rewrite list_to_gmap_lookup_snoc// in Hsome. *)
+  (* Admitted. *)
   
   
 End pop_func.

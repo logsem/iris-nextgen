@@ -4,8 +4,7 @@
     Original author: Amin Timany *)
 
 (** Some derived lemmas for ectx-based languages with continuations *)
-From iris.program_logic Require Export weakestpre.
-From iris.program_logic Require Export lifting.
+From self.case_study.program_logic Require Export lifting weakestpre.
 From self.case_study Require Export CC_ectx_language.
 From iris.proofmode Require Import tactics.
 Set Default Proof Using "Type".
@@ -31,12 +30,12 @@ Hint Resolve head_prim_reducible
 
 Lemma wp_lift_nonthrow_head_step_fupdN {s E Φ} K e1 :
   to_val e1 = None →
-  (∀ σ1 ns κ κs nt, state_interp σ1 ns (κ ++ κs) nt ={E,∅}=∗
+  (∀ σ1 ns κ κs nt, (⚡={next_state σ1}=> |==> state_interp σ1 ns (κ ++ κs) nt) ={E,∅}=∗
     ⌜head_nonthrow_reducible K e1 σ1⌝ ∗
     ∀ rm e2 σ2 efs, ⌜head_step K e1 σ1 κ e2 σ2 efs rm⌝ -∗
       £ (S (num_laters_per_step ns))
       ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-      state_interp σ2 (S ns) κs (length efs + nt) ∗ WP fill K e2 @ s; E {{ Φ }} ∗
+      (⚡={next_state σ2}=> |==> state_interp σ2 (S ns) κs (length efs + nt)) ∗ WP fill K e2 @ s; E {{ Φ }} ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ v, fork_post v }})
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
 Proof.
@@ -52,10 +51,10 @@ Qed.
 
 Lemma wp_lift_nonthrow_head_step {s E Φ} K e1 :
   to_val e1 = None →
-  (∀ σ1 ns κ κs nt, state_interp σ1 ns (κ ++ κs) nt ={E,∅}=∗
+  (∀ σ1 ns κ κs nt, (⚡={next_state σ1}=> |==> state_interp σ1 ns (κ ++ κs) nt) ={E,∅}=∗
     ⌜head_nonthrow_reducible K e1 σ1⌝ ∗
     ▷ ∀ rm e2 σ2 efs, ⌜head_step K e1 σ1 κ e2 σ2 efs rm⌝ -∗
-      £ 1 ={∅,E}=∗ state_interp σ2 (S ns) κs (length efs + nt) ∗ WP fill K e2 @ s; E {{ Φ }} ∗
+      £ 1 ={∅,E}=∗ (⚡={next_state σ2}=> |==> state_interp σ2 (S ns) κs (length efs + nt)) ∗ WP fill K e2 @ s; E {{ Φ }} ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ v, fork_post v }})
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
 Proof.
@@ -71,12 +70,12 @@ Qed.
 
 Lemma wp_lift_throw_head_step_fupdN {s E Φ} K e1 :
   to_val e1 = None →
-  (∀ σ1 ns κ κs nt, state_interp σ1 ns (κ ++ κs) nt ={E,∅}=∗
+  (∀ σ1 ns κ κs nt, (⚡={next_state σ1}=> |==> state_interp σ1 ns (κ ++ κs) nt) ={E,∅}=∗
     ⌜head_throw_reducible K e1 σ1⌝ ∗
     ∀ e2 σ2 efs, ⌜head_step K e1 σ1 κ e2 σ2 efs ThrowMode⌝ -∗
       £ (S (num_laters_per_step ns))
       ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-      state_interp σ2 (S ns) κs (length efs + nt) ∗ WP e2 @ s; E {{ Φ }} ∗
+      (⚡={next_state σ2}=> |==> state_interp σ2 (S ns) κs (length efs + nt)) ∗ WP e2 @ s; E {{ Φ }} ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ v, fork_post v }})
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
 Proof.
@@ -91,10 +90,10 @@ Qed.
 
 Lemma wp_lift_throw_head_step {s E Φ} K e1 :
   to_val e1 = None →
-  (∀ σ1 ns κ κs nt, state_interp σ1 ns (κ ++ κs) nt ={E,∅}=∗
+  (∀ σ1 ns κ κs nt, (⚡={next_state σ1}=> |==> state_interp σ1 ns (κ ++ κs) nt) ={E,∅}=∗
     ⌜head_throw_reducible K e1 σ1⌝ ∗
     ▷ ∀ e2 σ2 efs, ⌜head_step K e1 σ1 κ e2 σ2 efs ThrowMode⌝ -∗
-       £ 1 ={∅,E}=∗ state_interp σ2 (S ns) κs (length efs + nt) ∗ WP e2 @ s; E {{ Φ }} ∗
+       £ 1 ={∅,E}=∗ (⚡={next_state σ2}=> |==> state_interp σ2 (S ns) κs (length efs + nt)) ∗ WP e2 @ s; E {{ Φ }} ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ v, fork_post v }})
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
 Proof.
@@ -152,10 +151,10 @@ Qed.
    operational steps as atomic throw steps don't happen in practice! *)
 Lemma wp_lift_nonthrow_atomic_head_step {s E Φ} K e1 :
   to_val e1 = None →
-  (∀ σ1 ns κ κs nt, state_interp σ1 ns (κ ++ κs) nt ={E}=∗
+  (∀ σ1 ns κ κs nt, (⚡={next_state σ1}=> |==> state_interp σ1 ns (κ ++ κs) nt) ={E}=∗
     ⌜head_nonthrow_reducible K e1 σ1⌝ ∗
     ▷ ∀ rm e2 σ2 efs, ⌜head_step K e1 σ1 κ e2 σ2 efs rm⌝ -∗
-      £ 1 ={E}=∗ state_interp σ2 (S ns) κs (length efs + nt) ∗
+      £ 1 ={E}=∗ (⚡={next_state σ2}=> |==> state_interp σ2 (S ns) κs (length efs + nt)) ∗
       from_option (λ v, WP fill K (of_val v) @ s; E {{Φ}}) False (to_val e2) ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ v, fork_post v }})
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
@@ -174,10 +173,10 @@ Qed.
 
 Lemma wp_lift_nonthrow_atomic_head_step_no_fork {s E Φ} K e1 :
   to_val e1 = None →
-  (∀ σ1 ns κ κs nt, state_interp σ1 ns (κ ++ κs) nt ={E}=∗
+  (∀ σ1 ns κ κs nt, (⚡={next_state σ1}=> |==> state_interp σ1 ns (κ ++ κs) nt) ={E}=∗
     ⌜head_nonthrow_reducible K e1 σ1⌝ ∗
     ▷ ∀ rm e2 σ2 efs, ⌜head_step K e1 σ1 κ e2 σ2 efs rm⌝ -∗ £ 1 ={E}=∗
-      ⌜efs = []⌝ ∗ state_interp σ2 (S ns) κs (length efs + nt) ∗
+      ⌜efs = []⌝ ∗ (⚡={next_state σ2}=> |==> state_interp σ2 (S ns) κs (length efs + nt)) ∗
       from_option (λ v, WP fill K (of_val v) @ s; E {{Φ}}) False (to_val e2))
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
 Proof.

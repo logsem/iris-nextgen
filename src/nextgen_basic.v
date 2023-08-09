@@ -1,7 +1,7 @@
 (* The basic nextgen modality. *)
 
 From iris.proofmode Require Import classes tactics.
-From iris.base_logic.lib Require Export iprop own invariants.
+From iris.base_logic.lib Require Export iprop own invariants fancy_updates.
 From iris.prelude Require Import options.
 
 From self Require Import cmra_morphism_extra.
@@ -230,6 +230,15 @@ Section bnextgen_rules_cmra_morphism.
   Local Arguments uPred_holds {_} !_ _ _ /.
 
   Ltac unseal := try uPred.unseal; rewrite !uPred_bnextgen_unseal !/uPred_holds /=.
+
+  Lemma bnextgen_wand_1 P Q :
+    (⚡={f}=> P -∗ Q) ⊢ ((⚡={f}=> P) -∗ (⚡={f}=> Q)).
+  Proof.
+    unseal. split. intros ?? Hx Hi.
+    simpl in *. intros.  apply Hi in H1;auto.
+    - rewrite cmra_morphism_op//.
+    - rewrite -cmra_morphism_op. apply cmra_morphism_validN =>//.
+  Qed.
 
   Lemma bnextgen_sep_2 P Q :
     (⚡={f}=> P) ∗ (⚡={f}=> Q) ⊢ ⚡={f}=> (P ∗ Q) .

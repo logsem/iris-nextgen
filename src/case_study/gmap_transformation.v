@@ -30,8 +30,8 @@ Class mapTrans (L : Type) (V : ofe) `{EqDecision L, Countable L} :=
   v_discrete : forall (v : V), Discrete v
 }.
 
-Record ghost_mapGS (L V : Type) (Σ : gFunctors) (EqDecision0 : EqDecision L) (H : Countable L) : Set := GhostMapGS
-  { ghost_map_inG : inG Σ (gmap_viewR L (leibnizO V));  ghost_name : gname }.
+(* Record ghost_mapGS (L V : Type) (Σ : gFunctors) (EqDecision0 : EqDecision L) (H : Countable L) : Set := GhostMapGS *)
+(*   { ghost_map_inG : inG Σ (gmap_viewR L (leibnizO V));  ghost_name : gname }. *)
 
 Fixpoint option_list_collapse_list {A : Type} (l : list (option A)) : list A :=
   match l with
@@ -674,7 +674,7 @@ Proof.
   rewrite H0 in Hcontr. done.
 Qed.
   
-Global Instance gmapTrans_frag_lift_CmraMorphism {K : Type} (V : ofe) (eqK : EqDecision K) {countK : Countable K}
+Global Instance gmapTrans_frag_lift_CmraMorphism {K : Type} {V : ofe} {eqK : EqDecision K} {countK : Countable K}
   (gt : mapTrans K V) :  CmraMorphism (gmapTrans_frag_lift gt).
 Proof.
   split.
