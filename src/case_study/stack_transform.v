@@ -1,7 +1,7 @@
-From self.case_study Require Export stack_lang gmap_transformation.
+From self.case_study Require Export stack_lang.
 From stdpp Require Import fin_maps.
 From iris.algebra Require Import gmap.
-From self Require Import nextgen_basic gen_trans.
+From self Require Import nextgen_basic gen_trans gmap_view_transformation.
 Set Default Proof Using "Type".
 
 
@@ -104,22 +104,12 @@ Section pop_func.
       rewrite bool_decide_false //.
   Qed.
 
-  Program Definition stack_mapTrans (n : nat) : mapTrans (nat * loc) (leibnizO val) :=
-    {|
-      map_trans_auth := (stack_cut n);
-      map_trans_frag := (stack_location_cut n);
-
-      map_trans_incl := (stack_map_trans_incl n);
-
-      map_trans_frag_discard_all := (stack_map_trans_frag_discard_all n);
-  
-      map_trans_auth_ne := (stack_cut_ne n);
-      map_trans_frag_ne := (stack_location_cut_ne n);
-      
-      v_leibniz := _;
-      v_discrete := _
-    |}.
-  
+  Global Instance stack_mapTrans (n : nat) : MapTrans (stack_location_cut n).
+  Proof.
+    split.
+    - apply stack_map_trans_frag_discard_all.
+    - apply stack_location_cut_ne.
+  Qed.
     
   Inductive stack_cut_rel : nat -> gmap (nat * loc) val -> gmap (nat * loc) val -> Prop :=
   | stack_cut_rel_cond (n : nat) (σ : gmap (nat * loc) val) (σ' : gmap (nat * loc) val) :

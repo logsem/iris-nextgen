@@ -63,11 +63,52 @@ Section bnextgen_rules.
   Lemma bnextgen_ownM_inv' (a : M) b :
     (∀ x n, b ≼{n} f x → a ≼{n} x) →
     (⚡={f}=> uPred_ownM b) ⊢ uPred_ownM a.
+  Proof. intros H. unseal. split. simpl. intros n x Hv ?. apply H. done. Qed.
+
+  (* If the transformation is contractive, ie. _only_ removes things, then
+   * we can eliminate it. *)
+  Lemma bnextgen_elim_contractive P :
+    (∀ x n, f x ≼{n} x) →
+    (⚡={f}=> P) ⊢ P.
   Proof.
-    intros H. unseal. split. simpl. intros n x Hv ?. apply H. done.
+    intros ?. unseal. split. simpl. intros. eapply uPred_mono; done.
   Qed.
 
-  Lemma bnextgen_ownM_inv (a : M) g
+  (* If we own an element [a], we have a lower bound on elements for which we
+   * have to show that [f] is contractive. *)
+  Lemma bnextgen_elim_ownM_contractive (a : M) P :
+    (∀ x n, a ≼{n} x → f x ≼{n} x) →
+    uPred_ownM a ∧ (⚡={f}=> P) ⊢ uPred_ownM a ∧ P.
+  Proof.
+    intros incl. unseal. split. simpl. intros ??? [??].
+    split; first done. eapply uPred_mono; eauto.
+  Qed.
+
+  Lemma bnextgen_elim_ownM_fupd_contractive (a : M) P :
+    (∀ x yf k, (* This condition is probably too strong. *)
+      ✓{k} (x ⋅ yf) →
+      a ≼{k} f x →
+      ✓{k} (f x ⋅ yf)) →
+    uPred_ownM a ∧ (|==> ⚡={f}=> uPred_ownM a ∧ P) ⊢
+    uPred_ownM a ∧ |==> P.
+  Proof.
+    intros cond. unseal. split. simpl. intros ? initX ? [xLb updNgOwn].
+    split; first done.
+    intros.
+    destruct (updNgOwn _ _ H0 H1) as (xUpd & ? & ? & ?).
+    eexists _. split; last done.
+    apply cond; done.
+  Qed.
+
+  Lemma bnextgen_elim_ownM_2 (a b c : M) :
+    (∀ x n, a ≼{n} x → b ≼{n} f x → c ≼{n} x) →
+    uPred_ownM a ∧ (⚡={f}=> uPred_ownM b) ⊢
+    uPred_ownM c.
+  Proof.
+    intros incl. unseal. split. simpl. intros ??? [??]. apply incl; done.
+  Qed.
+
+  Lemma bnextgen_elim_ownM_inv (a : M) g
       `{mono : ∀ n, Proper (includedN n ==> includedN n) g} :
     (∀ a, g (f a) = a) →
     (⚡={f}=> uPred_ownM a) ⊢ uPred_ownM (g a).

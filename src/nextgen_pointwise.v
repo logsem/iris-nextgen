@@ -151,6 +151,11 @@ Section nextgen_inG.
       done.
   Qed.
 
+  #[global]
+  Instance own_into_bgupd γ t `{!CmraMorphism t} (a : A) :
+      IntoBnextgen (trans_single γ t) (own γ a) (own γ (t a)) :=
+    trans_single_own γ t a.
+
   Lemma trans_single_own_other {B : cmra} γ t `{!CmraMorphism t}
       γ' (b : B) `{i' : inG Σ B} :
     A ≠ B →
@@ -175,4 +180,31 @@ Section nextgen_inG.
     done.
   Qed.
 
+  (* #[global] *)
+  Lemma own_other_into_bgupd γ t `{!CmraMorphism t} γ2 {B : cmra} (b : B) `{i' : inG Σ B} :
+    A ≠ B → IntoBnextgen (trans_single γ t) (own γ2 b) (own γ2 b).
+  Proof. apply (trans_single_own_other γ t γ2 b). Qed.
+
 End nextgen_inG.
+
+#[export]
+Hint Extern 1 (IntoBnextgen _ _ _) => eapply own_other_into_bgupd; done : typeclass_instances.
+
+Section test_trans_single.
+    Context `{i1 : inG Σ natR} `{i2 : inG Σ unitR}.
+
+    Instance const_cmra_morphism n : CmraMorphism (const n : natR → natR).
+    Proof. Admitted.
+
+    Lemma test γ1 γ2 :
+      ⊢ own γ1 (0 : natR) -∗ own γ2 (() : unitR) -∗
+      ⚡={trans_single γ1 (const 4)}=>
+        own γ1 (4 : natR) ∗ own γ2 (() : unitR).
+    Proof.
+      assert (natR ≠ unitR). { admit. (* Arg, this is not easy to prove. *) }
+      iIntros "O1 O2".
+      iModIntro.
+      iFrame.
+    Admitted.
+
+End test_trans_single.

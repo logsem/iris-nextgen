@@ -17,7 +17,7 @@ From self Require Import cmra_morphism_extra.
 
 Definition gen_nc (A : cmra) : Type := option A * option A.
 Definition gen_ncR (A : cmra) : cmra := prodR (optionR A) (optionR A).
-Definition gen_ncUR (A : ucmra) : cmra := prodUR (optionUR A) (optionUR A).
+Definition gen_ncUR (A : cmra) : cmra := prodUR (optionUR A) (optionUR A).
 
 Definition gen_nc_trans {A : cmra} (p : gen_nc A) : gen_nc A :=
   match p with (a_p, a_v) => (a_p, a_p) end.

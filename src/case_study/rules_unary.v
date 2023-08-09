@@ -3,10 +3,10 @@ From iris.algebra Require Export list excl_auth.
 (* From iris.program_logic Require Export weakestpre. *)
 From self.case_study.program_logic Require Import CC_ectx_lifting
      CC_ectxi_language CC_ectx_lifting weakestpre.
-From self.case_study Require Export stack_lang gmap_transformation stack_transform.
+From self.case_study Require Export stack_lang stack_transform.
 From iris.proofmode Require Import tactics.
 From stdpp Require Import fin_maps.
-From self Require Import nextgen_basic gen_trans nextgen_pointwise.
+From self Require Import nextgen_basic gen_trans nextgen_pointwise gmap_view_transformation .
 From self.case_study Require Import stack_transform.
 Set Default Proof Using "Type".
 Import uPred.
@@ -60,7 +60,7 @@ End StackSize.
 Instance gmap_view_inG `{heapGS Σ} : inG Σ (gmap_view.gmap_viewR (nat * loc) (leibnizO val)).
 Proof. destruct H,heapG_gen_stackGS0,gen_heap_inG,gen_heapGpreS_heap =>//. Qed.
 
-Definition state_trans (σ : state) := (gmapTrans_lift (stack_mapTrans (length σ.2))).
+Definition state_trans (σ : state) := (map_entry_lift_gmap_view (stack_location_cut (length σ.2))).
 Definition stack_gname `{heapGS Σ} := gen_heap_name heapG_gen_stackGS.
 
 Lemma intro_id {PROP: bi} (P : PROP) : (P ⊢ P)%I. Proof. auto. Qed.
@@ -263,7 +263,7 @@ Section lifting.
     iDestruct (gen_heap_alloc_stack_ng _ ns κs nt l v0 with "Hstate") as "Hstate".
     { apply lookup_lt_is_Some. auto. }
     { simpl. rewrite /lookup_stack /= in H4. admit. }
-
+    
     
     
     simpl. simpl. simpl. unfold lookup_stack in H4.
