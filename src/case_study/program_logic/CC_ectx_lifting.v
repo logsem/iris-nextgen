@@ -4,15 +4,16 @@
     Original author: Amin Timany *)
 
 (** Some derived lemmas for ectx-based languages with continuations *)
-From iris.program_logic Require Export weakestpre.
-From iris.program_logic Require Export lifting.
+From nextgen.case_study.program_logic Require Export weakestpre.
+From nextgen.case_study.program_logic Require Export lifting.
 From nextgen.case_study Require Export CC_ectx_language.
+(* From nextgen Require Import nextgen_basic gmap_view_transformation. *)
 From iris.proofmode Require Import tactics.
 Set Default Proof Using "Type".
 
 Section wp.
 Context {expr val ectx state observation} {Λ : CCEctxLanguage expr val ectx state observation}.
-Context `{irisGS (CC_ectx_lang expr) Σ} {Hinh : Inhabited state}.
+Context `{irisGS_gen hls (CC_ectx_lang expr) Σ} {Hinh : Inhabited state}.
 Implicit Types P : iProp Σ.
 Implicit Types Φ : val → iProp Σ.
 Implicit Types v : val.

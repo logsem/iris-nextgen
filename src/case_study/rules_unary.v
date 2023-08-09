@@ -3,10 +3,10 @@ From iris.algebra Require Export list excl_auth.
 From iris.program_logic Require Export weakestpre.
 From nextgen.case_study.program_logic Require Import CC_ectx_lifting
      CC_ectxi_language CC_ectx_lifting.
-From nextgen.case_study Require Export stack_lang.
+From nextgen.case_study Require Export stack_lang stack_transform.
 From iris.proofmode Require Import tactics.
 From stdpp Require Import fin_maps.
-From nextgen Require Import nextgen_basic gen_trans gmap_view_transformation.
+From nextgen Require Import nextgen_basic gen_trans gmap_view_transformation nextgen_pointwise.
 Set Default Proof Using "Type".
 Import uPred.
 
@@ -64,7 +64,7 @@ Definition stack_gname `{heapGS Σ} := gen_heap_name heapG_gen_stackGS.
 
 Lemma intro_id {PROP: bi} (P : PROP) : (P ⊢ P)%I. Proof. auto. Qed.
 
-Instance heapG_irisGS `{heapGS Σ} : irisGS lang Σ := {
+Instance heapG_irisGS `{heapGS Σ} : irisGS_gen _ lang Σ := {
     iris_invGS := heapG_invGS;
     next_state σ :=
       trans_single stack_gname (state_trans σ);
@@ -263,60 +263,60 @@ Section lifting.
     { apply lookup_lt_is_Some. auto. }
     { simpl. rewrite /lookup_stack /= in H4. admit. }
     
+    Abort.
+    
+    (* simpl. simpl. simpl. unfold lookup_stack in H4. *)
+    (* simpl in H4. rewrite H4. insert_state. *)
     
     
-    simpl. simpl. simpl. unfold lookup_stack in H4.
-    simpl in H4. rewrite H4. insert_state.
     
-    
-    
-    iAssert (⚡={next_state (h1, s1)}=> _ ∗ _ ∗ _)%I with "[Hstate]" as "Hl".
-    { iModIntro. iDestruct "Hstate" as "(Hh & Hstk & Hsize) /=".
-      iSplitR "Hh Hsize";[|iSplitL "Hh";[iExact "Hh"|iExact "Hsize"] ].
-      iApply (gen_heap_alloc with "Hstk"). admit. }
+    (* iAssert (⚡={next_state (h1, s1)}=> _ ∗ _ ∗ _)%I with "[Hstate]" as "Hl". *)
+    (* { iModIntro. iDestruct "Hstate" as "(Hh & Hstk & Hsize) /=". *)
+    (*   iSplitR "Hh Hsize";[|iSplitL "Hh";[iExact "Hh"|iExact "Hsize"] ]. *)
+    (*   iApply (gen_heap_alloc with "Hstk"). admit. } *)
     
     
 
   (** Control flow -- stateful due to stack frames *)
-  Lemma wp_call_global K E n k x e1 e2 v2' v2 Φ `{!IntoVal e2 v2} :
-    shift_val v2 (-1) = v2' ->
-    ▷ ([size] (S n) -∗ WP fill K (Return (Cont (-1) K) (subst' k (ContV (-1) K) (subst' x v2' e1))) @ E {{ Φ }})
-      ∗ ▷ [size] n
-      ⊢ WP fill K (Call (Lam global k x e1) e2) @ E {{ Φ }}.
-  Proof.
-    iIntros (Hshift) "[HΦ >Hs]".
-    iApply wp_lift_nonthrow_head_step; auto.
-    iIntros ([h1 s1] ns κ κs nt) "(Hh & Hstk & Hsize) /=".
-    iDestruct (stacksize_own_agree with "[$]") as %Heq;subst.
-    iMod (stacksize_own_update (S (length s1)) with "[$]") as "[Hsize Hs]".
-    iApply fupd_mask_intro;[set_solver|]. iIntros "Hcls".
-    iSplit. { iPureIntro. exists CaptureMode. repeat econstructor; eauto. }
-    iNext. iIntros (rm r0 σ2 efs Hstep) "Hp".
-    inv_head_step. iMod "Hcls". iModIntro.
-    rewrite list_to_gmap_stack_push_stack push_stack_length.
-    iFrame. iApply "HΦ". iFrame.
-  Qed.
+  (* Lemma wp_call_global K E n k x e1 e2 v2' v2 Φ `{!IntoVal e2 v2} : *)
+  (*   shift_val v2 (-1) = v2' -> *)
+  (*   ▷ ([size] (S n) -∗ WP fill K (Return (Cont (-1) K) (subst' k (ContV (-1) K) (subst' x v2' e1))) @ E {{ Φ }}) *)
+  (*     ∗ ▷ [size] n *)
+  (*     ⊢ WP fill K (Call (Lam global k x e1) e2) @ E {{ Φ }}. *)
+  (* Proof. *)
+  (*   iIntros (Hshift) "[HΦ >Hs]". *)
+  (*   iApply wp_lift_nonthrow_head_step; auto. *)
+  (*   iIntros ([h1 s1] ns κ κs nt) "(Hh & Hstk & Hsize) /=". *)
+  (*   iDestruct (stacksize_own_agree with "[$]") as %Heq;subst. *)
+  (*   iMod (stacksize_own_update (S (length s1)) with "[$]") as "[Hsize Hs]". *)
+  (*   iApply fupd_mask_intro;[set_solver|]. iIntros "Hcls". *)
+  (*   iSplit. { iPureIntro. exists CaptureMode. repeat econstructor; eauto. } *)
+  (*   iNext. iIntros (rm r0 σ2 efs Hstep) "Hp". *)
+  (*   inv_head_step. iMod "Hcls". iModIntro. *)
+  (*   rewrite list_to_gmap_stack_push_stack push_stack_length. *)
+  (*   iFrame. iApply "HΦ". iFrame. *)
+  (* Qed. *)
 
-  Lemma wp_call_local K E n i k x e1 e2 e1' v2' v2 Φ `{!IntoVal e2 v2} :
-    scope_tag (local i) ->
-    shift_expr e1 (i - 1) = e1' ->
-    shift_val v2 (-1) = v2' ->
-    ▷ ([size] (S n) -∗ WP fill K (Return (Cont (-1) K) (subst' k (ContV (-1) K) (subst' x v2' e1'))) @ E {{ Φ }})
-      ∗ ▷ [size] n
-      ⊢ WP fill K (Call (Lam (local i) k x e1) e2) @ E {{ Φ }}.
-  Proof.
-    iIntros (Hscope Hshift1 Hshift2) "[HΦ >Hs]".
-    iApply wp_lift_nonthrow_head_step; auto.
-    iIntros ([h1 s1] ns κ κs nt) "(Hh & Hstk & Hsize) /=".
-    iDestruct (stacksize_own_agree with "[$]") as %Heq;subst.
-    iMod (stacksize_own_update (S (length s1)) with "[$]") as "[Hsize Hs]".
-    iApply fupd_mask_intro;[set_solver|]. iIntros "Hcls".
-    iSplit. { iPureIntro. exists CaptureMode. repeat econstructor; eauto. }
-    iNext. iIntros (rm r0 σ2 efs Hstep) "Hp".
-    inv_head_step. iMod "Hcls". iModIntro.
-    rewrite list_to_gmap_stack_push_stack push_stack_length.
-    iFrame. iApply "HΦ". iFrame.
-  Qed.
+  (* Lemma wp_call_local K E n i k x e1 e2 e1' v2' v2 Φ `{!IntoVal e2 v2} : *)
+  (*   scope_tag (local i) -> *)
+  (*   shift_expr e1 (i - 1) = e1' -> *)
+  (*   shift_val v2 (-1) = v2' -> *)
+  (*   ▷ ([size] (S n) -∗ WP fill K (Return (Cont (-1) K) (subst' k (ContV (-1) K) (subst' x v2' e1'))) @ E {{ Φ }}) *)
+  (*     ∗ ▷ [size] n *)
+  (*     ⊢ WP fill K (Call (Lam (local i) k x e1) e2) @ E {{ Φ }}. *)
+  (* Proof. *)
+  (*   iIntros (Hscope Hshift1 Hshift2) "[HΦ >Hs]". *)
+  (*   iApply wp_lift_nonthrow_head_step; auto. *)
+  (*   iIntros ([h1 s1] ns κ κs nt) "(Hh & Hstk & Hsize) /=". *)
+  (*   iDestruct (stacksize_own_agree with "[$]") as %Heq;subst. *)
+  (*   iMod (stacksize_own_update (S (length s1)) with "[$]") as "[Hsize Hs]". *)
+  (*   iApply fupd_mask_intro;[set_solver|]. iIntros "Hcls". *)
+  (*   iSplit. { iPureIntro. exists CaptureMode. repeat econstructor; eauto. } *)
+  (*   iNext. iIntros (rm r0 σ2 efs Hstep) "Hp". *)
+  (*   inv_head_step. iMod "Hcls". iModIntro. *)
+  (*   rewrite list_to_gmap_stack_push_stack push_stack_length. *)
+  (*   iFrame. iApply "HΦ". iFrame. *)
+  (* Qed. *)
 
 (*| ReturnS K K' i e e' v σ :
     to_val e = Some v ->
@@ -335,13 +335,13 @@ Section lifting.
   Proof.
     iIntros (Hle Hlen Hshift) "[HΦ >Hn]".
     iApply wp_lift_throw_head_step;auto.
-    iIntros ([h1 s1] ns κ κs nt) "(Hh & Hstk & Hsize) /=".
-    iDestruct (stacksize_own_agree with "[$]") as %Heq;subst.
-    iMod (stacksize_own_update (length s1 - Z.abs_nat i) with "[$]") as "[Hsize Hs]".
-    iApply fupd_mask_intro;[set_solver|]. iIntros "Hcls".
-    iSplit. { iPureIntro. repeat econstructor; eauto. }
-    iNext. iIntros (r0 σ2 efs Hstep) "Hp".
-    inv_head_step. iMod "Hcls". iModIntro. iFrame.
+    (* iIntros ([h1 s1] ns κ κs nt) "(Hh & Hstk & Hsize) /=". *)
+    (* iDestruct (stacksize_own_agree with "[$]") as %Heq;subst. *)
+    (* iMod (stacksize_own_update (length s1 - Z.abs_nat i) with "[$]") as "[Hsize Hs]". *)
+    (* iApply fupd_mask_intro;[set_solver|]. iIntros "Hcls". *)
+    (* iSplit. { iPureIntro. repeat econstructor; eauto. } *)
+    (* iNext. iIntros (r0 σ2 efs Hstep) "Hp". *)
+    (* inv_head_step. iMod "Hcls". iModIntro. iFrame. *)
   Abort.
 (** TODO: change the state interpretation such that there is no need to deallocate points to's:
  two possibilities:
