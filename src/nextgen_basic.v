@@ -4,8 +4,8 @@ From iris.proofmode Require Import classes tactics.
 From iris.base_logic.lib Require Export iprop own invariants.
 From iris.prelude Require Import options.
 
-From self Require Import cmra_morphism_extra.
-From self Require Export gen_trans.
+From nextgen Require Import cmra_morphism_extra.
+From nextgen Require Export gen_trans.
 Import uPred.
 
 (** When working in the model, it is convenient to be able to treat [uPred] as

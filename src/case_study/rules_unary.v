@@ -1,12 +1,12 @@
 From iris.base_logic Require Export gen_heap.
 From iris.algebra Require Export list excl_auth.
 From iris.program_logic Require Export weakestpre.
-From self.case_study.program_logic Require Import CC_ectx_lifting
+From nextgen.case_study.program_logic Require Import CC_ectx_lifting
      CC_ectxi_language CC_ectx_lifting.
-From self.case_study Require Export stack_lang gmap_transformation.
+From nextgen.case_study Require Export stack_lang.
 From iris.proofmode Require Import tactics.
 From stdpp Require Import fin_maps.
-From self Require Import nextgen_basic gen_trans.
+From nextgen Require Import nextgen_basic gen_trans gmap_view_transformation.
 Set Default Proof Using "Type".
 Import uPred.
 

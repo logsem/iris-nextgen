@@ -1,4 +1,4 @@
-From self Require Import nextgen_basic.
+From nextgen Require Import nextgen_basic.
 
 Import uPred.
 

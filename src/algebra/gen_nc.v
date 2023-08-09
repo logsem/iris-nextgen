@@ -13,7 +13,7 @@
 
 From iris.algebra Require Import cmra.
 
-From self Require Import cmra_morphism_extra.
+From nextgen Require Import cmra_morphism_extra.
 
 Definition gen_nc (A : cmra) : Type := option A * option A.
 Definition gen_ncR (A : cmra) : cmra := prodR (optionR A) (optionR A).

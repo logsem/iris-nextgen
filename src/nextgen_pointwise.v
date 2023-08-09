@@ -5,7 +5,7 @@ From iris.prelude Require Import options.
 
 Import EqNotations. (* Get the [rew] notation. *)
 
-From self Require Import nextgen_basic.
+From nextgen Require Import nextgen_basic.
 
 #[global]
 (* The functor in [Σ] at index [i] applied to [iProp]. *)

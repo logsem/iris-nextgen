@@ -1,4 +1,4 @@
--Q src self
+-Q src nextgen
 
 # Perennial-disabled warnings
 -arg -w -arg -ssr-search-moved

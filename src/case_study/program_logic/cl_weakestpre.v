@@ -4,7 +4,7 @@
     Original author: Amin Timany *)
 
 From iris.program_logic Require Export weakestpre.
-From self.case_study.program_logic Require Import CC_ectx_language CC_ectxi_language CC_ectx_lifting.
+From nextgen.case_study.program_logic Require Import CC_ectx_language CC_ectxi_language CC_ectx_lifting.
 
 From iris.proofmode Require Import tactics.
 Set Default Proof Using "Type".
