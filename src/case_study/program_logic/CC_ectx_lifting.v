@@ -30,97 +30,131 @@ Hint Resolve head_prim_reducible
      head_nonthrow_reducible_prim_step
      head_throw_reducible_prim_step : core.
 
+Lemma step_upd_fupdN_fupd_mono ns E P Q :
+  (P ⊢ Q) ->
+  (|={∅}▷=>
+     |={∅}▷=>^(num_laters_per_step ns)
+       |={∅,E}=> P) ⊢
+    |={∅}▷=>
+        |={∅}▷=>^(num_laters_per_step ns)
+          |={∅,E}=> Q.
+Proof.
+  intros HP.
+  iIntros "H".
+  iMod "H". iModIntro. iNext.
+  iMod "H". iModIntro.
+  iApply (step_fupdN_mono with "H").
+  iIntros "H".
+  iMod "H". iModIntro. iApply HP. auto.
+Qed.
+  
 Lemma wp_lift_nonthrow_head_step_fupdN {s E Φ} K e1 :
   to_val e1 = None →
-  (∀ σ1 ns κ κs nt, (⚡={next_state σ1}=> |==> state_interp σ1 ns (κ ++ κs) nt) ={E,∅}=∗
+  (∀ σ1 ns κ κs nt, (state_interp σ1 ns (κ ++ κs) nt) ={E,∅}=∗
     ⌜head_nonthrow_reducible K e1 σ1⌝ ∗
     ∀ rm e2 σ2 efs, ⌜head_step K e1 σ1 κ e2 σ2 efs rm⌝ -∗
       £ (S (num_laters_per_step ns))
       ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-      (⚡={next_state σ2}=> |==> state_interp σ2 (S ns) κs (length efs + nt)) ∗ WP fill K e2 @ s; E {{ Φ }} ∗
+      (state_interp σ2 (S ns) κs (length efs + nt)) ∗ (⚡={next_state (next_a e1 s.2)}=> WP fill K e2 @ s; E {{ Φ }}) ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ v, fork_post v }})
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
 Proof.
   iIntros (?) "H". iApply wp_lift_step_fupdN=>//; eauto using CC_fill_not_val.
-  iIntros (σ1 ns κ κs nt) "Hσ".
+  iIntros (σ1 ns κ κs nt) "Hσ". destruct s as [s a];simpl.
   iMod ("H" $! σ1 with "Hσ") as "[% H]"; iModIntro.
-  iSplit; first by destruct s; eauto. iIntros (e2 σ2 efs) "H1 Ht".
+  simpl. iSplit; first by destruct s; eauto. iIntros (e2 σ2 efs) "H1 Ht".
   iDestruct "H1" as %Hps.
   eapply head_nonthrow_reducible_prim_step in Hps; eauto.
   destruct Hps as (?&e2'&?&?&Hps); subst.
-  iApply "H". by eauto. iFrame.
+  iSpecialize ("H" $! _ _ _ _ Hps with "Ht").
+  iApply (step_upd_fupdN_fupd_mono with "H").
+  iIntros "[$ [H $]]".
+  iApply bnextgen_extensional_eq;[|iFrame "H"].
+  rewrite -next_state_ctx //.
 Qed.
 
 Lemma wp_lift_nonthrow_head_step {s E Φ} K e1 :
   to_val e1 = None →
-  (∀ σ1 ns κ κs nt, (⚡={next_state σ1}=> |==> state_interp σ1 ns (κ ++ κs) nt) ={E,∅}=∗
+  (∀ σ1 ns κ κs nt, (state_interp σ1 ns (κ ++ κs) nt) ={E,∅}=∗
     ⌜head_nonthrow_reducible K e1 σ1⌝ ∗
     ▷ ∀ rm e2 σ2 efs, ⌜head_step K e1 σ1 κ e2 σ2 efs rm⌝ -∗
-      £ 1 ={∅,E}=∗ (⚡={next_state σ2}=> |==> state_interp σ2 (S ns) κs (length efs + nt)) ∗ WP fill K e2 @ s; E {{ Φ }} ∗
+      £ 1 ={∅,E}=∗ (state_interp σ2 (S ns) κs (length efs + nt)) ∗ (⚡={next_state (next_a e1 s.2)}=> WP fill K e2 @ s; E {{ Φ }}) ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ v, fork_post v }})
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
 Proof.
   iIntros (?) "H". iApply wp_lift_step=>//; eauto using CC_fill_not_val.
-  iIntros (σ1 ns κ κs nt) "Hσ".
+  iIntros (σ1 ns κ κs nt) "Hσ". destruct s as [s a];simpl.
   iMod ("H" $! σ1 with "Hσ") as "[% H]"; iModIntro.
   iSplit; first by destruct s; eauto. iNext. iIntros (e2 σ2 efs) "H1 Ht".
   iDestruct "H1" as %Hps.
   eapply head_nonthrow_reducible_prim_step in Hps; eauto.
   destruct Hps as (?&e2'&?&?&Hps); subst.
-  iApply "H";eauto.
+  iSpecialize ("H" $! _ _ _ _ Hps with "Ht").
+  iMod "H" as "[$ [H $]]".
+  iModIntro.
+  iApply bnextgen_extensional_eq;[|iFrame "H"].
+  rewrite -next_state_ctx //.
 Qed.
 
 Lemma wp_lift_throw_head_step_fupdN {s E Φ} K e1 :
   to_val e1 = None →
-  (∀ σ1 ns κ κs nt, (⚡={next_state σ1}=> |==> state_interp σ1 ns (κ ++ κs) nt) ={E,∅}=∗
+  (∀ σ1 ns κ κs nt, (state_interp σ1 ns (κ ++ κs) nt) ={E,∅}=∗
     ⌜head_throw_reducible K e1 σ1⌝ ∗
     ∀ e2 σ2 efs, ⌜head_step K e1 σ1 κ e2 σ2 efs ThrowMode⌝ -∗
       £ (S (num_laters_per_step ns))
       ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-      (⚡={next_state σ2}=> |==> state_interp σ2 (S ns) κs (length efs + nt)) ∗ WP e2 @ s; E {{ Φ }} ∗
+      (state_interp σ2 (S ns) κs (length efs + nt)) ∗ (⚡={next_state (next_a e1 s.2)}=> WP e2 @ s; E {{ Φ }}) ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ v, fork_post v }})
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
 Proof.
   iIntros (?) "H". iApply wp_lift_step_fupdN=>//; eauto using CC_fill_not_val.
-  iIntros (σ1 ns κ κs nt) "Hσ".
+  iIntros (σ1 ns κ κs nt) "Hσ". destruct s as [s a];simpl.
   iMod ("H" $! σ1 with "Hσ") as "[% H]"; iModIntro.
   iSplit; first by destruct s; eauto. iIntros (e2 σ2 efs) "H1 Ht".
   iDestruct "H1" as %Hps.
   eapply head_throw_reducible_prim_step in Hps; eauto.
-  iApply "H". by eauto. iFrame.
+  iSpecialize ("H" $! _ _ _ Hps with "Ht").
+  iApply (step_upd_fupdN_fupd_mono with "H").
+  iIntros "[$ [H $]]".
+  iApply bnextgen_extensional_eq;[|iFrame "H"].
+  rewrite -next_state_ctx //.
 Qed.
 
 Lemma wp_lift_throw_head_step {s E Φ} K e1 :
   to_val e1 = None →
-  (∀ σ1 ns κ κs nt, (⚡={next_state σ1}=> |==> state_interp σ1 ns (κ ++ κs) nt) ={E,∅}=∗
+  (∀ σ1 ns κ κs nt, (state_interp σ1 ns (κ ++ κs) nt) ={E,∅}=∗
     ⌜head_throw_reducible K e1 σ1⌝ ∗
     ▷ ∀ e2 σ2 efs, ⌜head_step K e1 σ1 κ e2 σ2 efs ThrowMode⌝ -∗
-       £ 1 ={∅,E}=∗ (⚡={next_state σ2}=> |==> state_interp σ2 (S ns) κs (length efs + nt)) ∗ WP e2 @ s; E {{ Φ }} ∗
+       £ 1 ={∅,E}=∗ (state_interp σ2 (S ns) κs (length efs + nt)) ∗ (⚡={next_state (next_a e1 s.2)}=> WP e2 @ s; E {{ Φ }}) ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ v, fork_post v }})
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
 Proof.
   iIntros (?) "H". iApply wp_lift_step=>//; eauto using CC_fill_not_val.
-  iIntros (σ1 ns κ κs nt) "Hσ".
+  iIntros (σ1 ns κ κs nt) "Hσ". destruct s as [s a];simpl.
   iMod ("H" $! σ1 with "Hσ") as "[% H]"; iModIntro.
   iSplit; first by destruct s; eauto. iNext. iIntros (e2 σ2 efs) "H1 Ht".
   iDestruct "H1" as %Hps.
   eapply head_throw_reducible_prim_step in Hps; eauto.
-  iApply "H". by eauto. iFrame.
+  iSpecialize ("H" $! _ _ _ Hps with "Ht").
+  iMod "H" as "[$ [H $]]";iModIntro.
+  iApply bnextgen_extensional_eq;[|iFrame "H"].
+  rewrite -next_state_ctx //.
 Qed.
 
 Lemma wp_lift_nonthrow_pure_head_step_no_fork {s E E' Φ} K e1 :
   (∀ σ1, head_nonthrow_reducible K e1 σ1) →
   (∀ rm σ1 κ e2 σ2 efs, head_step K e1 σ1 κ e2 σ2 efs rm → κ = [] ∧ σ2 = σ1 /\ efs = []) →
   (|={E}[E']▷=> ∀ rm κ e2 efs σ, ⌜head_step K e1 σ κ e2 σ efs rm⌝ -∗ £ 1 -∗
-    WP fill K e2 @ s; E {{ Φ }})
+    (⚡={next_state (next_a e1 s.2)}=> WP fill K e2 @ s; E {{ Φ }}))
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
 Proof using Hinh.
   iIntros (Hnthsp Hpure) "H".
+  destruct s as [s a];simpl in *.
   iApply wp_lift_pure_step_no_fork;
-    first destruct s; eauto.
-  - intros σ; specialize (Hnthsp σ).
+    first destruct s; simpl in *; eauto.
+  - simpl. intros σ; specialize (Hnthsp σ).
     eauto using reducible_not_val,
-    head_prim_reducible, head_nonthrow_prim_reducible.
+      head_prim_reducible, head_nonthrow_prim_reducible.
   - intros ? ? ? ? ? Hps.
     eapply head_nonthrow_reducible_prim_step in Hps; eauto.
     destruct Hps as (e2'&?&?&?&Hps); subst; eauto.
@@ -128,24 +162,32 @@ Proof using Hinh.
     iIntros (???? Hps) "Ht".
     eapply head_nonthrow_reducible_prim_step in Hps; eauto.
     destruct Hps as (e2'&?&?&?&Hps); subst; eauto.
-    iDestruct ("H" with "[] Ht") as "?";eauto.
+    iDestruct ("H" with "[] Ht") as "H";eauto.
+    iApply bnextgen_extensional_eq;[|iFrame "H"].
+    rewrite -next_state_ctx //.
+    apply val_stuck in Hps. auto.
 Qed.
 
 Lemma wp_lift_throw_pure_head_step_no_fork {s E E' Φ} K e1 :
   (∀ σ1, head_throw_reducible K e1 σ1) →
   (∀ rm σ1 κ e2 σ2 efs, head_step K e1 σ1 κ e2 σ2 efs rm → κ = [] /\ σ2 = σ1 /\ efs = []) →
   (|={E}[E']▷=> ∀ rm κ e2 efs σ, ⌜head_step K e1 σ κ e2 σ efs rm⌝ -∗ £ 1 -∗
-    WP e2 @ s; E {{ Φ }})
+    (⚡={next_state (next_a e1 s.2)}=> WP e2 @ s; E {{ Φ }}))
   ⊢ WP fill K e1 @s;  E {{ Φ }}.
 Proof using Hinh.
-  iIntros (Hthsp Hpure) "H". iApply wp_lift_pure_step_no_fork; first destruct s; eauto.
+  iIntros (Hthsp Hpure) "H".
+  destruct s as [s a];simpl in *.
+  iApply wp_lift_pure_step_no_fork; first destruct s; simpl in *;eauto.
   - intros σ; specialize (Hthsp σ).
     eauto using reducible_not_val,
     head_prim_reducible, head_throw_prim_reducible.
   - iApply (step_fupd_wand with "H"); iIntros "H".
     iIntros (???? Hps) "Ht".
     eapply head_throw_reducible_prim_step in Hps; eauto.
-    iDestruct ("H" with "[] [$]") as "$"; eauto.
+    iDestruct ("H" with "[] [$]") as "H"; eauto.
+    iApply bnextgen_extensional_eq;[|iFrame "H"].
+    rewrite -next_state_ctx //.
+    apply val_stuck in Hps. auto.
 Qed.
 
 (* Atomic steps don't need any mask-changing business here, one can
@@ -153,11 +195,11 @@ Qed.
    operational steps as atomic throw steps don't happen in practice! *)
 Lemma wp_lift_nonthrow_atomic_head_step {s E Φ} K e1 :
   to_val e1 = None →
-  (∀ σ1 ns κ κs nt, (⚡={next_state σ1}=> |==> state_interp σ1 ns (κ ++ κs) nt) ={E}=∗
+  (∀ σ1 ns κ κs nt, (state_interp σ1 ns (κ ++ κs) nt) ={E}=∗
     ⌜head_nonthrow_reducible K e1 σ1⌝ ∗
     ▷ ∀ rm e2 σ2 efs, ⌜head_step K e1 σ1 κ e2 σ2 efs rm⌝ -∗
-      £ 1 ={E}=∗ (⚡={next_state σ2}=> |==> state_interp σ2 (S ns) κs (length efs + nt)) ∗
-      from_option (λ v, WP fill K (of_val v) @ s; E {{Φ}}) False (to_val e2) ∗
+      £ 1 ={E}=∗ (state_interp σ2 (S ns) κs (length efs + nt)) ∗
+      from_option (λ v, ⚡={next_state (next_a e1 s.2)}=> WP fill K (of_val v) @ s; E {{Φ}}) False (to_val e2) ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ v, fork_post v }})
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
 Proof.
@@ -175,11 +217,11 @@ Qed.
 
 Lemma wp_lift_nonthrow_atomic_head_step_no_fork {s E Φ} K e1 :
   to_val e1 = None →
-  (∀ σ1 ns κ κs nt, (⚡={next_state σ1}=> |==> state_interp σ1 ns (κ ++ κs) nt) ={E}=∗
+  (∀ σ1 ns κ κs nt, (state_interp σ1 ns (κ ++ κs) nt) ={E}=∗
     ⌜head_nonthrow_reducible K e1 σ1⌝ ∗
     ▷ ∀ rm e2 σ2 efs, ⌜head_step K e1 σ1 κ e2 σ2 efs rm⌝ -∗ £ 1 ={E}=∗
-      ⌜efs = []⌝ ∗ (⚡={next_state σ2}=> |==> state_interp σ2 (S ns) κs (length efs + nt)) ∗
-      from_option (λ v, WP fill K (of_val v) @ s; E {{Φ}}) False (to_val e2))
+      ⌜efs = []⌝ ∗ (state_interp σ2 (S ns) κs (length efs + nt)) ∗
+      from_option (λ v, ⚡={next_state (next_a e1 s.2)}=> WP fill K (of_val v) @ s; E {{Φ}}) False (to_val e2))
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
 Proof.
   iIntros (?) "H". iApply wp_lift_nonthrow_atomic_head_step; eauto.
@@ -192,11 +234,12 @@ Lemma wp_lift_nonthrow_pure_det_head_step_no_fork {s E E' Φ} K e1 e2 :
   (∀ σ1, head_nonthrow_reducible K e1 σ1) →
   (∀ σ1 κ e2' σ2 efs' rm,
     head_step K e1 σ1 κ e2' σ2 efs' rm → κ = [] /\ σ2 = σ1 ∧ e2' = e2 ∧ efs' = []) →
-  (|={E}[E']▷=> £ 1 -∗ WP fill K e2 @ s; E {{ Φ }})
+  (|={E}[E']▷=> £ 1 -∗ (⚡={next_state (next_a (fill K e1) s.2)}=> WP fill K e2 @ s; E {{ Φ }}))
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
 Proof using Hinh.
   intros Hnthsp Hdet.
-  apply wp_lift_pure_det_step_no_fork; first destruct s; eauto; simpl.
+  (* destruct s as [s a];simpl in *. *)
+  apply wp_lift_pure_det_step_no_fork; destruct s as [s a];simpl in *;first destruct s; eauto; simpl.
   - intros σ; specialize (Hnthsp σ).
     eauto using reducible_not_val,
     head_prim_reducible, head_nonthrow_prim_reducible.
@@ -210,13 +253,14 @@ Lemma wp_lift_throw_pure_det_head_step_no_fork {s E E' Φ} K e1 e2 :
   (∀ σ1, head_throw_reducible K e1 σ1) →
   (∀ σ1 κ e2' σ2 efs' rm,
     head_step K e1 σ1 κ e2' σ2 efs' rm → κ = [] /\ σ2 = σ1 ∧ e2' = e2 ∧ efs' = []) →
-  (|={E}[E']▷=> £ 1 -∗ WP e2 @ s; E {{ Φ }})
+  (|={E}[E']▷=> £ 1 -∗ ⚡={next_state (next_a (fill K e1) s.2)}=> WP e2 @ s; E {{ Φ }})
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
 Proof using Hinh.
-  intros Hthsp Hdet. apply wp_lift_pure_det_step_no_fork; destruct s; eauto.
+  intros Hthsp Hdet. destruct s as [s a].
+  apply wp_lift_pure_det_step_no_fork; destruct s; simpl;eauto.
   intros σ; specialize (Hthsp σ).
     eauto using reducible_not_val,
-    head_prim_reducible, head_throw_prim_reducible.
+      head_prim_reducible, head_throw_prim_reducible.    
 Qed.
 
 Lemma wp_lift_nonthrow_pure_det_head_step_no_fork' {s E Φ} K e1 e2 :
@@ -224,7 +268,7 @@ Lemma wp_lift_nonthrow_pure_det_head_step_no_fork' {s E Φ} K e1 e2 :
   (∀ σ1, head_nonthrow_reducible K e1 σ1) →
   (∀ rm σ1 κ e2' σ2 efs',
     head_step K e1 σ1 κ e2' σ2 efs' rm → κ = [] /\ σ2 = σ1 ∧ e2' = e2 ∧ efs' = []) →
-  ▷ (£ 1 -∗ WP fill K e2 @ s; E {{ Φ }}) ⊢ WP fill K e1 @ s; E {{ Φ }}.
+  ▷ (£ 1 -∗ ⚡={next_state (next_a (fill K e1) s.2)}=>  WP fill K e2 @ s; E {{ Φ }}) ⊢ WP fill K e1 @ s; E {{ Φ }}.
 Proof using Hinh.
   intros.
   rewrite -[(WP (fill K e1) @ _; _ {{ _ }})%I]
@@ -238,7 +282,7 @@ Lemma wp_lift_throw_pure_det_head_step_no_fork' {s E Φ} K e1 e2 :
   (∀ σ1, head_throw_reducible K e1 σ1) →
   (∀ rm σ1 κ e2' σ2 efs',
     head_step K e1 σ1 κ e2' σ2 efs' rm → κ = [] /\ σ2 = σ1 ∧ e2' = e2 ∧ efs' = []) →
-  ▷ (£ 1 -∗ WP e2 @ s; E {{ Φ }}) ⊢ WP fill K e1 @ s; E {{ Φ }}.
+  ▷ (£ 1 -∗⚡={next_state (next_a (fill K e1) s.2)}=>  WP e2 @ s; E {{ Φ }}) ⊢ WP fill K e1 @ s; E {{ Φ }}.
 Proof using Hinh.
   intros.
   rewrite -[(WP (fill K e1) @ _; _ {{ _ }})%I]
@@ -246,45 +290,46 @@ Proof using Hinh.
   rewrite -step_fupd_intro //. intros;eauto.
 Qed.
 
-Lemma wp_atomic_under_ectx E1 E2 K e Φ :
-  Atomic StronglyAtomic e → sub_values e → is_normal e →
-  (|={E1,E2}=> WP e @ E2 {{ v, |={E2,E1}=> WP fill K (of_val v) @ E1 {{ Φ }} }})
-    ⊢ WP fill K e @ E1 {{ Φ }}.
-Proof.
-  iIntros (Hatomic Hsv Hin) "H".
-  iLöb as "IH" forall (e Hatomic Hsv Hin).
-  rewrite !wp_unfold /wp_pre /=.
-  destruct (to_val (fill K e)) as [v|] eqn:HKe.
-  - iMod "H".
-    destruct (to_val e) as [e'|] eqn:Heqe'; last
-      by eapply (CC_fill_not_val K) in Heqe'; rewrite Heqe' in HKe.
-    repeat iMod "H".
-    rewrite (of_to_val _ _ Heqe').
-    iApply wp_value_fupd; simpl; eauto.
-  - iIntros (σ1 ns κ κs nt) "Hσ". iMod "H".
-    destruct (to_val e) as [v|] eqn:He.
-    + do 2 iMod "H". rewrite (of_to_val _ _ He).
-      rewrite !wp_unfold /wp_pre /= HKe.
-      by iApply ("H" with "Hσ").
-    + iMod ("H" with "Hσ") as "[Hr H]".
-      iDestruct "Hr" as %Hr.
-      iModIntro; iSplit; first by iPureIntro;
-        auto using reducible_under_ectx.
-      iIntros (e2 σ2 efs2) "Hps Ht". iDestruct "Hps" as %Hps.
-      destruct (reducible_prim_step _ _ _ _ _ _ _ Hr Hsv Hin Hps) as
-            (e2' & He2 & Hps'); simpl in *; subst.
-      iDestruct ("H" with "[] Ht") as "HH";eauto.
-      iMod "HH". iModIntro. iNext.
-      iMod "HH". iModIntro.
-      iDestruct (step_fupdN_frame_l with "[IH HH]") as "HH". iSplitR;[iExact "IH"|iFrame "HH"].
-      iApply (step_fupdN_mono with "HH").
-      iIntros "[IH HH]".
-      destruct (to_val e2') as [z|] eqn:Heqz.
-      ++ rewrite {1}wp_unfold /wp_pre /= Heqz /=.
-         rewrite (of_to_val _ _ Heqz). iMod "HH" as "[? [HH ?]]". iApply fupd_frame_l.
-         iFrame. iMod "HH". iFrame.
-      ++ apply Hatomic in Hps'. simpl in Hps'. rewrite Heqz in Hps'.
-         inversion Hps'. done.
-Qed.
+(* TODO: once we have figured out fupd *)
+(* Lemma wp_atomic_under_ectx E1 E2 K e Φ : *)
+(*   Atomic StronglyAtomic e → sub_values e → is_normal e → *)
+(*   (|={E1,E2}=> WP e @ E2 {{ v, |={E2,E1}=> WP fill K (of_val v) @ E1 {{ Φ }} }}) *)
+(*     ⊢ WP fill K e @ E1 {{ Φ }}. *)
+(* Proof. *)
+(*   iIntros (Hatomic Hsv Hin) "H". *)
+(*   iLöb as "IH" forall (e Hatomic Hsv Hin). *)
+(*   rewrite !wp_unfold /wp_pre /=. *)
+(*   destruct (to_val (fill K e)) as [v|] eqn:HKe. *)
+(*   - iMod "H". *)
+(*     destruct (to_val e) as [e'|] eqn:Heqe'; last *)
+(*       by eapply (CC_fill_not_val K) in Heqe'; rewrite Heqe' in HKe. *)
+(*     repeat iMod "H". *)
+(*     rewrite (of_to_val _ _ Heqe'). *)
+(*     iApply wp_value_fupd; simpl; eauto. *)
+(*   - iIntros (σ1 ns κ κs nt) "Hσ". iMod "H". *)
+(*     destruct (to_val e) as [v|] eqn:He. *)
+(*     + do 2 iMod "H". rewrite (of_to_val _ _ He). *)
+(*       rewrite !wp_unfold /wp_pre /= HKe. *)
+(*       by iApply ("H" with "Hσ"). *)
+(*     + iMod ("H" with "Hσ") as "[Hr H]". *)
+(*       iDestruct "Hr" as %Hr. *)
+(*       iModIntro; iSplit; first by iPureIntro; *)
+(*         auto using reducible_under_ectx. *)
+(*       iIntros (e2 σ2 efs2) "Hps Ht". iDestruct "Hps" as %Hps. *)
+(*       destruct (reducible_prim_step _ _ _ _ _ _ _ Hr Hsv Hin Hps) as *)
+(*             (e2' & He2 & Hps'); simpl in *; subst. *)
+(*       iDestruct ("H" with "[] Ht") as "HH";eauto. *)
+(*       iMod "HH". iModIntro. iNext. *)
+(*       iMod "HH". iModIntro. *)
+(*       iDestruct (step_fupdN_frame_l with "[IH HH]") as "HH". iSplitR;[iExact "IH"|iFrame "HH"]. *)
+(*       iApply (step_fupdN_mono with "HH"). *)
+(*       iIntros "[IH HH]". *)
+(*       destruct (to_val e2') as [z|] eqn:Heqz. *)
+(*       ++ rewrite {1}wp_unfold /wp_pre /= Heqz /=. *)
+(*          rewrite (of_to_val _ _ Heqz). iMod "HH" as "[? [HH ?]]". iApply fupd_frame_l. *)
+(*          iFrame. iMod "HH". iFrame. *)
+(*       ++ apply Hatomic in Hps'. simpl in Hps'. rewrite Heqz in Hps'. *)
+(*          inversion Hps'. done. *)
+(* Qed. *)
 
 End wp.

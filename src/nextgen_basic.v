@@ -602,7 +602,6 @@ Section into_bnextgen.
     rewrite and_sep_intuitionistically.
     rewrite intuitionistically_sep_2 -plainly_sep. rewrite wand_elim_r. auto.
   Qed.
-    
    
 End into_bnextgen.
 
