@@ -582,15 +582,6 @@ Section into_bnextgen.
     iApply bnextgen_compose. iApply "Hcond".
   Qed.
 
-  Lemma löb_wand_intuitionistically (P : uPredI M) : □ (□ ▷ P -∗ P) ⊢ P.
-Proof.
-  rewrite -{3}(intuitionistically_elim P) -(löb (□ P)). apply impl_intro_l.
-  rewrite {1}intuitionistically_into_persistently_1 later_persistently.
-  rewrite persistently_and_intuitionistically_sep_l.
-  rewrite -{1}(intuitionistically_idemp (▷ P)) intuitionistically_sep_2.
-  by rewrite wand_elim_r.
-Qed.
-
   Lemma löb_wand_plainly (P : uPredI M) `{!Absorbing P} :
     ■ ((■ ▷ P) -∗ P) ⊢ P.
   Proof.
