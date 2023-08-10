@@ -730,5 +730,13 @@ Section map_entry.
     intros. apply: map_trans_auth_frag_rel. auto.
   Qed.
 
+  Lemma map_entry_lift_gmap_view_auth dq m map_entry :
+    map_entry_lift_gmap_view map_entry (gmap_view_auth dq m) =
+    gmap_view_auth dq (map_imap map_entry m).
+  Proof.
+    unfold map_entry_lift_gmap_view, fmap_view, fmap_pair. simpl.
+    rewrite agree_map_to_agree. done.
+  Qed.
+
 End map_entry.
 
