@@ -606,7 +606,6 @@ Section map_entry.
     gmap_view.gmap_view_rel_raw K V n m1 view_frag_proj ->
     gmap_view.gmap_view_rel_raw K V n (map_imap map_entry m1) (map_imap (map_trans_frag_lift map_entry) view_frag_proj).
   Proof.
-    Set Printing All.
     intros Hv2. intros i [d' a'] Hlook1. simpl.
     rewrite map_lookup_imap in Hlook1.
     destruct (view_frag_proj !! i) eqn:Hlook2;rewrite Hlook2 /= in Hlook1;[|done].
@@ -722,6 +721,25 @@ Section map_entry.
       * rewrite op_None_right_id. auto.
       * rewrite op_None_left_id. auto.
   Qed.
+
+  (* Lemma test `{!MapTrans map_entry}  x : core ((map_entry_lift_gmap_view map_entry) x) = core x. *)
+  (* Proof. *)
+  (*   rewrite view.view_core_eq. f_equiv. *)
+  (*   - unfold core. simpl. destruct view_auth_proj =>// /=. *)
+  (*     destruct p. *)
+  (*     rewrite /pcore /cmra_pcore /= /prod_pcore_instance /=. *)
+  (*     rewrite /pcore /cmra_pcore /= /dfrac_pcore_instance. *)
+  (*     destruct d;simpl =>//. *)
+
+  (*     simpl.  *)
+  (*     destruct p as [d a];destruct d;simpl. *)
+
+  (*     unfold pcore. simpl. *)
+
+
+      
+  (*   f_equiv. apply map_eq. *)
+  (*   apply agree_eq. cmra_car_eq. *)
 
   Global Instance gMapTrans_lift_CmraMorphism map_entry `{!MapTrans map_entry} :
     CmraMorphism (map_entry_lift_gmap_view map_entry).

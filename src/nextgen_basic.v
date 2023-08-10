@@ -74,6 +74,14 @@ Section bnextgen_rules.
     intros ?. unseal. split. simpl. intros. eapply uPred_mono; done.
   Qed.
 
+  Lemma bnextgen_idemp P :
+    (∀ x, f x = f (f x)) →
+    (⚡={f}=> P) ⊣⊢ (⚡={f}=> ⚡={f}=>P).
+  Proof.
+    intros ?. unseal. split. simpl. intros.
+    rewrite {1}H;auto. 
+  Qed.
+  
   (* If we own an element [a], we have a lower bound on elements for which we
    * have to show that [f] is contractive. *)
   Lemma bnextgen_elim_ownM_contractive (a : M) P :
@@ -204,6 +212,24 @@ Section bnextgen_rules.
     done.
   Qed.
 
+  Lemma bnextgen_idemp_mono P Q :
+    (forall x, f x = f (f x)) →
+    (P ⊢ ⚡={f}=> Q) -> (⚡={f}=> P) ⊢ ⚡={f}=> Q.
+  Proof.
+    intros ??.
+    rewrite {1}(bnextgen_idemp Q)//.
+    apply bnextgen_mono=>//.
+  Qed.
+
+  Lemma bnextgen_idemp_mono_2 P Q :
+    (forall x, f x = f (f x)) →
+    ((⚡={f}=> P) ⊢ Q) -> (⚡={f}=> P) ⊢ ⚡={f}=> Q.
+  Proof.
+    intros ??.
+    rewrite {1}(bnextgen_idemp P)//.
+    apply bnextgen_mono=>//.
+  Qed.
+
   Lemma bnextgen_emp_2 : emp ⊢ ⚡={f}=> emp.
   Proof. unseal. done. Qed.
 
@@ -261,6 +287,59 @@ Section bnextgen_rules.
 
 End bnextgen_rules.
 
+Section bnextgen_compose_rules.
+  Context {M : ucmra} (f : M → M) (g : M → M) `{!GenTrans f} `{!GenTrans g}.
+
+  Notation "P ⊢ Q" := (@uPred_entails M P%I Q%I) : stdpp_scope.
+  Notation "⊢ Q" := (bi_entails (PROP:=uPredI M) True Q).
+  Notation "(⊢)" := (@uPred_entails M) (only parsing) : stdpp_scope.
+
+  Local Arguments uPred_holds {_} !_ _ _ /.
+
+  Ltac unseal := try uPred.unseal; rewrite !uPred_bnextgen_unseal !/uPred_holds /=.
+
+  Local Instance compose_gentrans : GenTrans (g ∘ f).
+  Proof using GenTrans0 GenTrans1.
+    destruct GenTrans0, GenTrans1.
+    split.
+    - intros n x y Hxy.
+      apply gen_trans_ne in Hxy.
+      apply gen_trans_ne0 in Hxy.
+      auto.
+    - intros n x Hv.
+      apply gen_trans_validN in Hv.
+      apply gen_trans_validN0 in Hv. auto.
+    - intros n x y Hincl.
+      apply gen_trans_monoN in Hincl.
+      apply gen_trans_monoN0 in Hincl.
+      auto.
+  Qed.
+    
+  Lemma bnextgen_compose P :
+    (⚡={f}=> ⚡={g}=> P) ⊣⊢ ⚡={g ∘ f}=> P.
+  Proof.
+    split. unseal. intros. split;auto.
+  Qed.
+
+  Lemma bnextgen_compose_elim P :
+    (forall x, g (f x) = g x) ->
+    (⚡={g}=> P) ⊣⊢ ⚡={f}=> ⚡={g}=> P.
+  Proof.
+    intros ?. split. unseal. intros.
+    rewrite H. auto.
+  Qed.
+
+  Lemma bnextgen_extensional_eq P :
+    (forall x, f x = g x) ->
+    (⚡={f}=> P) ⊣⊢ ⚡={g}=> P.
+  Proof.
+    intros Hext.
+    split. unseal. intros.
+    rewrite Hext. auto.
+  Qed.
+
+End bnextgen_compose_rules.
+
 Section bnextgen_rules_cmra_morphism.
   Context {M : ucmra} (f : M → M) `{!CmraMorphism f}.
 
@@ -280,6 +359,7 @@ Section bnextgen_rules_cmra_morphism.
     - rewrite cmra_morphism_op//.
     - rewrite -cmra_morphism_op. apply cmra_morphism_validN =>//.
   Qed.
+    
 
   Lemma bnextgen_sep_2 P Q :
     (⚡={f}=> P) ∗ (⚡={f}=> Q) ⊢ ⚡={f}=> (P ∗ Q) .
@@ -493,7 +573,72 @@ Section into_bnextgen.
   (*   iApply "H". iApply "P". *)
   (* Qed. *)
 
+  Lemma bnextgen_intro_forall P :
+    (∀ (f : M -> M) (_ : GenTrans f), ⚡={f}=> P) ⊢ ⚡={f}=> (∀ (f : M -> M) (_ : GenTrans f), ⚡={f}=> P).
+  Proof.
+    iIntros "Hcond".
+    iApply bnextgen_forall. iIntros (g).
+    iApply bnextgen_forall. iIntros (GenTrans).
+    iApply bnextgen_compose. iApply "Hcond".
+  Qed.
+
+  Lemma löb_wand_intuitionistically (P : uPredI M) : □ (□ ▷ P -∗ P) ⊢ P.
+Proof.
+  rewrite -{3}(intuitionistically_elim P) -(löb (□ P)). apply impl_intro_l.
+  rewrite {1}intuitionistically_into_persistently_1 later_persistently.
+  rewrite persistently_and_intuitionistically_sep_l.
+  rewrite -{1}(intuitionistically_idemp (▷ P)) intuitionistically_sep_2.
+  by rewrite wand_elim_r.
+Qed.
+
+  Lemma löb_wand_plainly (P : uPredI M) `{!Absorbing P} :
+    ■ ((■ ▷ P) -∗ P) ⊢ P.
+  Proof.
+    rewrite -{3}(plainly_elim P) -(löb (■ P)).
+    apply impl_intro_l. rewrite later_plainly_1.
+    rewrite -{1}(plainly_idemp (▷ P)).
+    rewrite -plainly_and plainly_and_sep. rewrite wand_elim_r. auto.
+  Qed.
+
+  Lemma löb_wand_plainly_and_intuitionistically (P : uPredI M) `{!Absorbing P} :
+    □ ■ ((□ ■ ▷ P) -∗ P) ⊢ P.
+  Proof.
+    rewrite -{3}(plainly_elim P) -{1}(intuitionistically_elim (■ P)) -(löb (□ ■ P)).
+    apply impl_intro_l. rewrite later_intuitionistically later_plainly_1.
+    rewrite -{1}(plainly_idemp (▷ P)).
+    rewrite -{1}(intuitionistically_idemp (■ ■ ▷ P)).
+    rewrite intuitionistically_plainly.
+    rewrite and_sep_intuitionistically.
+    rewrite intuitionistically_sep_2 -plainly_sep. rewrite wand_elim_r. auto.
+  Qed.
+    
+   
 End into_bnextgen.
+
+Section bnextgen_pred.
+  Context {M : ucmra} {A : Type} (f : A -> M → M) `{!forall a, CmraMorphism (f a)}.
+  
+  Notation "P ⊢ Q" := (@uPred_entails M P%I Q%I) : stdpp_scope.
+  Notation "⊢ Q" := (bi_entails (PROP:=uPredI M) True Q).
+  Notation "(⊢)" := (@uPred_entails M) (only parsing) : stdpp_scope.
+
+  Local Arguments uPred_holds {_} !_ _ _ /.
+
+  Ltac unseal := try uPred.unseal; rewrite !uPred_bnextgen_unseal !/uPred_holds /=.
+
+  Lemma bnextgen_pred_intro_forall P a :
+    (forall a b, exists c, f a ∘ f b = f c) ->
+    (∀ (a : A), ⚡={f a}=> P) ⊢ ⚡={f a}=> (∀ (a : A), ⚡={f a}=> P).
+  Proof.
+    iIntros (Him) "Hcond".
+    iApply bnextgen_forall. iIntros (b).
+    iApply bnextgen_compose.
+    specialize (Him b a) as [c Hc].
+    iApply bnextgen_extensional_eq;[rewrite Hc;eauto|].
+    iApply "Hcond".
+  Qed.
+
+End bnextgen_pred.
 
 Section bnextgen_inv.
   Context `{!invGS Σ}.

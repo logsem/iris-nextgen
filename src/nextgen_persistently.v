@@ -36,3 +36,19 @@ Section bnextgen_rules.
   Qed.
 
 End bnextgen_rules.
+
+Section bnextgen_persistently_compose.
+  Context {M : ucmra} (f : M -> M) `{!GenTrans f}.
+
+  Notation "□ P" := (uPred_persistently P) : bi_scope.
+  
+  Lemma bnextgen_persistently_elim P :
+    (forall x, core (f x) = core x) ->
+    □ P ⊣⊢ ⚡={f}=> □ P.
+  Proof.
+    intros ?. rewrite (ng_persistently_equiv P).
+    unfold ng_persistently.
+    apply bnextgen_compose_elim =>//.
+  Qed.
+  
+End bnextgen_persistently_compose.
