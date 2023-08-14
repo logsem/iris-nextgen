@@ -11,9 +11,13 @@ From nextgen.case_study Require Export CC_ectx_language.
 From iris.proofmode Require Import tactics.
 Set Default Proof Using "Type".
 
+Class NextMonotone {expr val ectx state observation} {Λ : CCEctxLanguage expr val ectx state observation}
+  `{iris_gen : irisGS_gen hlc (CC_ectx_lang expr) Σ} :=
+ nextMono { next_state_mono : forall (e1 : expr) (K : ectx), to_val e1 = None -> next_state (fill K e1) = next_state e1 }.
+
 Section wp.
 Context {expr val ectx state observation} {Λ : CCEctxLanguage expr val ectx state observation}.
-Context `{irisGS_gen hls (CC_ectx_lang expr) Σ} {Hinh : Inhabited state}.
+Context `{irisGS_gen hls (CC_ectx_lang expr) Σ} {Hinh : Inhabited state} {Hmono : NextMonotone}.
 Implicit Types P : iProp Σ.
 Implicit Types Φ : val → iProp Σ.
 Implicit Types v : val.
@@ -49,20 +53,21 @@ Proof.
 Qed.
   
 Lemma wp_lift_nonthrow_head_step_fupdN {s E Φ} K e1 :
+  (* next_state (fill K e1) = next_state e1 -> *)
   to_val e1 = None →
   (∀ σ1 ns κ κs nt, (state_interp σ1 ns (κ ++ κs) nt) ={E,∅}=∗
     ⌜head_nonthrow_reducible K e1 σ1⌝ ∗
     ∀ rm e2 σ2 efs, ⌜head_step K e1 σ1 κ e2 σ2 efs rm⌝ -∗
       £ (S (num_laters_per_step ns))
       ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-      (state_interp σ2 (S ns) κs (length efs + nt)) ∗ (⚡={next_state (next_a e1 s.2)}=> WP fill K e2 @ s; E {{ Φ }}) ∗
+      (state_interp σ2 (S ns) κs (length efs + nt)) ∗ (⚡={next_state e1}=> WP fill K e2 @ s; E {{ Φ }}) ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ v, fork_post v }})
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
-Proof.
+Proof using Hmono.
   iIntros (?) "H". iApply wp_lift_step_fupdN=>//; eauto using CC_fill_not_val.
-  iIntros (σ1 ns κ κs nt) "Hσ". destruct s as [s a];simpl.
+  iIntros (σ1 ns κ κs nt) "Hσ".
   iMod ("H" $! σ1 with "Hσ") as "[% H]"; iModIntro.
-  simpl. iSplit; first by destruct s; eauto. iIntros (e2 σ2 efs) "H1 Ht".
+  simpl. iSplit; first destruct s;[eauto..|]. iIntros (e2 σ2 efs) "H1 Ht".
   iDestruct "H1" as %Hps.
   eapply head_nonthrow_reducible_prim_step in Hps; eauto.
   destruct Hps as (?&e2'&?&?&Hps); subst.
@@ -70,7 +75,7 @@ Proof.
   iApply (step_upd_fupdN_fupd_mono with "H").
   iIntros "[$ [H $]]".
   iApply bnextgen_extensional_eq;[|iFrame "H"].
-  rewrite -next_state_ctx //.
+  rewrite next_state_mono; auto.
 Qed.
 
 Lemma wp_lift_nonthrow_head_step {s E Φ} K e1 :
@@ -78,12 +83,12 @@ Lemma wp_lift_nonthrow_head_step {s E Φ} K e1 :
   (∀ σ1 ns κ κs nt, (state_interp σ1 ns (κ ++ κs) nt) ={E,∅}=∗
     ⌜head_nonthrow_reducible K e1 σ1⌝ ∗
     ▷ ∀ rm e2 σ2 efs, ⌜head_step K e1 σ1 κ e2 σ2 efs rm⌝ -∗
-      £ 1 ={∅,E}=∗ (state_interp σ2 (S ns) κs (length efs + nt)) ∗ (⚡={next_state (next_a e1 s.2)}=> WP fill K e2 @ s; E {{ Φ }}) ∗
+      £ 1 ={∅,E}=∗ (state_interp σ2 (S ns) κs (length efs + nt)) ∗ (⚡={next_state e1}=> WP fill K e2 @ s; E {{ Φ }}) ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ v, fork_post v }})
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
-Proof.
+Proof using Hmono.
   iIntros (?) "H". iApply wp_lift_step=>//; eauto using CC_fill_not_val.
-  iIntros (σ1 ns κ κs nt) "Hσ". destruct s as [s a];simpl.
+  iIntros (σ1 ns κ κs nt) "Hσ".
   iMod ("H" $! σ1 with "Hσ") as "[% H]"; iModIntro.
   iSplit; first by destruct s; eauto. iNext. iIntros (e2 σ2 efs) "H1 Ht".
   iDestruct "H1" as %Hps.
@@ -93,7 +98,7 @@ Proof.
   iMod "H" as "[$ [H $]]".
   iModIntro.
   iApply bnextgen_extensional_eq;[|iFrame "H"].
-  rewrite -next_state_ctx //.
+  rewrite next_state_mono //.
 Qed.
 
 Lemma wp_lift_throw_head_step_fupdN {s E Φ} K e1 :
@@ -103,12 +108,12 @@ Lemma wp_lift_throw_head_step_fupdN {s E Φ} K e1 :
     ∀ e2 σ2 efs, ⌜head_step K e1 σ1 κ e2 σ2 efs ThrowMode⌝ -∗
       £ (S (num_laters_per_step ns))
       ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-      (state_interp σ2 (S ns) κs (length efs + nt)) ∗ (⚡={next_state (next_a e1 s.2)}=> WP e2 @ s; E {{ Φ }}) ∗
+      (state_interp σ2 (S ns) κs (length efs + nt)) ∗ (⚡={next_state e1}=> WP e2 @ s; E {{ Φ }}) ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ v, fork_post v }})
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
-Proof.
+Proof using Hmono.
   iIntros (?) "H". iApply wp_lift_step_fupdN=>//; eauto using CC_fill_not_val.
-  iIntros (σ1 ns κ κs nt) "Hσ". destruct s as [s a];simpl.
+  iIntros (σ1 ns κ κs nt) "Hσ".
   iMod ("H" $! σ1 with "Hσ") as "[% H]"; iModIntro.
   iSplit; first by destruct s; eauto. iIntros (e2 σ2 efs) "H1 Ht".
   iDestruct "H1" as %Hps.
@@ -117,7 +122,7 @@ Proof.
   iApply (step_upd_fupdN_fupd_mono with "H").
   iIntros "[$ [H $]]".
   iApply bnextgen_extensional_eq;[|iFrame "H"].
-  rewrite -next_state_ctx //.
+  rewrite next_state_mono //.
 Qed.
 
 Lemma wp_lift_throw_head_step {s E Φ} K e1 :
@@ -125,12 +130,12 @@ Lemma wp_lift_throw_head_step {s E Φ} K e1 :
   (∀ σ1 ns κ κs nt, (state_interp σ1 ns (κ ++ κs) nt) ={E,∅}=∗
     ⌜head_throw_reducible K e1 σ1⌝ ∗
     ▷ ∀ e2 σ2 efs, ⌜head_step K e1 σ1 κ e2 σ2 efs ThrowMode⌝ -∗
-       £ 1 ={∅,E}=∗ (state_interp σ2 (S ns) κs (length efs + nt)) ∗ (⚡={next_state (next_a e1 s.2)}=> WP e2 @ s; E {{ Φ }}) ∗
+       £ 1 ={∅,E}=∗ (state_interp σ2 (S ns) κs (length efs + nt)) ∗ (⚡={next_state e1}=> WP e2 @ s; E {{ Φ }}) ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ v, fork_post v }})
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
-Proof.
+Proof using Hmono.
   iIntros (?) "H". iApply wp_lift_step=>//; eauto using CC_fill_not_val.
-  iIntros (σ1 ns κ κs nt) "Hσ". destruct s as [s a];simpl.
+  iIntros (σ1 ns κ κs nt) "Hσ".
   iMod ("H" $! σ1 with "Hσ") as "[% H]"; iModIntro.
   iSplit; first by destruct s; eauto. iNext. iIntros (e2 σ2 efs) "H1 Ht".
   iDestruct "H1" as %Hps.
@@ -138,18 +143,17 @@ Proof.
   iSpecialize ("H" $! _ _ _ Hps with "Ht").
   iMod "H" as "[$ [H $]]";iModIntro.
   iApply bnextgen_extensional_eq;[|iFrame "H"].
-  rewrite -next_state_ctx //.
+  rewrite next_state_mono //.
 Qed.
 
 Lemma wp_lift_nonthrow_pure_head_step_no_fork {s E E' Φ} K e1 :
   (∀ σ1, head_nonthrow_reducible K e1 σ1) →
   (∀ rm σ1 κ e2 σ2 efs, head_step K e1 σ1 κ e2 σ2 efs rm → κ = [] ∧ σ2 = σ1 /\ efs = []) →
   (|={E}[E']▷=> ∀ rm κ e2 efs σ, ⌜head_step K e1 σ κ e2 σ efs rm⌝ -∗ £ 1 -∗
-    (⚡={next_state (next_a e1 s.2)}=> WP fill K e2 @ s; E {{ Φ }}))
+    (⚡={next_state e1}=> WP fill K e2 @ s; E {{ Φ }}))
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
-Proof using Hinh.
+Proof using Hinh Hmono.
   iIntros (Hnthsp Hpure) "H".
-  destruct s as [s a];simpl in *.
   iApply wp_lift_pure_step_no_fork;
     first destruct s; simpl in *; eauto.
   - simpl. intros σ; specialize (Hnthsp σ).
@@ -164,7 +168,7 @@ Proof using Hinh.
     destruct Hps as (e2'&?&?&?&Hps); subst; eauto.
     iDestruct ("H" with "[] Ht") as "H";eauto.
     iApply bnextgen_extensional_eq;[|iFrame "H"].
-    rewrite -next_state_ctx //.
+    rewrite next_state_mono //.
     apply val_stuck in Hps. auto.
 Qed.
 
@@ -172,11 +176,10 @@ Lemma wp_lift_throw_pure_head_step_no_fork {s E E' Φ} K e1 :
   (∀ σ1, head_throw_reducible K e1 σ1) →
   (∀ rm σ1 κ e2 σ2 efs, head_step K e1 σ1 κ e2 σ2 efs rm → κ = [] /\ σ2 = σ1 /\ efs = []) →
   (|={E}[E']▷=> ∀ rm κ e2 efs σ, ⌜head_step K e1 σ κ e2 σ efs rm⌝ -∗ £ 1 -∗
-    (⚡={next_state (next_a e1 s.2)}=> WP e2 @ s; E {{ Φ }}))
+    (⚡={next_state e1}=> WP e2 @ s; E {{ Φ }}))
   ⊢ WP fill K e1 @s;  E {{ Φ }}.
-Proof using Hinh.
+Proof using Hinh Hmono.
   iIntros (Hthsp Hpure) "H".
-  destruct s as [s a];simpl in *.
   iApply wp_lift_pure_step_no_fork; first destruct s; simpl in *;eauto.
   - intros σ; specialize (Hthsp σ).
     eauto using reducible_not_val,
@@ -186,7 +189,7 @@ Proof using Hinh.
     eapply head_throw_reducible_prim_step in Hps; eauto.
     iDestruct ("H" with "[] [$]") as "H"; eauto.
     iApply bnextgen_extensional_eq;[|iFrame "H"].
-    rewrite -next_state_ctx //.
+    rewrite next_state_mono //.
     apply val_stuck in Hps. auto.
 Qed.
 
@@ -199,10 +202,10 @@ Lemma wp_lift_nonthrow_atomic_head_step {s E Φ} K e1 :
     ⌜head_nonthrow_reducible K e1 σ1⌝ ∗
     ▷ ∀ rm e2 σ2 efs, ⌜head_step K e1 σ1 κ e2 σ2 efs rm⌝ -∗
       £ 1 ={E}=∗ (state_interp σ2 (S ns) κs (length efs + nt)) ∗
-      from_option (λ v, ⚡={next_state (next_a e1 s.2)}=> WP fill K (of_val v) @ s; E {{Φ}}) False (to_val e2) ∗
+      from_option (λ v, ⚡={next_state e1}=> WP fill K (of_val v) @ s; E {{Φ}}) False (to_val e2) ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ v, fork_post v }})
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
-Proof.
+Proof using Hmono.
   iIntros (?) "H".
   iApply (wp_lift_nonthrow_head_step)=>//; eauto using CC_fill_not_val.
   iIntros (σ1 ns κ κs nt) "Hσ1".
@@ -221,9 +224,9 @@ Lemma wp_lift_nonthrow_atomic_head_step_no_fork {s E Φ} K e1 :
     ⌜head_nonthrow_reducible K e1 σ1⌝ ∗
     ▷ ∀ rm e2 σ2 efs, ⌜head_step K e1 σ1 κ e2 σ2 efs rm⌝ -∗ £ 1 ={E}=∗
       ⌜efs = []⌝ ∗ (state_interp σ2 (S ns) κs (length efs + nt)) ∗
-      from_option (λ v, ⚡={next_state (next_a e1 s.2)}=> WP fill K (of_val v) @ s; E {{Φ}}) False (to_val e2))
+      from_option (λ v, ⚡={next_state e1}=> WP fill K (of_val v) @ s; E {{Φ}}) False (to_val e2))
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
-Proof.
+Proof using Hmono.
   iIntros (?) "H". iApply wp_lift_nonthrow_atomic_head_step; eauto.
   iIntros (σ1 ns κ κs nt) "Hσ1". iMod ("H" $! σ1 with "Hσ1") as "[$ H]"; iModIntro.
   iNext; iIntros (rm v2 σ2 efs) "% Ht".
@@ -234,33 +237,50 @@ Lemma wp_lift_nonthrow_pure_det_head_step_no_fork {s E E' Φ} K e1 e2 :
   (∀ σ1, head_nonthrow_reducible K e1 σ1) →
   (∀ σ1 κ e2' σ2 efs' rm,
     head_step K e1 σ1 κ e2' σ2 efs' rm → κ = [] /\ σ2 = σ1 ∧ e2' = e2 ∧ efs' = []) →
-  (|={E}[E']▷=> £ 1 -∗ (⚡={next_state (next_a (fill K e1) s.2)}=> WP fill K e2 @ s; E {{ Φ }}))
+  (|={E}[E']▷=> £ 1 -∗ (⚡={next_state e1}=> WP fill K e2 @ s; E {{ Φ }}))
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
-Proof using Hinh.
+Proof using Hinh Hmono.
   intros Hnthsp Hdet.
   (* destruct s as [s a];simpl in *. *)
-  apply wp_lift_pure_det_step_no_fork; destruct s as [s a];simpl in *;first destruct s; eauto; simpl.
+  iIntros "He". iApply (wp_lift_pure_det_step_no_fork (E':=E'));first destruct s; eauto; simpl.
+  (* apply wp_lift_pure_det_step_no_fork;first destruct s; eauto; simpl. *)
   - intros σ; specialize (Hnthsp σ).
     eauto using reducible_not_val,
     head_prim_reducible, head_nonthrow_prim_reducible.
   - intros ????? Hps.
     apply head_nonthrow_reducible_prim_step in Hps; auto.
     destruct Hps as (?&?&?&?&Hhs); subst.
-    apply Hdet in Hhs. destruct Hhs as (?&?&?);subst. intuition congruence.
+    apply Hdet in Hhs. destruct Hhs as (?&?&?&?);subst. intuition congruence.
+  - iMod "He". iModIntro. iNext. iMod "He". iModIntro.
+    iIntros "H1". iDestruct ("He" with "H1") as "He".
+    iApply bnextgen_extensional_eq;[|iFrame "He"].
+    rewrite next_state_mono //.
+    pose proof (Hinh) as [a].
+    apply head_nonthrow_prim_reducible with (σ:=a) in Hnthsp as (?&?&?&?&?&?);eauto.
+    eapply val_stuck;eauto.
 Qed.
 
 Lemma wp_lift_throw_pure_det_head_step_no_fork {s E E' Φ} K e1 e2 :
   (∀ σ1, head_throw_reducible K e1 σ1) →
   (∀ σ1 κ e2' σ2 efs' rm,
     head_step K e1 σ1 κ e2' σ2 efs' rm → κ = [] /\ σ2 = σ1 ∧ e2' = e2 ∧ efs' = []) →
-  (|={E}[E']▷=> £ 1 -∗ ⚡={next_state (next_a (fill K e1) s.2)}=> WP e2 @ s; E {{ Φ }})
+  (|={E}[E']▷=> £ 1 -∗ ⚡={next_state e1}=> WP e2 @ s; E {{ Φ }})
   ⊢ WP fill K e1 @ s; E {{ Φ }}.
-Proof using Hinh.
-  intros Hthsp Hdet. destruct s as [s a].
-  apply wp_lift_pure_det_step_no_fork; destruct s; simpl;eauto.
-  intros σ; specialize (Hthsp σ).
+Proof using Hinh Hmono.
+  intros Hthsp Hdet.
+  iIntros "He".
+  iApply (wp_lift_pure_det_step_no_fork (E':=E')).
+  1,2: destruct s; simpl;eauto;
+    intros σ; specialize (Hthsp σ);
     eauto using reducible_not_val,
-      head_prim_reducible, head_throw_prim_reducible.    
+    head_prim_reducible, head_throw_prim_reducible.
+  iMod "He". iModIntro. iNext. iMod "He". iModIntro.
+  iIntros "H1". iDestruct ("He" with "H1") as "He".
+  iApply bnextgen_extensional_eq;[|iFrame "He"].
+  rewrite next_state_mono //.
+  pose proof (Hinh) as [a].
+  apply head_throw_prim_reducible with (σ:=a) in Hthsp as (?&?&?&?&?&?);eauto.
+  eapply val_stuck;eauto.
 Qed.
 
 Lemma wp_lift_nonthrow_pure_det_head_step_no_fork' {s E Φ} K e1 e2 :
@@ -268,8 +288,8 @@ Lemma wp_lift_nonthrow_pure_det_head_step_no_fork' {s E Φ} K e1 e2 :
   (∀ σ1, head_nonthrow_reducible K e1 σ1) →
   (∀ rm σ1 κ e2' σ2 efs',
     head_step K e1 σ1 κ e2' σ2 efs' rm → κ = [] /\ σ2 = σ1 ∧ e2' = e2 ∧ efs' = []) →
-  ▷ (£ 1 -∗ ⚡={next_state (next_a (fill K e1) s.2)}=>  WP fill K e2 @ s; E {{ Φ }}) ⊢ WP fill K e1 @ s; E {{ Φ }}.
-Proof using Hinh.
+  ▷ (£ 1 -∗ ⚡={next_state e1}=>  WP fill K e2 @ s; E {{ Φ }}) ⊢ WP fill K e1 @ s; E {{ Φ }}.
+Proof using Hinh Hmono.
   intros.
   rewrite -[(WP (fill K e1) @ _; _ {{ _ }})%I]
              wp_lift_nonthrow_pure_det_head_step_no_fork //.
@@ -282,8 +302,8 @@ Lemma wp_lift_throw_pure_det_head_step_no_fork' {s E Φ} K e1 e2 :
   (∀ σ1, head_throw_reducible K e1 σ1) →
   (∀ rm σ1 κ e2' σ2 efs',
     head_step K e1 σ1 κ e2' σ2 efs' rm → κ = [] /\ σ2 = σ1 ∧ e2' = e2 ∧ efs' = []) →
-  ▷ (£ 1 -∗⚡={next_state (next_a (fill K e1) s.2)}=>  WP e2 @ s; E {{ Φ }}) ⊢ WP fill K e1 @ s; E {{ Φ }}.
-Proof using Hinh.
+  ▷ (£ 1 -∗⚡={next_state e1}=>  WP e2 @ s; E {{ Φ }}) ⊢ WP fill K e1 @ s; E {{ Φ }}.
+Proof using Hinh Hmono.
   intros.
   rewrite -[(WP (fill K e1) @ _; _ {{ _ }})%I]
              wp_lift_throw_pure_det_head_step_no_fork //.

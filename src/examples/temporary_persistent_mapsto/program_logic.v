@@ -1,4 +1,4 @@
-From iris.algebra Require Import excl.
+(* From iris.algebra Require Import excl.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Export weakestpre.
 From iris.heap_lang Require Export lang.
@@ -159,3 +159,4 @@ Section weakestpre_attempt_2.
   Admitted.
 
 End weakestpre_attempt_2.
+*)

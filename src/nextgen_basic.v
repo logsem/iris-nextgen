@@ -81,6 +81,14 @@ Section bnextgen_rules.
     intros ?. unseal. split. simpl. intros.
     rewrite {1}H;auto. 
   Qed.
+
+  Lemma bnextgen_id P :
+    (forall x, f x = x) ->
+    (⚡={f}=> P) ⊣⊢ P.
+  Proof.
+    split. unseal. intros.
+    rewrite H. auto.
+  Qed.
   
   (* If we own an element [a], we have a lower bound on elements for which we
    * have to show that [f] is contractive. *)
@@ -433,6 +441,36 @@ Section bnextgen_rules_cmra_morphism.
     FromModal True modality_bnextgen (⚡={f}=> P) (⚡={f}=> P) P | 1.
   Proof. by rewrite /FromModal. Qed.
 
+  Lemma bnextgen_intro_forall P :
+    (∀ (f : M -> M) (_ : GenTrans f), ⚡={f}=> P) ⊢ ⚡={f}=> (∀ (f : M -> M) (_ : GenTrans f), ⚡={f}=> P).
+  Proof.
+    iIntros "Hcond".
+    iApply bnextgen_forall. iIntros (g).
+    iApply bnextgen_forall. iIntros (GenTrans).
+    iApply bnextgen_compose. iApply "Hcond".
+  Qed.
+
+  Lemma löb_wand_plainly (P : uPredI M) `{!Absorbing P} :
+    ■ ((■ ▷ P) -∗ P) ⊢ P.
+  Proof.
+    rewrite -{3}(plainly_elim P) -(löb (■ P)).
+    apply impl_intro_l. rewrite later_plainly_1.
+    rewrite -{1}(plainly_idemp (▷ P)).
+    rewrite -plainly_and plainly_and_sep. rewrite wand_elim_r. auto.
+  Qed.
+
+  Lemma löb_wand_plainly_and_intuitionistically (P : uPredI M) `{!Absorbing P} :
+    □ ■ ((□ ■ ▷ P) -∗ P) ⊢ P.
+  Proof.
+    rewrite -{3}(plainly_elim P) -{1}(intuitionistically_elim (■ P)) -(löb (□ ■ P)).
+    apply impl_intro_l. rewrite later_intuitionistically later_plainly_1.
+    rewrite -{1}(plainly_idemp (▷ P)).
+    rewrite -{1}(intuitionistically_idemp (■ ■ ▷ P)).
+    rewrite intuitionistically_plainly.
+    rewrite and_sep_intuitionistically.
+    rewrite intuitionistically_sep_2 -plainly_sep. rewrite wand_elim_r. auto.
+  Qed.
+
 End bnextgen_rules_cmra_morphism.
 
 Lemma bnextgen_plain_soundness {M : ucmra} f `{!GenTrans f} (P : uPred M) `{!Plain P} :
@@ -572,36 +610,6 @@ Section into_bnextgen.
   (*   iModIntro. *)
   (*   iApply "H". iApply "P". *)
   (* Qed. *)
-
-  Lemma bnextgen_intro_forall P :
-    (∀ (f : M -> M) (_ : GenTrans f), ⚡={f}=> P) ⊢ ⚡={f}=> (∀ (f : M -> M) (_ : GenTrans f), ⚡={f}=> P).
-  Proof.
-    iIntros "Hcond".
-    iApply bnextgen_forall. iIntros (g).
-    iApply bnextgen_forall. iIntros (GenTrans).
-    iApply bnextgen_compose. iApply "Hcond".
-  Qed.
-
-  Lemma löb_wand_plainly (P : uPredI M) `{!Absorbing P} :
-    ■ ((■ ▷ P) -∗ P) ⊢ P.
-  Proof.
-    rewrite -{3}(plainly_elim P) -(löb (■ P)).
-    apply impl_intro_l. rewrite later_plainly_1.
-    rewrite -{1}(plainly_idemp (▷ P)).
-    rewrite -plainly_and plainly_and_sep. rewrite wand_elim_r. auto.
-  Qed.
-
-  Lemma löb_wand_plainly_and_intuitionistically (P : uPredI M) `{!Absorbing P} :
-    □ ■ ((□ ■ ▷ P) -∗ P) ⊢ P.
-  Proof.
-    rewrite -{3}(plainly_elim P) -{1}(intuitionistically_elim (■ P)) -(löb (□ ■ P)).
-    apply impl_intro_l. rewrite later_intuitionistically later_plainly_1.
-    rewrite -{1}(plainly_idemp (▷ P)).
-    rewrite -{1}(intuitionistically_idemp (■ ■ ▷ P)).
-    rewrite intuitionistically_plainly.
-    rewrite and_sep_intuitionistically.
-    rewrite intuitionistically_sep_2 -plainly_sep. rewrite wand_elim_r. auto.
-  Qed.
    
 End into_bnextgen.
 

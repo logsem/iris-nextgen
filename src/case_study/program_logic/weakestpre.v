@@ -25,15 +25,16 @@ Class irisGS_gen (hlc : has_lc) (Λ : language) (Σ : gFunctors) := IrisG {
   keep track of resources precisely, as in e.g. Iron. *)
   fork_post : val Λ → iProp Σ;
 
-  A : Type; (* a_inhabited : Inhabited A; *)
-  next_state : A -> iResUR Σ -> iResUR Σ;
-  next_a : expr Λ -> A -> A;
+  (* A : Type;  *)(* a_inhabited : Inhabited A; *)
+  next_state : expr Λ -> iResUR Σ -> iResUR Σ;
+  (* next_a : expr Λ -> A -> A; *)
   next_state_GenTrans :> forall e, CmraMorphism (next_state e);
   (* next_state_contractive : forall (a : A) (x : iResUR Σ) (n : nat), next_state a x ≼{n} x; *)
   (* next_state_compose : ∀ a b : A, ∃ c : A, next_state a ∘ next_state b = next_state c;           *)
   (* next_state_idemp : forall (a : A) (x : iResUR Σ) (n : nat), next_state a x = (next_state a (next_state a x)); *)
   (* next_state_core : forall (a : A) (x : iResUR Σ), core (next_state a x) = core x; *)
-  next_state_ctx : forall e a K, to_val e = None -> next_state (next_a e a) = next_state (next_a (K e) a);
+  (* next_state_ctx : forall e K, LanguageWeakCtx K -> to_val e = None -> (next_state e) = (next_state (K e)); *)
+                                                                      
 
   (** The number of additional logical steps (i.e., later modality in the
   definition of WP) and later credits per physical step is
@@ -74,19 +75,19 @@ Notation irisGS := (irisGS_gen HasLc).
     can only be used by exactly one client.
   - The step-taking update can even be used by clients that opt out of
     later credits, e.g. because they use [BiFUpdPlainly]. *)
-Definition wp_pre `{!irisGS_gen hlc Λ Σ} (s : stuckness * A)
+Definition wp_pre `{!irisGS_gen hlc Λ Σ} (s : stuckness)
     (wp : coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ) :
-    coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ := λ E e1 Φ,
+  coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ := λ E e1 Φ,
   (match to_val e1 with
   | Some v => |={E}=> Φ v
   | None => ∀ σ1 ns κ κs nt,
      state_interp σ1 ns (κ ++ κs) nt ={E,∅}=∗
-       ⌜if s.1 is NotStuck then reducible e1 σ1 else True⌝ ∗
+       ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
        ∀ e2 σ2 efs, ⌜prim_step e1 σ1 κ e2 σ2 efs⌝ -∗
          £ (S (num_laters_per_step ns))
          ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
         state_interp σ2 (S ns) κs (length efs + nt) ∗
-         (⚡={next_state (next_a e1 s.2)}=> wp E e2 Φ) ∗
+         (⚡={next_state e1}=> wp E e2 Φ) ∗
          [∗ list] i ↦ ef ∈ efs, wp ⊤ ef fork_post
   end)%I.
 
@@ -101,8 +102,7 @@ Proof.
   - by rewrite -IH.
 Qed.
 
-Local Definition wp_def `{!irisGS_gen hlc Λ Σ} : Wp (iProp Σ) (expr Λ) (val Λ) (stuckness * A) :=
-  λ (s : stuckness * A), fixpoint (wp_pre s).
+Local Definition wp_def `{!irisGS_gen hlc Λ Σ} : Wp (iProp Σ) (expr Λ) (val Λ) (stuckness) := λ s, fixpoint (wp_pre s).
 Local Definition wp_aux : seal (@wp_def). Proof. by eexists. Qed.
 Definition wp' := wp_aux.(unseal).
 Global Arguments wp' {hlc Λ Σ _}.
@@ -112,7 +112,7 @@ Proof. rewrite -wp_aux.(seal_eq) //. Qed.
 
 Section wp.
 Context `{!irisGS_gen hlc Λ Σ}.
-Implicit Types s : (stuckness * A).
+Implicit Types s : (stuckness).
 Implicit Types P : iProp Σ.
 Implicit Types Φ : val Λ → iProp Σ.
 Implicit Types v : val Λ.
@@ -126,7 +126,7 @@ Proof. rewrite wp_unseal. apply (fixpoint_unfold (wp_pre s)). Qed.
 Global Instance wp_ne s E e n :
   Proper (pointwise_relation _ (dist n) ==> dist n) (wp (PROP:=iProp Σ) s E e).
 Proof.
-  revert e. induction (lt_wf n) as [n _ IH]=> e Φ Ψ HΦ.
+  revert e s. induction (lt_wf n) as [n _ IH]=> e s Φ Ψ HΦ.
   rewrite !wp_unfold /wp_pre /=.
   (* FIXME: figure out a way to properly automate this proof *)
   (* FIXME: reflexivity, as being called many times by f_equiv and f_contractive
@@ -158,11 +158,10 @@ Lemma wp_value_fupd' s E Φ v : WP of_val v @ s; E {{ Φ }} ⊣⊢ |={E}=> Φ v.
 Proof. rewrite wp_unfold /wp_pre to_of_val. auto. Qed.
 
 Lemma wp_strong_mono s1 s2 E1 E2 e Φ Ψ :
-  s1.2 = s2.2 -> s1.1 ⊑ s2.1 → E1 ⊆ E2 →
+  s1 ⊑ s2 → E1 ⊆ E2 →
   WP e @ s1; E1 {{ Φ }} -∗ (■ (∀ v, (Φ v ={E2}=∗ Ψ v))) -∗ WP e @ s2; E2 {{ Ψ }}.
 Proof.
-  destruct s1 as [s1 a1]. destruct s2 as [s2 a2].
-  simpl. intros ? ?. subst a1. revert e E1 E2 Φ Ψ.
+  simpl. intros ?. revert e E1 E2 Φ Ψ.
   iApply löb_wand_plainly. iModIntro.
   iIntros "#IH". iIntros (e E1 E2 Φ Ψ HE) "H #HΦ".
   rewrite !wp_unfold /wp_pre /=.
@@ -218,8 +217,8 @@ Qed.
 Lemma wp_fupd s E e Φ : WP e @ s; E {{ v, |={E}=> Φ v }} ⊢ WP e @ s; E {{ Φ }}.
 Proof. iIntros "H". iApply (wp_strong_mono s s E with "H"); auto. Qed.
 
-Lemma wp_atomic E1 E2 e Φ a `{!Atomic StronglyAtomic e} :
-  (|={E1,E2}=> WP e @ (NotStuck,a); E2 {{ v, |={E2,E1}=> Φ v }}) ⊢ WP e @ (NotStuck,a); E1 {{ Φ }}.
+Lemma wp_atomic E1 E2 e Φ `{!Atomic StronglyAtomic e} :
+  (|={E1,E2}=> WP e @ E2 {{ v, |={E2,E1}=> Φ v }}) ⊢ WP e @ E1 {{ Φ }}.
 Proof.
   iIntros "H". rewrite !wp_unfold /wp_pre.  
   destruct (to_val e) as [v|] eqn:He.
@@ -315,7 +314,7 @@ Proof.
   iInduction n as [|n] "IH" forall (n0 Hn).
   - iApply (step_fupdN_wand with "H"). iIntros ">($ & Hwp & $)". iMod "HP".
     iModIntro.
-    iDestruct (bnextgen_intro_plainly (next_state (next_a e s.2)) with "HP") as "HP".
+    iDestruct (bnextgen_intro_plainly (next_state e) with "HP") as "HP".
     iModIntro.
     iApply (wp_strong_mono with "Hwp");auto. iDestruct "HP" as "#HP". iModIntro.
     iIntros (v) "HΦ". iApply ("HΦ" with "HP").
@@ -325,9 +324,10 @@ Proof.
 Qed.
 
 Lemma wp_bind K `{!LanguageCtx K} s E e Φ :
+  (forall e, to_val e = None -> next_state (K e) = next_state e) ->
   WP e @ s; E {{ v, WP K (of_val v) @ s; E {{ Φ }} }} ⊢ WP K e @ s; E {{ Φ }}.
 Proof.
-  destruct s as [s a];simpl.
+  intros next_state_ctx.
   iRevert (E e Φ).
   iApply löb_wand_plainly. iModIntro.
   iIntros "#IH" (E e Φ) "H".
@@ -343,21 +343,21 @@ Proof.
   iMod ("H" $! e2' σ2 efs with "[//] Hcred") as "H". iIntros "!>!>".
   iMod "H". iModIntro. iApply (step_fupdN_wand with "H"). iIntros "H".
   iMod "H" as "($ & H & $)". iModIntro.
-  iApply bnextgen_extensional_eq;[rewrite -(next_state_ctx _ _ K);eauto|].  
+  iApply bnextgen_extensional_eq;[rewrite (next_state_ctx);eauto|].
   iModIntro. by iApply "IH".
 Qed.
 
 Lemma wp_bind_inv K `{!LanguageCtx K} s E e Φ :
+  (forall e, to_val e = None -> next_state (K e) = next_state e) ->
   WP K e @ s; E {{ Φ }} ⊢ WP e @ s; E {{ v, WP K (of_val v) @ s; E {{ Φ }} }}.
 Proof.
-  destruct s as [s a];simpl.
-  iRevert (E e Φ).
+  intros next_state_ctx. iRevert (E e Φ).
   iApply löb_wand_plainly. iModIntro.
   iIntros "#IH" (E e Φ) "H".
   rewrite !wp_unfold /wp_pre /=.
   destruct (to_val e) as [v|] eqn:He.
   { apply of_to_val in He as <-. by rewrite !wp_unfold /wp_pre. }
-  rewrite fill_not_val //.
+  rewrite language.fill_not_val //.
   iIntros (σ1 ns κ κs nt) "Hσ". iMod ("H" with "[$]") as "[% H]".
   iModIntro; iSplit.
   { destruct s; eauto using reducible_fill_inv. }
@@ -365,8 +365,8 @@ Proof.
   iMod ("H" $! _ _ _ with "[] Hcred") as "H"; first eauto using fill_step.
   iIntros "!> !>". iMod "H". iModIntro. iApply (step_fupdN_wand with "H").
   iIntros "H". iMod "H" as "($ & H & $)". iModIntro.
-  iApply bnextgen_extensional_eq;[rewrite (next_state_ctx _ _ K);eauto|].  
-  iModIntro. by iApply "IH".
+  iApply bnextgen_extensional_eq;[erewrite <-(next_state_ctx);eauto|].  
+  iModIntro; by iApply "IH".
 Qed.
 
 (** * Derived rules *)
@@ -376,11 +376,11 @@ Proof.
   iIntros (v) "?". by iApply HΦ.
 Qed.
 Lemma wp_stuck_mono s1 s2 E e Φ :
-  s1.2 = s2.2 -> s1.1 ⊑ s2.1 → WP e @ s1; E {{ Φ }} ⊢ WP e @ s2; E {{ Φ }}.
-Proof. iIntros (??) "H". iApply (wp_strong_mono with "H"); auto. Qed.
-(* Lemma wp_stuck_weaken s E e Φ a : *)
-(*   WP e @ (s,a); E {{ Φ }} ⊢ WP e @ E ?{{ Φ }}. *)
-(* Proof. apply wp_stuck_mono. by destruct s. Qed. *)
+  s1 ⊑ s2 → WP e @ s1; E {{ Φ }} ⊢ WP e @ s2; E {{ Φ }}.
+Proof. iIntros (?) "H". iApply (wp_strong_mono with "H"); auto. Qed.
+Lemma wp_stuck_weaken s E e Φ :
+  WP e @ s; E {{ Φ }} ⊢ WP e @ E ?{{ Φ }}.
+Proof. apply wp_stuck_mono. by destruct s. Qed.
 Lemma wp_mask_mono s E1 E2 e Φ : E1 ⊆ E2 → WP e @ s; E1 {{ Φ }} ⊢ WP e @ s; E2 {{ Φ }}.
 Proof. iIntros (?) "H"; iApply (wp_strong_mono with "H"); auto. Qed.
 Global Instance wp_mono' s E e :

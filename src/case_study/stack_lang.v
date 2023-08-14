@@ -597,12 +597,15 @@ Module lang.
   Qed.
 
   Definition heap : Type := gmap loc val.
+  (* TODO: change this to a gmap instead of list. use filter + size of stack part of expression. *)
   Definition stack : Type := list (gmap loc val).
   Definition state : Type := heap * stack.
   Definition observation : Type := Empty_set.
 
   Definition heap_of (σ : state) : heap := fst σ.
   Definition stack_of (σ : state) : stack := snd σ.
+  Definition stack_expr : Type := nat * expr.
+  Definition stack_val : Type := nat * val.
   
   Inductive scope_tag : tag -> Prop :=
   | borrowScope : scope_tag borrow
@@ -786,125 +789,142 @@ Module lang.
   Definition subst' (mx : binder) (v : val) : expr → expr :=
     match mx with BNamed x => expr_subst x v | BAnon => id end.
 
-  Inductive head_step : list ectx_item -> expr -> state -> list observation -> expr -> state -> list expr -> RedMode -> Prop :=
+  Inductive head_step : list ectx_item -> stack_expr -> state -> list observation -> stack_expr -> state -> list stack_expr -> RedMode -> Prop :=
   (** Local Lam-β *)
-  | LamBetaLocalS K k x e1 i e2 v2 σ e1' v2' :
+  | LamBetaLocalS n K k x e1 i e2 v2 σ e1' v2' :
     to_val e2 = Some v2 ->
     scope_tag (local i) ->
     shift_val v2 (-1) = v2' ->
     shift_expr e1 (i - 1) = e1' ->
-    head_step K (Call (Lam (local i) k x e1) e2) σ []
-      (Return (Cont (-1) K) (subst' k (ContV (-1) K) (subst' x v2' e1'))) (push σ) [] CaptureMode
+    head_step K (n,Call (Lam (local i) k x e1) e2) σ []
+      (n+1,Return (Cont (-1) K) (subst' k (ContV (-1) K) (subst' x v2' e1'))) (push σ) [] CaptureMode
 
   (** Global Lam-β *)
-  | LamBetaGlobalS K k x e1 e2 v2 σ v2' :
+  | LamBetaGlobalS n K k x e1 e2 v2 σ v2' :
     to_val e2 = Some v2 ->
     shift_val v2 (-1) = v2' ->
-    head_step K (Call (Lam global k x e1) e2) σ []
-      (Return (Cont (-1) K) (subst' k (ContV (-1) K) (subst' x v2' e1))) (push σ) [] CaptureMode
+    head_step K (n, Call (Lam global k x e1) e2) σ []
+      (n+1,Return (Cont (-1) K) (subst' k (ContV (-1) K) (subst' x v2' e1))) (push σ) [] CaptureMode
 
   (** Return *)
-  | ReturnS K K' i e e' v σ :
+  | ReturnS n K K' i e e' v σ :
     to_val e = Some v ->
     shift_expr e i = e' ->
     (i <= 0)%Z ->
     length (stack_of σ) >= Z.abs_nat i ->
-    head_step K (Return (Cont i K') e) σ [] (foldl (flip fill_item) e' K') (popN σ (Z.abs_nat i)) [] ThrowMode
+    head_step K (n, Return (Cont i K') e) σ [] (n - (Z.abs_nat i), foldl (flip fill_item) e' K') (popN σ (Z.abs_nat i)) [] ThrowMode
 
   (** zeta *)
-  | ZetaS K x e1 e2 v1 σ :
+  | ZetaS n K x e1 e2 v1 σ :
     to_val e1 = Some v1 ->
-    head_step K (LetIn x e1 e2) σ [] (subst' x v1 e2) σ [] NormalMode
+    head_step K (n, LetIn x e1 e2) σ [] (n, subst' x v1 e2) σ [] NormalMode
 
   (** Products *)
-  | FstS K e1 v1 e2 v2 σ :
+  | FstS n K e1 v1 e2 v2 σ :
     to_val e1 = Some v1 → to_val e2 = Some v2 →
-    head_step K (Fst (Pair e1 e2)) σ [] e1 σ [] NormalMode
-  | SndS K e1 v1 e2 v2 σ :
+    head_step K (n, Fst (Pair e1 e2)) σ [] (n,e1) σ [] NormalMode
+  | SndS n K e1 v1 e2 v2 σ :
     to_val e1 = Some v1 → to_val e2 = Some v2 →
-    head_step K (Snd (Pair e1 e2)) σ [] e2 σ [] NormalMode
+    head_step K (n,Snd (Pair e1 e2)) σ [] (n,e2) σ [] NormalMode
 
   (** BinOp *)
-  | BinOpS K op e1 e2 v1 v2 w σ :
+  | BinOpS n K op e1 e2 v1 v2 w σ :
     to_val e1 = Some v1 → to_val e2 = Some v2 →
     binop_eval op v1 v2 = Some w →
-    head_step K (BinOp op e1 e2) σ [] (of_val w) σ [] NormalMode
+    head_step K (n, BinOp op e1 e2) σ [] (n, of_val w) σ [] NormalMode
 
   (** Allocation *)
-  | HallocS K e v σ l :
+  | HallocS n K e v σ l :
     to_val e = Some v ->
     permanent v ->
     [[σ @@]] !! l = None ->
-    head_step K (Halloc e) σ [] (Loc global l) (<[l@@:=v]>σ) [] NormalMode
+    head_step K (n, Halloc e) σ [] (n, Loc global l) (<[l@@:=v]>σ) [] NormalMode
 
-  | SallocS K e v σ l :
+  | SallocS n K e v σ l :
     to_val e = Some v ->
     scope v 0 ->
     [[σ @ 0]] !! l = None ->
-    head_step K (Salloc e) σ [] (Loc (local 0) l) (<[0@l:=v]>σ) [] NormalMode
+    head_step K (n, Salloc e) σ [] (n, Loc (local 0) l) (<[0@l:=v]>σ) [] NormalMode
 
   (** Loading *)
-  | LoadHeapS K v l δ σ :
+  | LoadHeapS n K v l δ σ :
     [[σ @@]] !! l = Some v ->
     heap_tag δ ->
-    head_step K (Load (Loc δ l)) σ [] (of_val v) σ [] NormalMode
+    head_step K (n, Load (Loc δ l)) σ [] (n, of_val v) σ [] NormalMode
 
-  | LoadStackS K v v' l i σ :
+  | LoadStackS n K v v' l i σ :
     [[σ @ (Z.abs_nat i)]] !! l = Some v ->
     scope_tag (local i) ->
     shift_val v i = v' ->
-    head_step K (Load (Loc (local i) l)) σ [] (of_val v') σ [] NormalMode
+    head_step K (n, Load (Loc (local i) l)) σ [] (n, of_val v') σ [] NormalMode
 
   (** Storing *)
-  | StoreHeapS K e v l δ σ :
+  | StoreHeapS n K e v l δ σ :
     to_val e = Some v ->
     permanent v ->
     heap_tag δ ->
     is_Some ([[σ @@]] !! l) ->
-    head_step K (Store (Loc δ l) e) σ [] Unit (<[l@@:=v]>σ) [] NormalMode
+    head_step K (n, Store (Loc δ l) e) σ [] (n,Unit) (<[l@@:=v]>σ) [] NormalMode
 
-  | StoreStackS K e v v' l j i σ :
+  | StoreStackS n K e v v' l j i σ :
     i = (Z.abs_nat j) ->
     to_val e = Some v ->
     scope v j ->
     shift_val v i = v' ->
     is_Some ([[σ @ i]] !! l) ->
-    head_step K (Store (Loc (local j) l) e) σ [] Unit (<[i@l:=v]>σ) [] NormalMode
+    head_step K (n, Store (Loc (local j) l) e) σ [] (n,Unit) (<[i@l:=v]>σ) [] NormalMode
 
   (** Downgrade Heap Location *)
-  | MaskS K l σ :
-    head_step K (Mask (Loc global l)) σ [] (Loc borrow l) σ [] NormalMode
+  | MaskS K l σ n :
+    head_step K (n, Mask (Loc global l)) σ [] (n, Loc borrow l) σ [] NormalMode
 
   (** If then else *)
-  | IfFalse K e1 e2 σ :
-    head_step K (If (#♭ false) e1 e2) σ [] e2 σ [] NormalMode
-  | IfTrue K e1 e2 σ :
-    head_step K (If (#♭ true) e1 e2) σ [] e1 σ [] NormalMode
+  | IfFalse n K e1 e2 σ :
+    head_step K (n, If (#♭ false) e1 e2) σ [] (n, e2) σ [] NormalMode
+  | IfTrue n K e1 e2 σ :
+    head_step K (n, If (#♭ true) e1 e2) σ [] (n,e1) σ [] NormalMode
 
   .
 
-  Lemma fill_item_val Ki e :
-    is_Some (to_val (fill_item Ki e)) → is_Some (to_val e).
-  Proof. intros [v ?]. destruct Ki; simplify_option_eq; eauto. Qed.
+  Definition stack_fill_item Ki (e : stack_expr) :=
+    (e.1,fill_item Ki e.2).
+  Definition stack_to_val (e : stack_expr) :=
+    to_val e.2 ≫= λ v, Some (e.1,v).
+  Definition stack_of_val (v : stack_val) :=
+    (v.1,of_val v.2).
+  Lemma stack_to_of_val v : stack_to_val (stack_of_val v) = Some v.
+  Proof. rewrite /stack_to_val /stack_of_val /= to_of_val /=. destruct v;auto. Qed.
+  Lemma stack_of_to_val e v : stack_to_val e = Some v -> stack_of_val v = e.
+  Proof. rewrite /stack_to_val /stack_of_val /=. destruct (to_val e.2) eqn:Hsome => /= //.
+         destruct e;simpl in *. intros HH. inversion HH. simpl.
+         apply of_to_val in Hsome as ->. auto. Qed.
 
-  Instance fill_item_inj Ki : Inj (=) (=) (fill_item Ki).
-  Proof. destruct Ki; intros ???; simplify_eq; auto with f_equal. Qed.
+  Lemma fill_item_val Ki e :
+    is_Some (stack_to_val (stack_fill_item Ki e)) → is_Some (stack_to_val e).
+  Proof. intros [v ?]. unfold stack_to_val. unfold stack_to_val in H.
+         destruct Ki; simplify_option_eq; simpl; eauto. Qed.
+
+  Instance fill_item_inj Ki : Inj (=) (=) (stack_fill_item Ki).
+  Proof. intros ? ?.  destruct x,y;simpl.
+         destruct Ki; intros ?; simplify_eq; auto with f_equal. Qed.
 
   Lemma val_stuck K e1 σ1 κ e2 σ2 ef rm :
-    head_step K e1 σ1 κ e2 σ2 ef rm → to_val e1 = None.
+    head_step K e1 σ1 κ e2 σ2 ef rm → stack_to_val e1 = None.
   Proof. destruct 1; naive_solver. Qed.
 
   Lemma head_ctx_step_val K Ki e σ1 κ e2 σ2 ef rm :
-    head_step K (fill_item Ki e) σ1 κ e2 σ2 ef rm → is_Some (to_val e).
-  Proof. destruct Ki; inversion_clear 1; simplify_option_eq; eauto. Qed.
+    head_step K (stack_fill_item Ki e) σ1 κ e2 σ2 ef rm → is_Some (stack_to_val e).
+  Proof. destruct e. destruct Ki; inversion_clear 1; simplify_option_eq; eauto.
+         all: try (rewrite /stack_to_val /= H0 /= //).
+         all: try (rewrite /stack_to_val /= H1 /= //). Qed.
 
   Lemma fill_item_no_val_inj Ki1 Ki2 e1 e2 :
-    to_val e1 = None → to_val e2 = None →
-    fill_item Ki1 e1 = fill_item Ki2 e2 → Ki1 = Ki2.
+    stack_to_val e1 = None → stack_to_val e2 = None →
+    stack_fill_item Ki1 e1 = stack_fill_item Ki2 e2 → Ki1 = Ki2.
   Proof.
-    destruct Ki1, Ki2; intros; try discriminate; simplify_eq;
+    destruct e1,e2. rewrite /stack_to_val /=. destruct Ki1, Ki2; intros; try discriminate; simplify_eq;
       repeat match goal with
-        | H : to_val (of_val _) = None |- _ => by rewrite to_of_val in H
+        | H : (to_val (of_val _)) ≫= _ = None |- _ => by rewrite to_of_val in H
         end; auto.
   Qed.
 
@@ -914,13 +934,13 @@ Module lang.
       head_step K' e1 σ1' κ' e2' σ2' efs' rm' → rm' = rm.
   Proof. by destruct 1; intros ??????; inversion 1. Qed.           
 
-  Definition capture K e :=
-    match e with
+  Definition capture K (e : stack_expr) :=
+    match e.2 with
     | Call (Lam global k x e1) e2 =>
         match to_val e2 with
         | Some v2 => 
             let v2' := shift_val v2 (-1) in
-            Some (Return (Cont (-1) K) (subst' k (ContV (-1) K) (subst' x v2' e1)))
+            Some (e.1+1,Return (Cont (-1) K) (subst' k (ContV (-1) K) (subst' x v2' e1)))
         | None => None
         end
     | Call (Lam (local i) k x e1) e2 =>
@@ -929,7 +949,7 @@ Module lang.
           | Some v2 =>
               let v2' := shift_val v2 (-1) in
               let e1' := shift_expr e1 (i - 1) in
-              Some (Return (Cont (-1) K) (subst' k (ContV (-1) K) (subst' x v2' e1')))
+              Some (e.1+1,Return (Cont (-1) K) (subst' k (ContV (-1) K) (subst' x v2' e1')))
           | None => None
           end
         else None
@@ -946,9 +966,9 @@ Module lang.
     capture K e1 = Some e2.
   Proof.
     inversion 1; eauto.
-    - simplify_eq. rewrite /= scope_tag_local_leb /= //.
+    - (* destruct e2; inversion H8. *) simplify_eq. unfold capture. simpl. rewrite /= scope_tag_local_leb /= //.
       simplify_option_eq. auto.
-    - simplify_eq. simpl. simplify_option_eq. auto.
+    - unfold capture. simplify_eq. simpl. simplify_option_eq. auto.
   Qed.
 
   Lemma ectxi_normal_reduciblity K K' e1 σ1 κ e2 σ2 efs :
@@ -964,9 +984,9 @@ Module lang.
              head_step K' e1 σ1 κ e2' σ2 efs CaptureMode.
   Proof.
     inversion 1; subst; simpl; eauto using head_step.
-    - simplify_option_eq. rewrite /= scope_tag_local_leb /= //.
+    - unfold capture. simplify_option_eq. rewrite /= scope_tag_local_leb /= //.
       eauto using head_step.
-    - simplify_option_eq. eauto using head_step.
+    - unfold capture. simplify_option_eq. eauto using head_step.
   Qed.
 
   Lemma ectxi_throw_reduciblity K K' e1 σ1 κ e2 σ2 efs :
@@ -975,19 +995,19 @@ Module lang.
   Proof. inversion 1; econstructor; eauto. Qed.
 
   
-  Lemma halloc_fresh K e v σ :
+  Lemma halloc_fresh n K e v σ :
     let l := fresh (dom (heap_of σ)) in
     to_val e = Some v →
     permanent v ->
-    head_step K (Halloc e) σ [] (Loc global l) (<[l@@:=v]>σ) [] NormalMode.
+    head_step K (n,Halloc e) σ [] (n,Loc global l) (<[l@@:=v]>σ) [] NormalMode.
   Proof. intros; apply HallocS;auto. apply not_elem_of_dom,is_fresh. Qed.
 
-  Lemma salloc_fresh K e v σ s :
+  Lemma salloc_fresh n K e v σ s :
     let l := fresh (dom s) in
     stack_of σ !! (length (stack_of σ) - 1) = Some s ->
     to_val e = Some v →
     scope v 0 ->
-    head_step K (Salloc e) σ [] (Loc (local 0) l) (<[0 @ l:=v]>σ) [] NormalMode.
+    head_step K (n,Salloc e) σ [] (n, Loc (local 0) l) (<[0 @ l:=v]>σ) [] NormalMode.
   Proof.
     intros; apply SallocS;auto.
     eapply not_elem_of_stack_dom;[|eapply is_fresh]. rewrite Nat.sub_0_r //.
@@ -1001,26 +1021,393 @@ End lang.
 (** Language *)
 Program Instance stack_lambda_ectxi_lang :
   CCEctxiLanguage
-    (lang.expr) lang.val lang.ectx_item lang.state lang.observation :=
+    (lang.stack_expr) lang.stack_val lang.ectx_item lang.state lang.observation :=
   {|
-    of_val := lang.of_val;
-    to_val := lang.to_val;
-    fill_item := lang.fill_item;
+    of_val := lang.stack_of_val;
+    to_val := lang.stack_to_val;
+    fill_item := lang.stack_fill_item;
     head_step := lang.head_step;
     capture := lang.capture
   |}.
-Solve Obligations with simpl; eauto using lang.to_of_val, lang.of_to_val,
+Solve Obligations with simpl; eauto using lang.stack_to_of_val, lang.stack_of_to_val,
   lang.val_stuck, lang.fill_item_val, lang.fill_item_no_val_inj,
   lang.head_ctx_step_val, lang.red_mode_det, lang.ectxi_capture_captures,
   lang.ectxi_normal_reduciblity, lang.ectxi_throw_reduciblity,
   lang.ectxi_capture_reduciblity.
 
-Canonical Structure lang := CC_ectx_lang (lang.expr).
+Canonical Structure lang := CC_ectx_lang (lang.stack_expr).
 
 Export lang.
 
-Definition is_atomic (e : expr) : Prop :=
+Inductive throw_reducible_fill : expr -> Z -> Prop :=
+| throw_reduce_fill i K v Ks : throw_reducible_fill (foldl (flip fill_item) (Return (Cont i K) (of_val v)) Ks) i.
+(* | throw_reduce_fill_ctx n Ks e : throw_reducible_fill (n, foldl (flip fill_item) Ks e). *)
+
+Inductive throw_reducible : expr -> Prop :=
+| throw_reduce i K v : throw_reducible ( Return (Cont i K) (of_val v))
+| throw_reduce_ctx K e : throw_reducible (e) -> throw_reducible ( fill_item K e).
+
+Inductive throw_reducible_i : expr -> Z -> Prop :=
+| throw_reduce_i i K v : throw_reducible_i (Return (Cont i K) (of_val v)) i
+| throw_reduce_i_ctx K e i : throw_reducible_i e i -> throw_reducible_i (fill_item K e) i.
+
+Local Ltac simpl_throw_red_solve IH ptrn K := destruct IH;                                           
+    [left; rewrite /= -/(fill_item ptrn _); constructor; auto|
+      right; intros Hcontr; inversion Hcontr as [|? ? ? HH]; simplify_eq; try (by destruct K; inversion HH; simpl in *; simplify_eq)].
+
+Lemma throw_reducible_fill_iff e i :
+  throw_reducible_fill e i <-> throw_reducible_i e i.
+Proof.
+  split; intros He.
+  - induction He; try constructor.
+    induction Ks using rev_ind.
+    + simpl. constructor.
+    + rewrite foldl_snoc /=. constructor. auto.
+  - induction He.
+    + assert (Return (Cont i K) (of_val v) = foldl (flip fill_item) (Return (Cont i K) (of_val v)) []) as ->;auto. constructor.
+    + inversion IHHe;subst. eassert (fill_item _ _ = flip fill_item _ _) as ->;[eauto|].
+      rewrite -(foldl_snoc (flip fill_item)). constructor.
+Qed.
+
+
+Definition is_cont (e1 : expr) :=
+  match e1 with
+  | Cont i K => true
+  | _ => false
+  end.
+
+Definition throw_reducible_dec e : Decision (throw_reducible e).
+Proof.
+  induction e; try (right;intros Hcontr;inversion Hcontr;by destruct K).
+  - simpl_throw_red_solve IHe1 (LetInCtx x e2) K. 
+  - destruct IHe1.
+    + left. rewrite -/(fill_item (BinOpLCtx _ _) _). constructor;auto.
+    + destruct (to_val e1) eqn:Hv.
+      * destruct IHe2.
+        { rewrite -(of_to_val e1 v)//. left. rewrite -/(fill_item (BinOpRCtx _ _) _). constructor;auto. }
+        { right. intros Hcontr; inversion Hcontr; destruct K; inversion H; simpl in *; simplify_eq;done. }
+      * right. intros Hcontr; inversion Hcontr; destruct K; inversion H; simpl in *; simplify_eq; try done.
+        by rewrite to_of_val in Hv.
+  - simpl_throw_red_solve IHe HallocCtx K.
+  - simpl_throw_red_solve IHe SallocCtx K.
+  - simpl_throw_red_solve IHe LoadCtx K.
+  - destruct IHe1.
+    + left. rewrite -/(fill_item (StoreLCtx _) _). constructor;auto.
+    + destruct (to_val e1) eqn:Hv.
+      * destruct IHe2.
+        { rewrite -(of_to_val e1 v)//. left. rewrite -/(fill_item (StoreRCtx _) _). constructor;auto. }
+        { right. intros Hcontr; inversion Hcontr; destruct K; inversion H; simpl in *; simplify_eq; done. }
+      * right. intros Hcontr; inversion Hcontr; destruct K; inversion H; simpl in *; simplify_eq; try done.
+        by rewrite to_of_val in Hv.
+  - simpl_throw_red_solve IHe MaskCtx K.
+  - right;intros Hcontr;inversion Hcontr;by destruct K0.
+  - destruct IHe1.
+    + left. rewrite -/(fill_item (CallLCtx _) _). constructor;auto.
+    + destruct (to_val e1) eqn:Hv.
+      * destruct IHe2.
+        { rewrite -(of_to_val e1 v)//. left. rewrite -/(fill_item (CallRCtx _) _). constructor;auto. }
+        { right. intros Hcontr; inversion Hcontr; destruct K; inversion H; simpl in *; simplify_eq; done. }
+      * right. intros Hcontr; inversion Hcontr; destruct K; inversion H; simpl in *; simplify_eq; try done.
+        by rewrite to_of_val in Hv.
+  - destruct (is_cont (e1)) eqn:Hcont.
+    + destruct e1;inversion Hcont. destruct (to_val e2) eqn:Hv.
+      * rewrite -(of_to_val e2 v)//;left;constructor.
+      * destruct IHe2.
+        { left. rewrite -(of_to_val (Cont i K) (ContV i K))// -/(fill_item (ReturnRCtx _) _).
+          constructor;auto. }
+        right. intros Hcontr; inversion Hcontr; simpl in *; simplify_eq;[rewrite to_of_val in Hv;done|].
+        destruct K0;inversion H;simpl in *; simplify_eq;[inversion H0; destruct K0; done|congruence].
+    + destruct IHe2.
+      * destruct (to_val e1) eqn:Hv.
+        { rewrite -(of_to_val e1 v)//  -/(fill_item (ReturnRCtx v) _). left. constructor; auto. }
+        simpl_throw_red_solve IHe1 (ReturnLCtx e2) K; simpl in *;simplify_eq.
+        destruct K;inversion HH;simpl in *; simplify_eq;[done|]. 
+        rewrite to_of_val in Hv. done.
+      * simpl_throw_red_solve IHe1 (ReturnLCtx e2) K; simplify_eq.
+  - destruct IHe1.
+    + left. rewrite -/(fill_item (PairLCtx _) _). constructor;auto.
+    + destruct (to_val e1) eqn:Hv.
+      * destruct IHe2.
+        { rewrite -(of_to_val e1 v)//. left. rewrite -/(fill_item (PairRCtx _) _). constructor;auto. }
+        { right. intros Hcontr; inversion Hcontr; destruct K; inversion H; simpl in *; simplify_eq; done. }
+      * right. intros Hcontr; inversion Hcontr; destruct K; inversion H; simpl in *; simplify_eq; try done.
+        by rewrite to_of_val in Hv.
+  - simpl_throw_red_solve IHe FstCtx K.
+  - simpl_throw_red_solve IHe SndCtx K.
+  - simpl_throw_red_solve IHe1 (IfCtx e2 e3) K.
+Qed.
+
+Lemma throw_reducible_exists_i (e : expr) :
+  throw_reducible e <->
+  exists i, throw_reducible_i e i.
+Proof.
+  split.
+  - intros H. induction H.
+    + exists i. constructor.
+    + destruct IHthrow_reducible as [i Hi].
+      exists i. constructor. auto.
+  - intros H. destruct H as [i Hi]. induction Hi.
+    + constructor.
+    + constructor. auto.
+Qed.
+
+Fixpoint construct_ctx (e : expr) : (ectx * expr) :=
   match e with
+  | Var _ | Lam _ _ _ _ | Nat _ | Bool _ | Loc _ _ | Cont _ _ | Unit => ([],e)
+  | LetIn x e1 e2 => let '(Ks,e') := construct_ctx e1 in (Ks ++ [LetInCtx x e2],e')
+  | BinOp op e1 e2 => match to_val e1 with
+                     | Some v => let '(Ks,e') := construct_ctx e2 in (Ks ++ [BinOpRCtx op v],e')
+                     | None => let '(Ks,e') := construct_ctx e1 in (Ks ++ [BinOpLCtx op e2],e')
+                     end
+  | Halloc e1 => let '(Ks,e') := construct_ctx e1 in (Ks ++ [HallocCtx],e')
+  | Salloc e1 => let '(Ks,e') := construct_ctx e1 in (Ks ++ [SallocCtx],e')
+  | Load e1 => let '(Ks,e') := construct_ctx e1 in (Ks ++ [LoadCtx],e')
+  | Store e1 e2 => match to_val e1 with
+                  | Some v => let '(Ks,e') := construct_ctx e2 in (Ks ++ [StoreRCtx v],e')
+                  | None => let '(Ks,e') := construct_ctx e1 in (Ks ++ [StoreLCtx e2],e')
+                  end
+  | Mask e1 => let '(Ks,e') := construct_ctx e1 in (Ks ++ [MaskCtx],e')
+  | Call e1 e2 => match to_val e1 with
+                 | Some v => let '(Ks,e') := construct_ctx e2 in (Ks ++ [CallRCtx v],e')
+                 | None => let '(Ks,e') := construct_ctx e1 in (Ks ++ [CallLCtx e2],e')
+                 end
+  | Return e1 e2 => match to_val e1 with
+                   | Some v => let '(Ks,e') := construct_ctx e2 in (Ks ++ [ReturnRCtx v],e')
+                   | None => let '(Ks,e') := construct_ctx e1 in (Ks ++ [ReturnLCtx e2],e')
+                   end
+  | Pair e1 e2 => match to_val e1,to_val e2 with
+                 | Some v1, Some v2 => ([],e)
+                 | Some v, None => let '(Ks,e') := construct_ctx e2 in (Ks ++ [PairRCtx v],e')
+                 | None,_ => let '(Ks,e') := construct_ctx e1 in (Ks ++ [PairLCtx e2],e')
+                 end
+  | Fst e1 => let '(Ks,e') := construct_ctx e1 in (Ks ++ [FstCtx],e')
+  | Snd e1 => let '(Ks,e') := construct_ctx e1 in (Ks ++ [SndCtx],e')
+  | If e1 e2 e3 => let '(Ks,e') := construct_ctx e1 in (Ks ++ [IfCtx e2 e3],e')
+  end.
+
+Definition stack_construct_ctx (e : stack_expr) : (ectx * stack_expr) :=
+  let '(Ks,e') := construct_ctx e.2 in (Ks,(e.1,e')).
+
+Lemma snoc_eq {A : Type} (l1 l2 : list A) (a1 a2 : A) :
+  l1 ++ [a1] = l2 ++ [a2] -> l1 = l2 /\ a1 = a2.
+Proof.
+  intros Heq.
+  apply app_inj_2 in Heq as [Heq1 Heq2];auto.
+  simplify_eq. auto.
+Qed.
+
+Lemma construct_ctx_fill e Ks e' :
+  construct_ctx e = (Ks,e') -> e = foldl (flip fill_item) e' Ks.
+Proof.
+  revert e e'. induction Ks using rev_ind;intros e e'.
+  - simpl. intros Heq.
+    destruct e;simpl in *;inversion Heq;auto.
+    all: try (case_match;inversion Heq; by apply app_nil in H2 as [? ?]).
+    all: try (case_match;case_match;inversion Heq; by apply app_nil in H3 as [? ?]).
+    case_match;[case_match|];inversion Heq;auto.
+    all: case_match;inversion Heq;destruct l;simpl in *;done.
+  - destruct e; simpl;intros Heq;inversion Heq;simpl;auto.
+    all: rewrite foldl_snoc.
+    all:try (case_match;inversion Heq;subst;apply snoc_eq in H2 as [? ?];simplify_eq).
+    all:try by (rewrite -(IHKs e1)//).
+    all:try (case_match;case_match;inversion Heq;apply snoc_eq in H3 as [? ?];simplify_eq).
+    all:try (rewrite -(IHKs e2) // /= (of_to_val e1) //).
+    all:try by (rewrite -(IHKs e1) /= //).
+    all:try by (rewrite -(IHKs e) /= //).
+    case_match;case_match;simplify_eq. destruct Ks => //.
+    case_match;simplify_eq. all: apply snoc_eq in H0 as [? ?];simplify_eq.
+    by (rewrite -(IHKs e2)// /= (of_to_val e1)//).
+    rewrite -(IHKs e1)//.
+Qed.
+
+Definition find_i (e : expr) : option Z :=
+  let '(Ks,e') := construct_ctx e in
+  match (Ks,e') with
+  | (ReturnRCtx (ContV i _) :: Ks', e) => to_val e ≫= λ _, Some i
+  | (_,_) => None
+  end.
+
+Compute construct_ctx (Fst (Return (Cont 0 [FstCtx]) (Nat 0))).
+Compute (fill [ReturnRCtx (ContV 0 [FstCtx]); FstCtx] (0,Nat 0)).
+Compute (find_i (Fst (Return (Cont 0 [FstCtx]) (Nat 0)))).
+
+Lemma construct_ctx_val e e' :
+  construct_ctx e = ([], e') ->
+  ((is_Some (to_val e) \/ (exists b, e = Var b)) /\ e = e').
+Proof.
+  intros Hctx.
+  destruct e;inversion Hctx;subst;simpl.
+  all: try by (split;eauto).
+  all: try (case_match;destruct l;done).
+  all: try (case_match;case_match;destruct l;done).
+  case_match;case_match;simpl;simplify_eq;eauto.
+  case_match;destruct l;done. destruct l;done.
+Qed.
+
+Lemma find_i_throw_reducible e i :
+  find_i e = Some i -> throw_reducible_i e i.
+Proof.
+  intros Hi. unfold find_i in Hi.
+  destruct (construct_ctx e) as [Ks e'] eqn:He.
+  destruct Ks;[done|].
+  destruct e0;try done. destruct v1;try done.
+  destruct (to_val e') eqn:He';try done. simpl in Hi. simplify_eq.
+  apply throw_reducible_fill_iff.
+  apply construct_ctx_fill in He as Heq. subst e.
+  simpl. rewrite -(of_to_val e' v)//.
+Qed.
+  
+Lemma construct_ctx_to_val e v :
+  to_val e = Some v ->
+  construct_ctx e = ([],e).
+Proof.
+  intros Hv.
+  destruct e;inversion Hv;simpl;auto.
+  case_match;simpl in *.
+  case_match;simpl in *;auto.
+  done. done.
+Qed.
+
+Lemma construct_ctx_of_val e :
+  construct_ctx (of_val e) = ([],of_val e).
+Proof.
+  destruct e;simpl;auto.
+  rewrite !to_of_val //.
+Qed.
+
+Lemma to_val_foldl_None e Ks :
+  to_val e = None ->
+  to_val (foldl (flip fill_item) e Ks) = None.
+Proof.
+  intros Hnone.
+  induction Ks using rev_ind;simpl;auto.
+  rewrite foldl_snoc;simpl.
+  destruct x;simpl;auto.
+  rewrite IHKs//.
+  rewrite to_of_val /= IHKs //.
+Qed.
+  
+Lemma find_i_fill_item e i K:
+  find_i e = Some i ->
+  find_i (fill_item K e) = Some i.
+Proof.
+  rewrite /find_i /=. case_match.
+  case_match;[done|]. destruct e1;try done.
+  destruct v1;try done.
+  intros Hval. destruct (to_val e0) eqn:Hv;simpl in *;[|done].
+  simplify_eq. apply construct_ctx_fill in H as Heq; subst e.
+  simpl. clear H. revert K. induction l0 using rev_ind;intros K.
+  - simpl. destruct K;simpl; erewrite construct_ctx_to_val;eauto;rewrite /= //.
+    all: try rewrite Hv /= //. all: try rewrite to_of_val /= // Hv //.
+  - rewrite foldl_snoc. simpl.
+    specialize (IHl0 x).
+    case_match. destruct l;try done.
+    destruct e1;try done. destruct v1;try done.
+    destruct (to_val e) eqn:Hval;try done.
+    simpl in *. simplify_eq.
+    destruct K;simpl;try rewrite H /= Hval/=;auto.
+    all: try rewrite to_of_val H /= Hval /= //.
+    all: rewrite -/(flip fill_item _ x) -foldl_snoc.
+    all: rewrite to_val_foldl_None//.
+    all: try rewrite foldl_snoc /flip /= H /= Hval /= //.
+    rewrite to_of_val.
+    rewrite foldl_snoc /flip /= H /= Hval /= //.
+Qed.
+
+Lemma find_i_fill e i Ks :
+  find_i e = Some i ->
+  find_i (foldl (flip fill_item) e Ks) = Some i.
+Proof.
+  intros Hf.
+  induction Ks using rev_ind.
+  - simpl. auto.
+  - rewrite foldl_snoc.
+    apply find_i_fill_item =>//.
+Qed.
+    
+Lemma throw_reducible_find_i e i :
+  throw_reducible_i e i -> find_i e = Some i.
+Proof.
+  intros Hred.
+  induction Hred;subst.
+  - unfold find_i. simpl.
+    erewrite construct_ctx_to_val;[|apply to_of_val].
+    rewrite /= to_of_val /= //.
+  -  apply find_i_fill_item. auto.
+Qed.
+
+Lemma throw_reducible_find_i_iff e i :
+  throw_reducible_i e i <-> find_i e = Some i.
+Proof.
+  split.
+  - apply throw_reducible_find_i.
+  - apply find_i_throw_reducible.
+Qed.
+
+Lemma throw_reducible_of_val_false v1 i : throw_reducible_i (of_val v1) i -> False.
+Proof.
+  intros Ht.
+  remember (of_val v1) as e in Ht.
+  generalize dependent v1.
+  induction Ht.
+  - intros. destruct v1;done.
+  - intros. destruct K,v1;simpl in Heqe;try done.
+    inversion Heqe;subst. eapply IHHt;eauto.
+    inversion Heqe;subst. eapply IHHt;eauto.
+Qed.    
+  
+Lemma fill_item_find_i e i K:
+  to_val e = None ->
+  find_i (fill_item K e) = Some i ->
+  find_i e = Some i.
+Proof.
+  rewrite -!throw_reducible_find_i_iff.
+  intros He Ht.
+  remember (fill_item K e) as e' in Ht.
+  generalize dependent K.
+  generalize dependent e.
+  induction Ht;intros e' He K' Heqe'.
+  - subst. destruct K';inversion Heqe';subst.
+    done. rewrite to_of_val in He. done.
+  - destruct K,K';inversion Heqe';subst;auto.
+    all: try by rewrite to_of_val in He.
+    all: inversion Ht;subst;[destruct v1;done|].
+    all: destruct K,v1;try done;inversion H;simplify_eq;
+      exfalso;eapply throw_reducible_of_val_false;eauto.
+Qed.
+
+Lemma fill_find_i e i Ks :
+  to_val e = None ->
+  find_i (foldl (flip fill_item) e Ks) = Some i ->
+  find_i e = Some i.
+Proof.
+  intros Hv Hf.
+  induction Ks using rev_ind.
+  - simpl. auto.
+  - rewrite foldl_snoc in Hf.
+    apply IHKs.
+    apply fill_item_find_i with (K:=x);eauto.
+    apply to_val_foldl_None =>//.    
+Qed.
+
+Lemma fill_proj (e : stack_expr) (K : ectx) :
+  (foldl (flip stack_fill_item) e K).2 = foldl (flip fill_item) e.2 K.
+Proof.
+  destruct e;simpl. induction K using rev_ind;simpl;auto.
+  rewrite !foldl_snoc.
+  simpl. rewrite IHK. auto.
+Qed.
+
+Lemma fill_proj_fst_eq (e : stack_expr) (K : ectx) :
+  (foldl (flip stack_fill_item) e K).1 = e.1.
+Proof.
+  destruct e;simpl. induction K using rev_ind;simpl;auto.
+  rewrite !foldl_snoc.
+  simpl. rewrite IHK. auto.
+Qed.
+
+Definition is_atomic (e : stack_expr) : Prop :=
+  match e.2 with
   | Halloc e => is_Some (to_val e)
   | Salloc e => is_Some (to_val e)
   | Load e =>  is_Some (to_val e)
@@ -1029,18 +1416,27 @@ Definition is_atomic (e : expr) : Prop :=
   end.
 Lemma is_atomic_sub_values e : is_atomic e → sub_values e.
 Proof.
-  destruct e; inversion 1; simpl; apply ectxi_language_sub_values;
-    intros [] ?; inversion 1; subst; simpl in *; tauto.
+  destruct e as [n e]; rewrite /is_atomic /=; destruct e; inversion 1; simpl; apply ectxi_language_sub_values;
+    intros [] ?; inversion 1; subst; simpl in *.
+  all: try rewrite /stack_to_val H0 /=;eauto.
+  inversion H0;rewrite /stack_to_val H3 //.
+  inversion H1;rewrite /stack_to_val H3 //.
 Qed.
 Lemma is_atomic_correct e : is_atomic e → Atomic StronglyAtomic e.
 Proof.
   intros ?; apply ectx_language_atomic; simpl.
-  - destruct 1; simpl; try done; rewrite ?to_of_val; eauto.
+  - destruct 1; simpl; try done; rewrite /stack_to_val /= ?to_of_val; eauto.
   - apply ectxi_language_sub_values => Ki e' Heq; subst; simpl in *.
-    destruct Ki; naive_solver.
+    destruct e';simpl in *.
+    rewrite /stack_fill_item /= in H.
+    rewrite /stack_to_val /=.
+    destruct Ki; simpl in *; inversion H.
+    all: try rewrite H0 /= //.
+    inversion H0. rewrite H2 /= //.
+    inversion H1. rewrite H2 /= //.
 Qed.
 Lemma is_atomic_normal e : is_atomic e → is_normal e.
-Proof. by destruct e; inversion 1; intros ????; inversion 1; simpl. Qed.
+Proof. destruct e;simpl. by destruct e; inversion 1; intros ????; inversion 1; simpl. Qed.
 
 Ltac solve_atomic :=
   apply is_atomic_correct; simpl; repeat split;
