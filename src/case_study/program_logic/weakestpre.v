@@ -86,7 +86,7 @@ Definition wp_pre `{!irisGS_gen hlc Λ Σ} (s : stuckness)
        ∀ e2 σ2 efs, ⌜prim_step e1 σ1 κ e2 σ2 efs⌝ -∗
          £ (S (num_laters_per_step ns))
          ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-        state_interp σ2 (S ns) κs (length efs + nt) ∗
+        (⚡={next_state e1}=> state_interp σ2 (S ns) κs (length efs + nt)) ∗
          (⚡={next_state e1}=> wp E e2 Φ) ∗
          [∗ list] i ↦ ef ∈ efs, wp ⊤ ef fork_post
   end)%I.
@@ -252,8 +252,8 @@ Lemma wp_credit_access s E e Φ P :
   (∀ m k, num_laters_per_step m + num_laters_per_step k ≤ num_laters_per_step (m + k)) →
   (∀ σ1 ns κs nt, (state_interp σ1 ns κs nt) ={E}=∗
     ∃ k m, (state_interp σ1 m κs nt) ∗ ⌜ns = (m + k)%nat⌝ ∗
-    (∀ nt σ2 κs, £ (num_laters_per_step k) -∗ (state_interp σ2 (S m) κs nt) ={E}=∗
-      (state_interp σ2 (S ns) κs nt) ∗ ■ P)) -∗
+    (∀ nt σ2 κs, £ (num_laters_per_step k) -∗ (⚡={next_state e}=> state_interp σ2 (S m) κs nt) ={E}=∗
+      (⚡={next_state e}=> state_interp σ2 (S ns) κs nt) ∗ ■ P)) -∗
   WP e @ s; E {{ v, P ={E}=∗ Φ v }} -∗
   WP e @ s; E {{ Φ }}.
 Proof.
@@ -342,9 +342,10 @@ Proof.
   destruct (fill_step_inv e σ1 κ e2 σ2 efs) as (e2'&->&?); auto.
   iMod ("H" $! e2' σ2 efs with "[//] Hcred") as "H". iIntros "!>!>".
   iMod "H". iModIntro. iApply (step_fupdN_wand with "H"). iIntros "H".
-  iMod "H" as "($ & H & $)". iModIntro.
-  iApply bnextgen_extensional_eq;[rewrite (next_state_ctx);eauto|].
-  iModIntro. by iApply "IH".
+  iMod "H" as "(HH & H & $)". iModIntro.
+  iSplitL "HH".
+  all: iApply bnextgen_extensional_eq;[rewrite (next_state_ctx);eauto|].
+  all: iModIntro. 1: iFrame. by iApply "IH".
 Qed.
 
 Lemma wp_bind_inv K `{!LanguageCtx K} s E e Φ :
@@ -364,9 +365,9 @@ Proof.
   iIntros (e2 σ2 efs Hstep) "Hcred".
   iMod ("H" $! _ _ _ with "[] Hcred") as "H"; first eauto using fill_step.
   iIntros "!> !>". iMod "H". iModIntro. iApply (step_fupdN_wand with "H").
-  iIntros "H". iMod "H" as "($ & H & $)". iModIntro.
-  iApply bnextgen_extensional_eq;[erewrite <-(next_state_ctx);eauto|].  
-  iModIntro; by iApply "IH".
+  iIntros "H". iMod "H" as "(HH & H & $)". iModIntro.
+  iSplitL "HH". all: iApply bnextgen_extensional_eq;[erewrite <-(next_state_ctx);eauto|].  
+  all: iModIntro. 1:iFrame. by iApply "IH".
 Qed.
 
 (** * Derived rules *)

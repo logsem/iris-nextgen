@@ -23,7 +23,7 @@ Lemma wp_lift_step_fupdN s E Φ e1 :
     ∀ e2 σ2 efs, ⌜prim_step e1 σ1 κ e2 σ2 efs⌝ -∗
       £ (S $ num_laters_per_step ns)
       ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-      state_interp σ2 (S ns) κs (length efs + nt) ∗
+      (⚡={next_state e1}=> state_interp σ2 (S ns) κs (length efs + nt)) ∗
       (⚡={next_state e1}=> WP e2 @ s; E {{ Φ }}) ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ fork_post }})
   ⊢ WP e1 @ s; E {{ Φ }}.
@@ -34,7 +34,7 @@ Lemma wp_lift_step_fupd s E Φ e1 :
   (∀ σ1 ns κ κs nt, (state_interp σ1 ns (κ ++ κs) nt) ={E,∅}=∗
     ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
     ∀ e2 σ2 efs, ⌜prim_step e1 σ1 κ e2 σ2 efs⌝ -∗ £ 1 ={∅}=∗ ▷ |={∅,E}=>
-      (state_interp σ2 (S ns) κs (length efs + nt)) ∗
+      (⚡={next_state e1}=> state_interp σ2 (S ns) κs (length efs + nt)) ∗
       (⚡={next_state e1}=> WP e2 @ s; E {{ Φ }}) ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ fork_post }})
   ⊢ WP e1 @ s; E {{ Φ }}.
@@ -64,7 +64,7 @@ Lemma wp_lift_step s E Φ e1 :
   (∀ σ1 ns κ κs nt, (state_interp σ1 ns (κ ++ κs) nt) ={E,∅}=∗
     ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
     ▷ ∀ e2 σ2 efs, ⌜prim_step e1 σ1 κ e2 σ2 efs⌝ -∗ £ 1 ={∅,E}=∗
-      (state_interp σ2 (S ns) κs (length efs + nt)) ∗
+      (⚡={next_state e1}=> state_interp σ2 (S ns) κs (length efs + nt)) ∗
       (⚡={next_state e1}=> WP e2 @ s; E {{ Φ }}) ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ fork_post }})
   ⊢ WP e1 @ s; E {{ Φ }}.
@@ -76,7 +76,8 @@ Qed.
 Lemma wp_lift_pure_step_no_fork `{!Inhabited (state Λ)} s E E' Φ e1 :
   (∀ σ1, if s is NotStuck then reducible e1 σ1 else to_val e1 = None) →
   (∀ κ σ1 e2 σ2 efs, prim_step e1 σ1 κ e2 σ2 efs → κ = [] ∧ σ2 = σ1 ∧ efs = []) →
-  (|={E}[E']▷=> ∀ κ e2 efs σ, ⌜prim_step e1 σ κ e2 σ efs⌝ -∗ £ 1 -∗ ⚡={next_state e1}=> WP e2 @ s; E {{ Φ }})
+  (|={E}[E']▷=> ∀ κ κs e2 efs σ nt ns, ⌜prim_step e1 σ κ e2 σ efs⌝ -∗ £ 1 -∗ state_interp σ ns (κ ++ κs) nt
+                             -∗ (⚡={next_state e1}=> state_interp σ ns (κ ++ κs) nt) ∗ ⚡={next_state e1}=> WP e2 @ s; E {{ Φ }})
   ⊢ WP e1 @ s; E {{ Φ }}.
 Proof.
   iIntros (Hsafe Hstep) "H". iApply wp_lift_step.
@@ -87,8 +88,8 @@ Proof.
   iNext. iIntros (e2 σ2 efs ?) "Hcred".
   destruct (Hstep κ σ1 e2 σ2 efs) as (-> & <- & ->); auto.
   iMod "Hclose" as "_". iMod "H". iModIntro.
-  iDestruct ("H" with "[//] Hcred") as "$".
-  iSplitL =>//.
+  iDestruct ("H" with "[//] Hcred Hσ") as "[Hσ $]".
+  iSplitL =>//. iModIntro. simpl.
   by iApply state_interp_mono.
 Qed.
 
@@ -109,7 +110,7 @@ Lemma wp_lift_atomic_step_fupd {s E1 E2 Φ} e1 :
   (∀ σ1 ns κ κs nt, (state_interp σ1 ns (κ ++ κs) nt) ={E1}=∗
     ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
     ∀ e2 σ2 efs, ⌜prim_step e1 σ1 κ e2 σ2 efs⌝ -∗ £ 1 ={E1}[E2]▷=∗
-      (state_interp σ2 (S ns) κs (length efs + nt)) ∗
+      (⚡={next_state e1}=> state_interp σ2 (S ns) κs (length efs + nt)) ∗
       from_option (λ v, ⚡={next_state e1}=> Φ v) False (to_val e2) ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ fork_post }})
   ⊢ WP e1 @ s; E1 {{ Φ }}.
@@ -131,7 +132,7 @@ Lemma wp_lift_atomic_step {s E Φ} e1 :
   (∀ σ1 ns κ κs nt, (state_interp σ1 ns (κ ++ κs) nt) ={E}=∗
     ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
     ▷ ∀ e2 σ2 efs, ⌜prim_step e1 σ1 κ e2 σ2 efs⌝ -∗ £ 1 ={E}=∗
-      (state_interp σ2 (S ns) κs (length efs + nt)) ∗
+      (⚡={next_state e1}=> state_interp σ2 (S ns) κs (length efs + nt)) ∗
       from_option (λ v, ⚡={next_state e1}=> Φ v) False (to_val e2) ∗
       [∗ list] ef ∈ efs, WP ef @ s; ⊤ {{ fork_post }})
   ⊢ WP e1 @ s; E {{ Φ }}.
@@ -145,13 +146,21 @@ Qed.
 Lemma wp_lift_pure_det_step_no_fork `{!Inhabited (state Λ)} {s E E' Φ} e1 e2 :
   (∀ σ1, if s is NotStuck then reducible e1 σ1 else to_val e1 = None) →
   (∀ σ1 κ e2' σ2 efs', prim_step e1 σ1 κ e2' σ2 efs' →
-    κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = []) →
+                       κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = []) →
+  (* (∀ σ1 κ κs ns nt e2' σ2 efs', prim_step e1 σ1 κ e2' σ2 efs' → *)
+  (*                            (state_interp σ1 ns κs nt) -∗ *)
+  (*                             ⚡={next_state e1}=> state_interp σ2 ns (κ ++ κs) (length efs' + nt)) → *)
+  (∀ σ ns κs nt, prim_step e1 σ [] e2 σ [] -> state_interp σ ns κs nt -∗ ⚡={next_state e1}=> state_interp σ ns κs nt) ->
   (|={E}[E']▷=> £ 1 -∗ (⚡={next_state e1}=> WP e2 @ s; E {{ Φ }})) ⊢ WP e1 @ s; E {{ Φ }}.
 Proof.
-  iIntros (? Hpuredet) "H". iApply (wp_lift_pure_step_no_fork s E E'); try done.
+  iIntros (? Hpuredet Hcond) "H". iApply (wp_lift_pure_step_no_fork s E E'); try done.
   { naive_solver. }
   iApply (step_fupd_wand with "H"); iIntros "H".
-  iIntros (κ e' efs' σ (_&?&->&?)%Hpuredet); auto.
+  iIntros (κ κs e' efs' σ nt ns Hstep);auto.
+  apply Hpuredet in Hstep as Hpure. destruct Hpure as (?&?&->&?);subst.
+  iIntros "Hc Hσ". iDestruct ("H" with "Hc") as "$".
+  simpl.
+  iDestruct (Hcond with "Hσ") as "Hσ";eauto.
 Qed.
 
 Fixpoint n_next_state (n : nat) (e1 : expr Λ) (P : iProp Σ) :=

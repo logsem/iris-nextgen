@@ -597,7 +597,6 @@ Module lang.
   Qed.
 
   Definition heap : Type := gmap loc val.
-  (* TODO: change this to a gmap instead of list. use filter + size of stack part of expression. *)
   Definition stack : Type := list (gmap loc val).
   Definition state : Type := heap * stack.
   Definition observation : Type := Empty_set.
