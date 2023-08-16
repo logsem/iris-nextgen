@@ -119,7 +119,7 @@ Notation "l ↦ v" :=
   (mapsto (L:=loc) (V:=val) l (DfracOwn 1) v%V) (at level 20) : bi_scope.
 Notation "l ↦{ q } -" := (∃ v, l ↦{q} v)%I
   (at level 20, q at level 50, format "l  ↦{ q }  -") : bi_scope.
-Notation "l ↦ -" := (l ↦{1} -)%I (at level 20) : bi_scope.
+Notation "l ↦ -" := (l ↦{DfracOwn 1} -)%I (at level 20) : bi_scope.
 
 Notation "i @@ l ↦{ q } v" := (mapsto (L:=nat * loc) (V:=val) (i,l) q v%V)
   (at level 20, l at next level, q at next level, format "i  @@  l  ↦{ q }  v") : bi_scope.
@@ -158,7 +158,28 @@ Section heapG_nextgen_updates.
     done.
   Qed.
 
-  Lemma gen_heap_alloc_stack_pop s1 i :
+  Lemma gen_stack_valid (s : stack) (h : heap) (j : nat) (l : loc) (w : val) :
+    (length s - 1 - j) @@ l ↦ w -∗ gen_stack_interp s -∗ ⌜[[ (h,s) @ j ]] !! l = Some w ⌝.
+  Proof.
+    iIntros "Hl Hs".
+    rewrite /mapsto seal_eq /gen_heap.mapsto_def.
+    iDestruct (ghost_map.ghost_map_lookup with "Hs Hl") as %Hlookup.
+    rewrite list_to_gmap_stack_lookup in Hlookup.
+    rewrite /lookup /lookup_state_Lookup /lookup_state /lookup_stack /=.
+    auto.
+  Qed.
+
+  Lemma gen_stack_update s s0 j l w w' :
+    s !! (length s - 1 - j) = Some s0 ->
+    (length s - 1 - j) @@ l ↦ w -∗ gen_stack_interp s ==∗ (length s - 1 - j) @@ l ↦ w' ∗ gen_stack_interp (<[length s - 1 - j:=<[l:=w']> s0]> s).
+  Proof.
+    iIntros (Hs0) "Hl Hs".
+    rewrite /mapsto seal_eq /gen_heap.mapsto_def.
+    iMod (ghost_map.ghost_map_update with "Hs Hl") as "[Hs Hl]". iFrame.
+    erewrite list_to_gmap_stack_insert =>//.
+  Qed.
+
+  Lemma gen_stack_interp_stack_pop s1 i :
     length s1 ≥ i ->
     gen_stack_interp s1 -∗
     ⚡={trans_single stack_gname (state_trans ((length s1) - i))}=> gen_stack_interp (popN_stack s1 i).
@@ -173,7 +194,69 @@ Section heapG_nextgen_updates.
     rewrite agree_map_to_agree.
     rewrite stack_location_cut_popN_stack. iFrame.
   Qed.
-  
+
+  Lemma gen_heap_interp_stack_pop (h : heap) n :
+    gen_heap_interp h -∗
+    ⚡={trans_single stack_gname (state_trans n)}=> gen_heap_interp h.
+  Proof.
+    iIntros "Hh".
+    rewrite /gen_heap_interp.
+    iApply bnextgen_exist. iDestruct "Hh" as (m Hdom) "[Hh Hm]".
+    iExists m. iApply bnextgen_sep_2. iSplitR.
+    { iModIntro; auto. }
+    iApply bnextgen_sep_2. iSplitR "Hm".
+    - rewrite /ghost_map.ghost_map_auth seal_eq /ghost_map.ghost_map_auth_def.
+      iApply trans_single_own_other;[admit|]. (* will go through with the new inG def *)
+      iFrame.
+    - rewrite /ghost_map.ghost_map_auth seal_eq /ghost_map.ghost_map_auth_def.
+      iApply trans_single_own_other;[admit|]. (* will go through with the new inG def *)
+      iFrame.
+  Admitted.
+
+  Lemma stack_size_auth_stack_pop s n :
+    own heapG_stacksize_name (excl_auth_auth s) -∗
+    ⚡={trans_single stack_gname (state_trans n)}=> own heapG_stacksize_name (excl_auth_auth s).
+  Proof.
+    iIntros "Hs".
+    iApply trans_single_own_other;[admit|]. (* will go through with the new inG def *)
+    iFrame.
+  Admitted.
+
+  Lemma heap_stack_pop_intro l q v n :
+    l ↦{q} v -∗ ⚡={trans_single stack_gname (state_trans n)}=> l ↦{q} v.
+  Proof.
+    iIntros "Hl".
+    rewrite /mapsto seal_eq /gen_heap.mapsto_def
+      /ghost_map.ghost_map_elem seal_eq /ghost_map.ghost_map_elem_def.
+    iApply trans_single_own_other;[admit|]. (* will go through with the new inG def *)
+    iFrame.
+  Admitted.
+
+  Lemma stack_size_frag_stack_pop s n :
+    [size] s -∗ ⚡={trans_single stack_gname (state_trans n)}=> [size] s.
+  Proof.
+    iIntros "Hs".
+    iApply trans_single_own_other;[admit|]. (* will go through with the new inG def *)
+  Admitted.
+
+  Lemma stack_stack_pop_intro i l q v n :
+    i < n ->
+    i @@ l ↦{q} v -∗ ⚡={trans_single stack_gname (state_trans n)}=> i @@ l ↦{q} v.
+  Proof.
+    iIntros (Hle) "Hl".
+    rewrite /mapsto seal_eq /gen_heap.mapsto_def
+      /ghost_map.ghost_map_elem seal_eq /ghost_map.ghost_map_elem_def.
+    rewrite -/stack_gname.
+    iDestruct (trans_single_own _ (state_trans n) with "Hl") as "Hl".
+    iModIntro.
+    rewrite /state_trans /map_entry_lift_gmap_view /gmap_view.gmap_view_frag /=.
+    rewrite /cmra_morphism_extra.fmap_view /=.
+    rewrite /gMapTrans_frag_lift /=.
+    rewrite map_imap_insert /= agree_option_map_to_agree /=.
+    rewrite /stack_location_cut bool_decide_true // /=.
+  Qed.
+    
+    
 End heapG_nextgen_updates.
 
 (** The tactic [inv_head_step] performs inversion on hypotheses of the shape
@@ -228,8 +311,10 @@ Section lifting.
          | H : IntoVal (_,?e) ?v |- to_val ?e = Some _ => inversion H; eauto
          | H : language.of_val (_,?v) = ?e |- to_val ?e = Some _ => inversion H; eauto
          end : core.
-  
-  (** Base axioms for core primitives of the language: Stateless reductions *)
+
+  (** ------------------------------------------------------------ *)
+  (** ------------------- Stateless reductions ------------------- *)
+  (** ------------------------------------------------------------ *)
 
   Lemma next_state_letin_id n x e1 v1 e2 `{!IntoVal (n,e1) v1} :
     next_state_f (n, LetIn x e1 e2) = id.
@@ -242,9 +327,9 @@ Section lifting.
   Ltac resolve_next_state :=
          match goal with
          | |- ∀ x, next_state_f _ _ = _ _ =>
-             inv_head_step; rewrite /next_state_f /find_i /=; (try rewrite !to_of_val); (try rewrite construct_ctx_of_val); simpl; auto
+             inv_head_step; rewrite /next_state_f /find_i /=; (try rewrite !to_of_val); (try rewrite construct_ctx_of_val /=); (try rewrite !to_of_val); simpl; auto
          | |- ∀ x, next_state _ _ = _ _ =>
-             inv_head_step; rewrite /next_state /next_state_f /find_i /=; (try rewrite !to_of_val); (try rewrite construct_ctx_of_val); simpl; auto
+             inv_head_step; rewrite /next_state /next_state_f /find_i /=; (try rewrite !to_of_val); (try rewrite construct_ctx_of_val /=); (try rewrite !to_of_val); simpl; auto
          end.
 
   Lemma wp_LetIn K E e1 e2 v1 x Φ (n : nat) `{!IntoVal (n,e1) v1} :
@@ -329,6 +414,24 @@ Section lifting.
     iApply nextgen_id. inv_head_step. iFrame.
   Qed.
 
+  Lemma wp_mask K E l n Φ :
+    ▷ WP fill K (n,Loc borrow l) @ E {{ Φ }}
+      ⊢ WP fill K (n, Mask (Loc global l)) @ E {{ Φ }}.
+  Proof.
+    iIntros "H".
+    iApply (wp_lift_nonthrow_pure_det_head_step_no_fork' K (n,Mask _) _);eauto.
+    inv_head_step. eauto. intros. inv_head_step. eauto.
+    { intros. iIntros "Hs". iApply (bnextgen_extensional_eq _ id);[resolve_next_state|].
+      iApply nextgen_id. iFrame. }
+    iNext. iIntros "H1".
+    iApply (bnextgen_extensional_eq _ id);[resolve_next_state;simpl;auto|].
+    iApply nextgen_id. inv_head_step. iFrame.
+  Qed.
+
+  (** ------------------------------------------------------------ *)
+  (** ------------------------ Allocations ----------------------- *)
+  (** ------------------------------------------------------------ *)
+
   Lemma wp_stack_alloc K E n e v Φ `{!IntoVal (n,e) (n,v)} :
     0 < n -> (* stack is non empty *)
     scope v 0 ->
@@ -361,8 +464,103 @@ Section lifting.
     all: iApply (bnextgen_extensional_eq _ id);[resolve_next_state;simpl;auto|].
     all: iApply nextgen_id. iFrame. iApply "HΦ". iFrame.
   Qed.
-    
 
+  Lemma wp_heap_alloc K E n e v Φ `{!IntoVal (n,e) (n,v)} :
+    permanent v ->
+    ▷ (∀ l, l ↦ v -∗ WP fill K (n,Loc global l) @ E {{ Φ }})
+      ⊢ WP fill K (n,Halloc e) @ E {{ Φ }}.
+  Proof.
+    iIntros (Hperm) "HΦ".
+    iApply wp_lift_nonthrow_head_step; auto.
+    iIntros ([h1 s1] ns κ κs nt) "(Hh & Hs & Hn)".
+    iApply fupd_mask_intro;[set_solver|]. iIntros "Hcls".
+    iSplit.
+    { iPureIntro. exists NormalMode. do 5 econstructor;[constructor|].
+      simpl. apply halloc_fresh;eauto. }
+    iNext. iIntros (rm r0 σ2 efs Hstep) "Hp".
+    inv_head_step. iMod "Hcls".
+    iMod (gen_heap_alloc _ l v0 with "Hh") as "[Hh [Hl _]]";[auto|].
+    iDestruct ("HΦ" with "Hl") as "Hwp".
+    iModIntro. iFrame.
+    iSplitR "Hwp".
+    - iApply (bnextgen_extensional_eq _ id);[resolve_next_state;simpl;auto|].
+      iApply nextgen_id. iFrame.
+    - iFrame. iApply (bnextgen_extensional_eq _ id);[resolve_next_state;simpl;auto|].
+      iApply nextgen_id. iFrame.
+  Qed.
+
+  (** ------------------------------------------------------------ *)
+  (** ---------------------- Load and Store ---------------------- *)
+  (** ------------------------------------------------------------ *)
+
+  Lemma wp_heap_store K E e l δ v Φ `{!IntoVal (n,e) (n,v)} :
+    permanent v ->
+    heap_tag δ ->
+    ▷ (l ↦ v -∗ WP fill K (n,lang.Unit) @ E {{ Φ }})
+      ∗ ▷ l ↦ -
+      ⊢ WP fill K (n,Store (Loc δ l) e) @ E {{ Φ }}.
+  Proof.
+    iIntros (Hperm Hδ) "[HΦ >Hl]".
+    iApply wp_lift_nonthrow_head_step; auto.
+    iIntros ([h1 s1] ns κ κs nt) "(Hh & Hs & Hn)".
+    iApply fupd_mask_intro;[set_solver|]. iIntros "Hcls".
+    iDestruct "Hl" as (w) "Hl".
+    iDestruct (gen_heap_valid with "Hh Hl") as %Hlookup.
+    iSplit.
+    { iPureIntro. exists NormalMode. do 5 econstructor;[constructor|].
+      simpl. constructor;auto. }
+    iNext. iIntros (rm r0 σ2 efs Hstep) "Hp".
+    inv_head_step.
+    2: { inversion Hδ. }
+    iMod "Hcls".
+    iMod (gen_heap_update _ _ _ v0 with "Hh Hl") as "[Hh Hl]".
+    iDestruct ("HΦ" with "Hl") as "Hwp".
+    iModIntro. iFrame.
+    iSplitR "Hwp".
+    - iApply (bnextgen_extensional_eq _ id);[resolve_next_state;simpl;auto|].
+      iApply nextgen_id. iFrame.
+    - iFrame. iApply (bnextgen_extensional_eq _ id);[resolve_next_state;simpl;auto|].
+      iApply nextgen_id. iFrame.
+  Qed.
+
+  Lemma wp_stack_store K E e l j v v' w Φ `{!IntoVal (n,e) (n,v)} :
+    scope v j ->
+    shift_val v (Z.abs_nat j) = v' ->
+    ▷ ([size] n ∗ (n - 1 - Z.abs_nat j) @@ l ↦ v -∗ WP fill K (n,lang.Unit) @ E {{ Φ }})
+      ∗ ▷ (n - 1 - Z.abs_nat j) @@ l ↦ w
+      ∗ ▷ [size] n
+      ⊢ WP fill K (n,Store (Loc (local j) l) e) @ E {{ Φ }}.
+  Proof.
+    iIntros (Hperm Hδ) "[HΦ [>Hl >Hsize] ]".
+    iApply wp_lift_nonthrow_head_step; auto.
+    iIntros ([h1 s1] ns κ κs nt) "(Hh & Hs & Hn)".
+    iApply fupd_mask_intro;[set_solver|]. iIntros "Hcls".
+    iDestruct (stacksize_own_agree with "[$]") as %Hsize;subst n.
+    iDestruct (gen_stack_valid _ h1 with "Hl Hs") as %Hlookup.
+    assert (is_Some (s1 !! (length s1 - 1 - Z.abs_nat j))) as [s0 Hs0].
+    { rewrite /lookup /lookup_state_Lookup /lookup_state /lookup_stack /= in Hlookup.
+      destruct (s1 !! (length s1 - 1 - Z.abs_nat j));eauto. done. }
+    iSplit.
+    { iPureIntro. exists NormalMode. do 5 econstructor;[constructor|].
+      simpl. eapply StoreStackS;eauto. }
+    iNext. iIntros (rm r0 σ2 efs Hstep) "Hp".
+    inv_head_step. inversion H13.
+    iMod "Hcls". 
+    iMod (gen_stack_update _ _ _ _ _ v0 with "Hl Hs") as "[Hl Hs]";eauto.
+    rewrite /insert /insert_state_Insert /insert_state /insert_stack /= Hs0.
+    iModIntro. iDestruct ("HΦ" with "[$]") as "Hwp".
+    iFrame.
+    iSplitR "Hwp".
+    - iApply (bnextgen_extensional_eq _ id);[resolve_next_state;simpl;auto|].
+      iApply nextgen_id. iFrame. rewrite insert_length. iFrame.
+    - iFrame. iApply (bnextgen_extensional_eq _ id);[resolve_next_state;simpl;auto|].
+      iApply nextgen_id. iFrame.
+  Qed.
+
+  (** ------------------------------------------------------------ *)
+  (** ----------------------- Control Flow ----------------------- *)
+  (** ------------------------------------------------------------ *)
+    
   (** Control flow -- stateful due to stack frames *)
   Lemma wp_call_global K E n k x e1 e2 v2' v2 Φ `{!IntoVal (n,e2) (n,v2)} :
     shift_val v2 (-1) = v2' ->
@@ -410,22 +608,14 @@ Section lifting.
     all: iApply nextgen_id. iFrame. rewrite PeanoNat.Nat.add_1_r. iApply "HΦ". iFrame.
   Qed.
 
-(*| ReturnS K K' i e e' v σ :
-    to_val e = Some v ->
-    shift_expr e i = e' ->
-    (i <= 0)%Z ->
-    length (stack_of σ) >= Z.abs_nat i ->
-    head_step K (Return (Cont i K') e) σ [] (foldl (flip fill_item) e' K') (popN σ (Z.abs_nat i)) [] ThrowMode *)
-  
   Lemma wp_return K K' E n i e e' v Φ `{!IntoVal (n,e) v} :
     (i <= 0)%Z ->
     Z.abs_nat i <= n ->
-    shift_expr e i = e' ->
-    ▷ ([size] (n - (Z.abs_nat i)) -∗ ⚡={trans_single stack_gname (state_trans (n - (Z.abs_nat i)))}=> WP fill K' (n - (Z.abs_nat i),e) @ E {{ Φ }})
+    ▷ ([size] (n - (Z.abs_nat i)) -∗ ⚡={trans_single stack_gname (state_trans (n - (Z.abs_nat i)))}=> WP fill K' (n - (Z.abs_nat i),shift_expr e i) @ E {{ Φ }})
       ∗ ▷ [size] n
       ⊢ WP fill K (n,Return (Cont i K') e) @ E {{ Φ }}.
   Proof.
-    iIntros (Hle Hlen Hshift) "[HΦ >Hn]".
+    iIntros (Hle Hlen) "[HΦ >Hn]".
     iApply wp_lift_throw_head_step;auto.
     iIntros ([h1 s1] ns κ κs nt) "Hstate".
     iApply fupd_mask_intro;[set_solver|]. iIntros "Hcls".
@@ -435,30 +625,18 @@ Section lifting.
     iNext. iIntros (r0 σ2 efs Hstep) "Hp".
     inv_head_step. iMod "Hcls". rewrite H1.
     iDestruct "Hstate" as "(Hh & Hs & Hsize)".
-    iDestruct (gen_heap_alloc_stack_pop with "Hs") as "Hs";[eauto|].
-    admit.
-
-    (* rewrite /popN_stack. *)
-    (* rewrite /insert /= PeanoNat.Nat.sub_0_r Hs' /state_trans_state insert_length /=. *)
-    (* rewrite -/(state_trans_state (h1,s1)). (* rewrite -/(state_interp (h1,s1) ns κs nt). *) *)
-    (* iDestruct (gen_heap_alloc_stack_ng (h1,s1) ns κs nt l v0 with "Hstate") as ">[Hstate Hl]". *)
-    (* { apply lookup_lt_is_Some. auto. } *)
-    (* { simpl. rewrite /lookup_stack /= in H4. admit. } *)
-    
-    (* iIntros ([h1 s1] ns κ κs nt) "(Hh & Hstk & Hsize) /=". *)
-    (* iDestruct (stacksize_own_agree with "[$]") as %Heq;subst. *)
-    (* iMod (stacksize_own_update (length s1 - Z.abs_nat i) with "[$]") as "[Hsize Hs]". *)
-    (* iApply fupd_mask_intro;[set_solver|]. iIntros "Hcls". *)
-    (* iSplit. { iPureIntro. repeat econstructor; eauto. } *)
-    (* iNext. iIntros (r0 σ2 efs Hstep) "Hp". *)
-    (* inv_head_step. iMod "Hcls". iModIntro. iFrame. *)
-  Abort.
-(** TODO: change the state interpretation such that there is no need to deallocate points to's:
- two possibilities:
- (1) change the opsem so maintain a "top of frame" number and never remove parts of the state
- (2) allow a larger gen_heap. This becomes quite tricky when pushing though, since there will be clashing
- (3) generations? I need the non frame preserving update modality!!!
- (4) always have all fragments of the stack in the state interpretation *)
+    iDestruct (gen_stack_interp_stack_pop with "Hs") as "Hs";[eauto|].
+    iDestruct (gen_heap_interp_stack_pop _ (length s1 - Z.abs_nat i) with "Hh") as "Hh".
+    iMod (stacksize_own_update (length s1 - Z.abs_nat i) with "[$Hsize $Hn]") as "[Hsize Hn]".
+    iDestruct (stack_size_auth_stack_pop _ (length s1 - Z.abs_nat i) with "Hsize") as "Hsize".
+    iModIntro.
+    iDestruct ("HΦ" with "Hn") as "Hwp". iFrame.
+    iSplitR "Hwp".
+    - iApply bnextgen_extensional_eq;[resolve_next_state|].
+      iModIntro. iFrame. rewrite popN_stack_length. iFrame.
+    - iApply bnextgen_extensional_eq;[resolve_next_state|].
+      iModIntro. rewrite /CC_ectxi_language.fill /= fill_proj_eq. iFrame.
+  Qed.
 
 
 End lifting.

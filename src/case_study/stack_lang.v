@@ -1405,6 +1405,14 @@ Proof.
   simpl. rewrite IHK. auto.
 Qed.
 
+Lemma fill_proj_eq (e : stack_expr) (K : ectx) :
+  foldl (flip stack_fill_item) e K = (e.1,foldl (flip fill_item) e.2 K).
+Proof.
+  destruct e;simpl. induction K using rev_ind;simpl;auto.
+  rewrite !foldl_snoc.
+  simpl. rewrite IHK. auto.
+Qed.
+
 Definition is_atomic (e : stack_expr) : Prop :=
   match e.2 with
   | Halloc e => is_Some (to_val e)
