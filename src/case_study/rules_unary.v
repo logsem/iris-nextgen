@@ -1,8 +1,7 @@
 From iris.base_logic Require Export gen_heap.
 From iris.algebra Require Export list excl_auth.
-From iris.program_logic Require Export weakestpre.
 From nextgen.case_study.program_logic Require Import CC_ectx_lifting
-     CC_ectxi_language CC_ectx_lifting.
+     CC_ectxi_language CC_ectx_lifting weakestpre.
 From nextgen.case_study Require Export stack_lang stack_transform.
 From iris.proofmode Require Import tactics.
 From stdpp Require Import fin_maps.
@@ -287,6 +286,16 @@ Local Hint Resolve halloc_fresh : core.
 Local Hint Resolve salloc_fresh : core.
 Local Hint Resolve to_of_val : core.
 
+(** Helper lemma to compute context *)
+Lemma construct_ctx_eq (n : nat) (e : expr) :
+  let '(Ks,e') := construct_ctx e in (n,e) = fill Ks (n,e').
+Proof.
+  destruct (construct_ctx e) eqn:Hctx.
+  apply construct_ctx_fill in Hctx. subst e.
+  rewrite /fill /= /CC_ectxi_language.fill.
+  rewrite fill_proj_eq /= //.
+Qed.
+
 Section lifting.
   Context `{heapGS Σ}.
   Implicit Types P Q : iProp Σ.
@@ -493,6 +502,65 @@ Section lifting.
   (** ---------------------- Load and Store ---------------------- *)
   (** ------------------------------------------------------------ *)
 
+  Lemma wp_heap_load K E l δ n v Φ :
+    heap_tag δ ->
+    ▷ (l ↦ v -∗ WP fill K (n,of_val v) @ E {{ Φ }})
+      ∗ ▷ l ↦ v
+      ⊢ WP fill K (n,Load (Loc δ l)) @ E {{ Φ }}.
+  Proof.
+    iIntros (Hδ) "[HΦ >Hl]".
+    iApply wp_lift_nonthrow_head_step; auto.
+    iIntros ([h1 s1] ns κ κs nt) "(Hh & Hs & Hn)".
+    iApply fupd_mask_intro;[set_solver|]. iIntros "Hcls".
+    iDestruct (gen_heap_valid with "Hh Hl") as %Hlookup.
+    iSplit.
+    { iPureIntro. exists NormalMode. do 5 econstructor;[constructor|].
+      simpl. constructor;eauto. }
+    iNext. iIntros (rm r0 σ2 efs Hstep) "Hp".
+    inv_head_step.
+    2: { inversion Hδ. }
+    rewrite /lookup_heap /= Hlookup in H10. simplify_eq.
+    iMod "Hcls".
+    iDestruct ("HΦ" with "Hl") as "Hwp".
+    iModIntro. iFrame.
+    iSplitR "Hwp".
+    - iApply (bnextgen_extensional_eq _ id);[resolve_next_state;simpl;auto|].
+      iApply nextgen_id. iFrame.
+    - iFrame. iApply (bnextgen_extensional_eq _ id);[resolve_next_state;simpl;auto|].
+      iApply nextgen_id. iFrame.
+  Qed.
+
+  Lemma wp_stack_load K E l j v n Φ :
+    scope_tag (local j) ->
+    ▷ ([size] n ∗ (n - 1 - Z.abs_nat j) @@ l ↦ v -∗ WP fill K (n,of_val (shift_val v j)) @ E {{ Φ }})
+      ∗ ▷ (n - 1 - Z.abs_nat j) @@ l ↦ v
+      ∗ ▷ [size] n
+      ⊢ WP fill K (n,Load (Loc (local j) l)) @ E {{ Φ }}.
+  Proof.
+    iIntros (Hscope) "[HΦ [>Hl >Hsize] ]".
+    iApply wp_lift_nonthrow_head_step; auto.
+    iIntros ([h1 s1] ns κ κs nt) "(Hh & Hs & Hn)".
+    iApply fupd_mask_intro;[set_solver|]. iIntros "Hcls".
+    iDestruct (stacksize_own_agree with "[$]") as %Hsize;subst n.
+    iDestruct (gen_stack_valid _ h1 with "Hl Hs") as %Hlookup.
+    assert (is_Some (s1 !! (length s1 - 1 - Z.abs_nat j))) as [s0 Hs0].
+    { rewrite /lookup /lookup_state_Lookup /lookup_state /lookup_stack /= in Hlookup.
+      destruct (s1 !! (length s1 - 1 - Z.abs_nat j));eauto. done. }
+    iSplit.
+    { iPureIntro. exists NormalMode. do 5 econstructor;[constructor|].
+      simpl. eapply LoadStackS;eauto. }
+    iNext. iIntros (rm r0 σ2 efs Hstep) "Hp".
+    inv_head_step. inversion H11.
+    iMod "Hcls". 
+    iModIntro. iDestruct ("HΦ" with "[$]") as "Hwp".
+    iFrame.
+    iSplitR "Hwp".
+    - iApply (bnextgen_extensional_eq _ id);[resolve_next_state;simpl;auto|].
+      iApply nextgen_id. iFrame.
+    - iFrame. iApply (bnextgen_extensional_eq _ id);[resolve_next_state;simpl;auto|].
+      iApply nextgen_id. iFrame.
+  Qed.
+
   Lemma wp_heap_store K E e l δ v Φ `{!IntoVal (n,e) (n,v)} :
     permanent v ->
     heap_tag δ ->
@@ -585,7 +653,7 @@ Section lifting.
     all: iApply nextgen_id. iFrame. rewrite PeanoNat.Nat.add_1_r. iApply "HΦ". iFrame.
   Qed.
 
-  Lemma wp_call_local K E n i k x e1 e2 e1' v2' v2 Φ `{!IntoVal (n,e2) (n,v2)} :
+  Lemma wp_call_local K E n (i : Z) k x e1 e2 e1' v2' v2 Φ `{!IntoVal (n,e2) (n,v2)} :
     scope_tag (local i) ->
     shift_expr e1 (i - 1) = e1' ->
     shift_val v2 (-1) = v2' ->
@@ -599,7 +667,7 @@ Section lifting.
     iDestruct (stacksize_own_agree with "[$]") as %Heq;subst.
     iMod (stacksize_own_update (S (length s1)) with "[$]") as "[Hsize Hs]".
     iApply fupd_mask_intro;[set_solver|]. iIntros "Hcls".
-    iSplit. { iPureIntro. exists CaptureMode. repeat econstructor; eauto. }
+    iSplit. { iPureIntro. exists CaptureMode. repeat econstructor; eauto. inversion Hscope;subst;auto. }
     iNext. iIntros (rm r0 σ2 efs Hstep) "Hp".
     inv_head_step. iMod "Hcls". iModIntro.
     rewrite /gen_stack_interp list_to_gmap_stack_push_stack push_stack_length. iFrame.
@@ -608,7 +676,7 @@ Section lifting.
     all: iApply nextgen_id. iFrame. rewrite PeanoNat.Nat.add_1_r. iApply "HΦ". iFrame.
   Qed.
 
-  Lemma wp_return K K' E n i e e' v Φ `{!IntoVal (n,e) v} :
+  Lemma wp_return K K' E n i e v Φ `{!IntoVal (n,e) v} :
     (i <= 0)%Z ->
     Z.abs_nat i <= n ->
     ▷ ([size] (n - (Z.abs_nat i)) -∗ ⚡={trans_single stack_gname (state_trans (n - (Z.abs_nat i)))}=> WP fill K' (n - (Z.abs_nat i),shift_expr e i) @ E {{ Φ }})

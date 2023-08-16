@@ -229,7 +229,7 @@ Module lang.
   (** Substitution, replaces occurrences of [x] in [e] with [v]. *)
   Fixpoint expr_subst (x : string) (v : val) (e : expr) : expr :=
     match e with
-    | Var y => if decide (x = y) then of_val v else Var x
+    | Var y => if decide (x = y) then of_val v else Var y
     | Lam δ k y e =>
         Lam δ k y $
           if decide (BNamed x ≠ k ∧ BNamed x ≠ y)
@@ -609,7 +609,7 @@ Module lang.
   Inductive scope_tag : tag -> Prop :=
   | borrowScope : scope_tag borrow
   | globalScope : scope_tag global
-  | localScope i : i <= 0 -> scope_tag (local i).
+  | localScope i : (i <= 0)%Z -> scope_tag (local i).
 
   Inductive permanent : val -> Prop :=
   | lamPerm k x e : permanent (LamV global k x e)
@@ -623,7 +623,7 @@ Module lang.
   | permScope v n : permanent v -> scope v n
   | locScope δ l n : scope_tag δ -> scope (LocV δ l) n
   | lamScope δ k x e n : scope_tag δ -> scope (LamV δ k x e) n
-  | contScope i K j : i <= j -> scope (ContV i K) j.
+  | contScope i K j : (i <= j)%Z -> scope (ContV i K) j.
 
   Inductive heap_tag : tag -> Prop :=
   | borrowHeap : heap_tag borrow
