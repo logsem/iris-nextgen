@@ -510,11 +510,7 @@ Section into_bnextgen.
     IntoBnextgen f Q Q' →
     IntoBnextgen f (P ∗ Q) (P' ∗ Q').
   Proof.
-    rewrite /IntoBnextgen.
-    iIntros (Hi1 Hi2) "[P Q]".
-    rewrite Hi1 Hi2.
-    iModIntro.
-    iFrame.
+    intros ??. rewrite /IntoBnextgen. iIntros "[P Q]". iModIntro. iFrame.
   Qed.
 
   Global Instance into_bnextgen_later P P' :
