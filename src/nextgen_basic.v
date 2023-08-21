@@ -1,7 +1,7 @@
 (* The basic nextgen modality. *)
 
 From iris.proofmode Require Import classes tactics.
-From iris.base_logic.lib Require Export iprop own invariants fancy_updates.
+From iris.base_logic.lib Require Export iprop own invariants.
 From iris.prelude Require Import options.
 
 From nextgen Require Import cmra_morphism_extra.
@@ -33,7 +33,7 @@ Local Definition uPred_bnextgen_unseal :
   @uPred_bnextgen = @uPred_bnextgen_def := uPred_bnextgen_aux.(seal_eq).
 
 Notation "⚡={ f }=> P" := (uPred_bnextgen f P)
-  (at level 99, f at level 50, P at level 200, format "⚡={ f }=>  P") : bi_scope.
+                            (at level 99, f at level 50, P at level 200, format "⚡={ f }=>  P") : bi_scope.
 
 Class IntoBnextgen `{M : ucmra}
     f `{!GenTrans f}
@@ -218,7 +218,7 @@ Section bnextgen_rules.
     apply Hi.
     apply: gen_trans_validN.
     done.
-  Qed.
+  Qed.    
 
   Lemma bnextgen_idemp_mono P Q :
     (forall x, f x = f (f x)) →
@@ -293,7 +293,39 @@ Section bnextgen_rules.
   (*   unseal. split. simpl. *)
   (* Qed. *)
 
+  Lemma plain_bnextgen_plain P `{!Plain P} : Plain (⚡={f}=> P).
+  Proof.
+    revert Plain0. unseal. rewrite /Plain /=. split. intros n x Hv HP.
+    pose proof (bnextgen_mono P (■ P)) as Hmono1.
+    apply Hmono1 in Plain0 as Hp. revert Hp. unseal. rewrite /uPred_bnextgen_def /=. destruct P. simpl.
+    intros. inversion Hp. clear Hp. simpl in *.
+    clear Hmono1.
+    apply uPred_in_entails in HP as He;auto.
+    eapply uPred_mono;[apply He|..];auto. apply ucmra_unit_leastN.
+  Qed.
+
 End bnextgen_rules.
+
+(* Section bnextgen_list_rules. *)
+(*   Context {M : ucmra} (l : list (M → M)) {gt: Forall (λ f, GenTrans f) l}. *)
+
+(*   Notation "P ⊢ Q" := (@uPred_entails M P%I Q%I) : stdpp_scope. *)
+(*   Notation "⊢ Q" := (bi_entails (PROP:=uPredI M) True Q). *)
+(*   Notation "(⊢)" := (@uPred_entails M) (only parsing) : stdpp_scope. *)
+
+(*   Local Arguments uPred_holds {_} !_ _ _ /. *)
+
+(*   Ltac unseal := try uPred.unseal; rewrite !uPred_bnextgen_unseal !/uPred_holds /=. *)
+
+(*   Lemma bnextgen_n_mono P Q : *)
+(*     (P ⊢ Q) → (@nextgen_n _ l gt P) ⊢ (@nextgen_n _ l gt Q). *)
+(*   Proof. *)
+(*     intros [Hi]. induction l;simpl. *)
+(*     - split. auto. *)
+(*     - rewrite (bnextgen_mono a);eauto. done. *)
+(*   Qed. *)
+  
+(* End bnextgen_list_rules. *)
 
 Section bnextgen_compose_rules.
   Context {M : ucmra} (f : M → M) (g : M → M) `{!GenTrans f} `{!GenTrans g}.
@@ -601,7 +633,7 @@ Section into_bnextgen.
     iApply H.
     done.
   Qed.
-
+    
   (* Lemma bnextgen_wand_plain' P `{!Plain P, !Absorbing P} Q : *)
   (*   (P -∗ Q) ⊢ ⚡={f}=> (P -∗ Q). *)
   (* Proof. *)
