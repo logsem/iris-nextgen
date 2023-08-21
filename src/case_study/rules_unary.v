@@ -5,7 +5,7 @@ From nextgen.case_study.program_logic Require Import CC_ectx_lifting
 From nextgen.case_study Require Export stack_lang stack_transform.
 From iris.proofmode Require Import tactics.
 From stdpp Require Import fin_maps.
-From nextgen Require Import nextgen_basic gen_trans gmap_view_transformation nextgen_pointwise nextgen_id.
+From nextgen Require Import nextgen_basic gen_trans gmap_view_transformation nextgen_single nextgen_id.
 Set Default Proof Using "Type".
 Import uPred.
 
