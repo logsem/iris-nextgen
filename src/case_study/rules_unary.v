@@ -679,7 +679,9 @@ Section lifting.
   Lemma wp_return K K' E n i e v Φ `{!IntoVal (n,e) v} :
     (i <= 0)%Z ->
     Z.abs_nat i <= n ->
-    ▷ ([size] (n - (Z.abs_nat i)) -∗ ⚡={trans_single stack_gname (state_trans (n - (Z.abs_nat i)))}=> WP fill K' (n - (Z.abs_nat i),shift_expr e i) @ E {{ Φ }})
+    ▷ ([size] (n - (Z.abs_nat i)) -∗
+         ⚡={trans_single stack_gname (state_trans (n - (Z.abs_nat i)))}=>
+         WP fill K' (n - (Z.abs_nat i),shift_expr e i) @ E {{ Φ }})
       ∗ ▷ [size] n
       ⊢ WP fill K (n,Return (Cont i K') e) @ E {{ Φ }}.
   Proof.
