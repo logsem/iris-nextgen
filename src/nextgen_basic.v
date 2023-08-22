@@ -218,7 +218,7 @@ Section bnextgen_rules.
     apply Hi.
     apply: gen_trans_validN.
     done.
-  Qed.    
+  Qed.
 
   Lemma bnextgen_idemp_mono P Q :
     (forall x, f x = f (f x)) →
