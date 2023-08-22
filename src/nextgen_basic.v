@@ -79,7 +79,7 @@ Section bnextgen_rules.
     (⚡={f}=> P) ⊣⊢ (⚡={f}=> ⚡={f}=>P).
   Proof.
     intros ?. unseal. split. simpl. intros.
-    rewrite {1}H;auto. 
+    rewrite {1}H;auto.
   Qed.
 
   Lemma bnextgen_id P :
@@ -89,7 +89,7 @@ Section bnextgen_rules.
     split. unseal. intros.
     rewrite H. auto.
   Qed.
-  
+
   (* If we own an element [a], we have a lower bound on elements for which we
    * have to show that [f] is contractive. *)
   Lemma bnextgen_elim_ownM_contractive (a : M) P :
@@ -218,7 +218,7 @@ Section bnextgen_rules.
     apply Hi.
     apply: gen_trans_validN.
     done.
-  Qed.    
+  Qed.
 
   Lemma bnextgen_idemp_mono P Q :
     (forall x, f x = f (f x)) →
@@ -324,7 +324,7 @@ End bnextgen_rules.
 (*     - split. auto. *)
 (*     - rewrite (bnextgen_mono a);eauto. done. *)
 (*   Qed. *)
-  
+
 (* End bnextgen_list_rules. *)
 
 Section bnextgen_compose_rules.
@@ -354,7 +354,7 @@ Section bnextgen_compose_rules.
       apply gen_trans_monoN0 in Hincl.
       auto.
   Qed.
-    
+
   Lemma bnextgen_compose P :
     (⚡={f}=> ⚡={g}=> P) ⊣⊢ ⚡={g ∘ f}=> P.
   Proof.
@@ -399,7 +399,6 @@ Section bnextgen_rules_cmra_morphism.
     - rewrite cmra_morphism_op//.
     - rewrite -cmra_morphism_op. apply cmra_morphism_validN =>//.
   Qed.
-    
 
   Lemma bnextgen_sep_2 P Q :
     (⚡={f}=> P) ∗ (⚡={f}=> Q) ⊢ ⚡={f}=> (P ∗ Q) .
@@ -609,14 +608,18 @@ Section into_bnextgen.
   (*   iApply "H". iApply "P". *)
   (* Qed. *)
 
-  Lemma bnextgen_persistently_2 P :
-    □ (⚡={f}=> P) ⊢ ⚡={f}=> (□ P).
+  Lemma bnextgen_persistently P :
+    □ (⚡={f}=> P) ⊣⊢ ⚡={f}=> (□ P).
   Proof.
     rewrite /bi_intuitionistically /bi_affinely.
     rewrite 2!left_id.
     rewrite bnextgen_intuitionistically.
     done.
   Qed.
+
+  Lemma bnextgen_persistently_2 P :
+    □ (⚡={f}=> P) ⊢ ⚡={f}=> (□ P).
+  Proof. rewrite bnextgen_persistently. done. Qed.
 
   Global Instance bnextgen_persistent P :
     Persistent P → (Persistent (⚡={f}=> P)).
@@ -629,7 +632,7 @@ Section into_bnextgen.
     iApply H.
     done.
   Qed.
-    
+
   (* Lemma bnextgen_wand_plain' P `{!Plain P, !Absorbing P} Q : *)
   (*   (P -∗ Q) ⊢ ⚡={f}=> (P -∗ Q). *)
   (* Proof. *)
@@ -638,12 +641,12 @@ Section into_bnextgen.
   (*   iModIntro. *)
   (*   iApply "H". iApply "P". *)
   (* Qed. *)
-   
+
 End into_bnextgen.
 
 Section bnextgen_pred.
   Context {M : ucmra} {A : Type} (f : A -> M → M) `{!forall a, CmraMorphism (f a)}.
-  
+
   Notation "P ⊢ Q" := (@uPred_entails M P%I Q%I) : stdpp_scope.
   Notation "⊢ Q" := (bi_entails (PROP:=uPredI M) True Q).
   Notation "(⊢)" := (@uPred_entails M) (only parsing) : stdpp_scope.
