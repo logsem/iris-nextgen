@@ -177,7 +177,7 @@ Proof.
   iIntros ">($ & H & Hefs)". iMod "Hclose" as "_". iModIntro. iSplitR "Hefs".
   - iModIntro. iApply ("IH" $! e2 with "[//] H"). auto.
   - iApply (big_sepL_impl with "Hefs"); iIntros "!>" (k ef _).
-    iIntros "H". iApply ("IH" with "[] H"); auto.
+    iIntros "H". (* iModIntro.  *)iApply ("IH" with "[] H"); auto.
 Qed.
 
 (* ALTERNATIVE: TODO => discuss *)
@@ -342,10 +342,13 @@ Proof.
   destruct (fill_step_inv e σ1 κ e2 σ2 efs) as (e2'&->&?); auto.
   iMod ("H" $! e2' σ2 efs with "[//] Hcred") as "H". iIntros "!>!>".
   iMod "H". iModIntro. iApply (step_fupdN_wand with "H"). iIntros "H".
-  iMod "H" as "(HH & H & $)". iModIntro.
-  iSplitL "HH".
-  all: iApply bnextgen_extensional_eq;[rewrite (next_state_ctx);eauto|].
-  all: iModIntro. 1: iFrame. by iApply "IH".
+  iMod "H" as "(HH & H & Htp)". iModIntro.
+  iSplitL "HH";[|iSplitR "Htp"].
+  1,2: iApply bnextgen_extensional_eq;[rewrite (next_state_ctx);eauto|].
+  1,2: iModIntro. 1: iFrame. 1: by iApply "IH".
+  iApply (big_sepL_mono with "Htp");intros. auto.
+  (* iIntros "H". iApply bnextgen_extensional_eq;[rewrite (next_state_ctx);eauto|]. *)
+  (* iModIntro. iFrame. *)
 Qed.
 
 Lemma wp_bind_inv K `{!LanguageCtx K} s E e Φ :
@@ -365,9 +368,13 @@ Proof.
   iIntros (e2 σ2 efs Hstep) "Hcred".
   iMod ("H" $! _ _ _ with "[] Hcred") as "H"; first eauto using fill_step.
   iIntros "!> !>". iMod "H". iModIntro. iApply (step_fupdN_wand with "H").
-  iIntros "H". iMod "H" as "(HH & H & $)". iModIntro.
-  iSplitL "HH". all: iApply bnextgen_extensional_eq;[erewrite <-(next_state_ctx);eauto|].  
-  all: iModIntro. 1:iFrame. by iApply "IH".
+  iIntros "H". iMod "H" as "(HH & H & Htp)". iModIntro.
+  iSplitL "HH";[|iSplitR "Htp"].
+  1,2: iApply bnextgen_extensional_eq;[erewrite <-(next_state_ctx);eauto|].
+  1,2: iModIntro. 1: iFrame. 1: by iApply "IH". auto.
+  (* iApply (big_sepL_mono with "Htp");intros. *)
+  (* iIntros "H". iApply bnextgen_extensional_eq;[erewrite <-(next_state_ctx);eauto|]. *)
+  (* iModIntro. iFrame. *)
 Qed.
 
 (** * Derived rules *)

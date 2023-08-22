@@ -37,7 +37,7 @@ Section examples.
   Definition example3 : expr :=
     let: "g" := λ: global, "<>", "f'", "f'" () in
     let: "f" := λ: global, "<>", "<>", let: "x" := sref 42 in "g" (λ: local 0, "<>", "<>", !"x") in
-    "f" ().    
+    "f" ().
     
   
   Definition stuck_example : expr :=
@@ -117,7 +117,8 @@ Section stack_lang_examples.
     iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /=". prepare_ctx.
     iApply wp_stack_alloc;[lia|repeat constructor|iFrame]. iNext. iIntros (l) "[Hsize Hl]". peel_ctx.
     iApply wp_return;[lia..|iFrame]. iNext. iIntros "Hsize /=".
-    iModIntro.
+    iDestruct (stack_stack_pop_intro _ _ _ _ 1 with "Hl") as "Hl";cycle 1.
+    - iModIntro.
     (* STUCK! the points-to for l gets lost, its lifetime is not less than 1 *)
   Abort.
 
