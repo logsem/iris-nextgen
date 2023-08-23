@@ -31,9 +31,10 @@ Proof.
   iDestruct "H2" as ">H2". iModIntro. iNext. iFrame.
 Qed.
 
-Lemma bnextgen_fupd_soundness_lc `{!invGpreS Σ} `{!lcGpreS Σ} `{!wsatGpreS Σ} n E1 E2 (P : iProp Σ) `{!Plain P} (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
+Lemma bnextgen_fupd_soundness_lc `{!invGpreS Σ} n E1 E2 (P : iProp Σ) `{!Plain P} (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
   (∀ `{Hinv: !invGS_gen HasLc Σ}, £ n ={E1,E2}=∗ ⚡={f}=> P) → ⊢ P.
 Proof.
+  inversion invGpreS0.
   intros Hfupd. eapply (le_upd.lc_soundness (S n)); first done.
   intros Hc. rewrite lc_succ.
   iIntros "[Hone Hn]". rewrite -le_upd.le_upd_trans. iApply le_upd.bupd_le_upd.
@@ -48,9 +49,10 @@ Proof.
   iApply bnextgen_plain. iDestruct "H" as "(_ & _ & $)".
 Qed.
 
-Lemma bnextgen_fupd_soundness_gen `{!invGpreS Σ} `{!lcGpreS Σ} `{!wsatGpreS Σ} n hlc E1 E2 (P : iProp Σ) `{!Plain P} (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
+Lemma bnextgen_fupd_soundness_gen `{!invGpreS Σ} n hlc E1 E2 (P : iProp Σ) `{!Plain P} (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
   (∀ `{Hinv: !invGS_gen hlc Σ}, £ n ={E1,E2}=∗ ⚡={f}=> P) → ⊢ P.
 Proof.
+  inversion invGpreS0.
   destruct hlc.
   - by apply bnextgen_fupd_soundness_lc.
   - by apply bnextgen_fupd_soundness_no_lc.
@@ -84,10 +86,11 @@ Proof.
   simpl. iMod "H". iIntros "!>!>!>". iMod "H". by iApply "IH".
 Qed.
 
-Lemma bnextgen_step_fupdN_soundness_lc `{!invGpreS Σ} `{!lcGpreS Σ} `{!wsatGpreS Σ} (P : iProp Σ) `{!Plain P} n m (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
+Lemma bnextgen_step_fupdN_soundness_lc `{!invGpreS Σ} (P : iProp Σ) `{!Plain P} n m (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
   (∀ `{Hinv: !invGS_gen HasLc Σ}, £ m ={⊤,∅}=∗ |={∅}▷=>^n ⚡={f}=> P) →
   ⊢ P.
 Proof.
+  inversion invGpreS0.
   intros Hiter.
   eapply (bnextgen_fupd_soundness_lc (m + n)); [apply _..|].
   iIntros (Hinv) "Hlc". rewrite lc_split.
@@ -100,10 +103,11 @@ Proof.
     by iApply ("IH" with "Hn Hupd").
 Qed.
 
-Lemma bnextgen_step_fupdN_soundness_lc' `{!invGpreS Σ} `{!lcGpreS Σ} `{!wsatGpreS Σ} (P : iProp Σ) `{!Plain P} n m (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
+Lemma bnextgen_step_fupdN_soundness_lc' `{!invGpreS Σ} (P : iProp Σ) `{!Plain P} n m (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
   (∀ `{Hinv: !invGS_gen hlc Σ}, £ m ={⊤}[∅]▷=∗^n ⚡={f}=> P) →
   ⊢ P.
 Proof.
+  inversion invGpreS0.
   intros Hiter.
   eapply (bnextgen_fupd_soundness_lc (m + n) ⊤ ⊤); [apply _..|].
   iIntros (Hinv) "Hlc". rewrite lc_split.
@@ -119,12 +123,13 @@ Qed.
 
 (** Generic soundness lemma for the fancy update, parameterized by [use_credits]
   on whether to use credits or not. *)
-Lemma bnextgen_step_fupdN_soundness_gen `{!invGpreS Σ} `{!lcGpreS Σ} `{!wsatGpreS Σ} (P : iProp Σ) `{!Plain P}
+Lemma bnextgen_step_fupdN_soundness_gen `{!invGpreS Σ} (P : iProp Σ) `{!Plain P}
   (hlc : has_lc) (n m : nat) (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
   (∀ `{Hinv : invGS_gen hlc Σ},
     £ m ={⊤,∅}=∗ |={∅}▷=>^n ⚡={f}=> P) →
   ⊢ P.
 Proof.
+  inversion invGpreS0.
   destruct hlc.
   - apply bnextgen_step_fupdN_soundness_lc. done.
   - apply bnextgen_step_fupdN_soundness_no_lc. done.
@@ -136,6 +141,27 @@ Proof.
   induction n;simpl;try apply _.
   intros m P1 P2 Hm. apply fupd_ne, later_ne, fupd_ne, IHn =>//.
 Qed.
+
+Lemma bnextgen_fupd_elim `{!invGpreS Σ} `{Hinv: !invGS_gen hlc Σ} E1 E2 (P : iProp Σ) `{!Plain P} (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
+  (|={E1,E2}=> ⚡={f}=> P) ⊢ |={E1,E2}=> P.
+Proof.
+  iIntros "Hm".
+  iMod "Hm". iModIntro.
+  iApply bnextgen_plain. eauto.
+Qed.
+
+Lemma step_fupdN_sep (PROP : bi) (BiFUpd0 : BiFUpd PROP) (E : coPset) n (P Q : PROP) :
+  (|={E}▷=>^n P) ∗ (|={E}▷=>^n Q) ⊢ |={E}▷=>^n P ∗ Q.
+Proof.
+  induction n.
+  - simpl. auto.
+  - simpl. iIntros "[H1 H2]".
+    iMod "H1". iMod "H2".
+    iIntros "!>!>".
+    iMod "H1". iMod "H2".
+    iModIntro. iApply IHn. iFrame.
+Qed.
+  
 
 Section bnextgen_pred_imod.
   Context {M : ucmra} {A : Type} (f : A -> M → M) `{!forall a, CmraMorphism (f a)} {num_laters_per_step : nat -> nat}
@@ -233,23 +259,31 @@ Section bnextgen_pred_imod.
       + iDestruct (IHl with "H") as "H".
         rewrite Nat.add_succ_r. iFrame.
       + iApply IHl. rewrite Nat.add_succ_r. iFrame.
+  Qed. 
+  
+  Lemma bnextgen_n_sep l n P Q :
+    (⚡={[ l ]}▷=>>^(n) P) ∗ (⚡={[ l ]}▷=>^(n) Q) -∗ ⚡={[ l ]}▷=>^(n) P ∗ Q.
+  Proof.
+    revert n; induction l =>n.
+    - simpl. iIntros "H". auto.
+    - simpl. iIntros "[H1 H2]".
+      iMod "H2". iModIntro.
+      iDestruct (step_fupdN_sep _ _ _ (S $ num_laters_per_step n) with "[H1 H2]") as "H".
+      { simpl. iFrame. }
+      iApply (step_fupdN_wand with "H").
+      iIntros "[H1 H2]".
+      iMod "H1". iModIntro. iModIntro. iApply IHl.
+      iFrame.
   Qed.
-
+  
 End bnextgen_pred_imod.
 
-Lemma bnextgen_fupd_elim_no_lc `{!invGpreS Σ} `{Hinv: !invGS_gen HasNoLc Σ} E1 E2 (P : iProp Σ) `{!Plain P} (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
-  (|={E1,E2}=> ⚡={f}=> P) ⊢ |={E1,E2}=> P.
-Proof.
-  iIntros "Hm".
-  iMod "Hm". iModIntro.
-  iApply bnextgen_plain. eauto.
-Qed.
-
-Lemma fupd_soundness_no_lc_unfold_alt `{!invGpreS Σ} `{!lcGpreS Σ} `{!wsatGpreS Σ} m E :
+Lemma fupd_soundness_no_lc_unfold_alt `{!invGpreS Σ} m E :
   ⊢ |==> ∃ `(Hws: invGS_gen HasNoLc Σ) (ω : coPset → iProp Σ),
       £ m ∗ ω E ∗ ■ (∀ E1 E2 P n, (|={E1}[E2]▷=>^n P) -∗ ω E1 -∗ Nat.iter n (λ P, |==> ▷ |==> ▷ P) (ω E1 ∗ P))
                 ∗ ■ (∀ (E1 E2 : coPset) (P : iPropI Σ), (|={E1,E2}=> P) -∗ ω E1 ==∗ ◇ (ω E2 ∗ P)).
 Proof.
+  inversion invGpreS0.
   iMod wsat_alloc as (Hw) "[Hw HE]".
   (* We don't actually want any credits, but we need the [lcGS]. *)
   iMod (later_credits.le_upd.lc_alloc m) as (Hc) "[_ Hlc]".
@@ -350,27 +384,26 @@ Section bnextgen_n_open_soundness.
 
   Lemma step_fupdN_nextgen_soundness_no_lc (l : list A) :
     invGpreS Σ → ∀ P : iProp Σ,
-        Plain P → ∀ (n m : nat), (∀ (Hinv : invGS_gen HasNoLc Σ), £ m ={⊤}=∗ ⚡={[l]}▷=>^(n) P) → (⊢ P)%stdpp.
+        Plain P → ∀ (n m : nat), (∀ (Hinv : invGS_gen HasNoLc Σ), £ m ={⊤}=∗ ⚡={[l]}▷=>^(n) |={⊤,∅}=> P) → (⊢ P)%stdpp.
   Proof.
-    intros until P. intros HPlain n m  Hiter.
+    intros until P. inversion H0. intros HPlain n m  Hiter.
     apply (laterN_soundness _ (steps_sum num_laters_per_step (n) (S (length l)) + steps_sum num_laters_per_step (n) (S (length l)))).
     iMod (fupd_soundness_no_lc_unfold_alt (m + (steps_sum num_laters_per_step (n) (length l))) ⊤) as (Hws ω) "[Hm [Hω [#H #H']]]".
     specialize (Hiter Hws).
     rewrite lc_split. iDestruct "Hm" as "[Hm Hn]".
     iDestruct (Hiter with "Hm") as "HH". clear Hiter.
     iStopProof. revert n. induction l;intros n;iIntros "[#[H H'] (Hn & Hω & HH)]".
-    - simpl. iMod ("H'" with "HH Hω") as "[>Hω >HH]". auto.
+    - simpl. rewrite fupd_trans.
+      iMod ("H'" with "HH Hω") as "[>Hω >HH]". auto.
     - simpl. rewrite /= -Nat.add_succ_r.
       iDestruct "Hn" as "[Hone [Hm Hn]]".
+      rewrite fupd_trans.
 
       iApply bupd_plain.
       iMod ("H'" with "HH Hω") as "[>Hω >HH]".
       iModIntro.
-      iApply bupd_plain.
-      iMod ("H'" with "HH Hω") as "[>Hω >HH]".
-      iModIntro.
       
-      iAssert (|={∅}▷=>^(S $ num_laters_per_step n) |={∅,⊤}=> ⚡={f a}=> ⚡={[l]}▷=>^(S n) P)%I with "HH" as "HH".
+      iAssert (|={∅}▷=>^(S $ num_laters_per_step n) |={∅,⊤}=> ⚡={f a}=> ⚡={[l]}▷=>^(S n) |={⊤,∅}=> P)%I with "HH" as "HH".
       iDestruct ("H" with "HH Hω") as "HH".
 
       set (num:=S (num_laters_per_step (S n) + steps_sum num_laters_per_step (S (S n)) (length l))).
