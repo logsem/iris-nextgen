@@ -247,7 +247,8 @@ Qed.
 
 Lemma fupd_soundness_no_lc_unfold_alt `{!invGpreS Σ} `{!lcGpreS Σ} `{!wsatGpreS Σ} m E :
   ⊢ |==> ∃ `(Hws: invGS_gen HasNoLc Σ) (ω : coPset → iProp Σ),
-    £ m ∗ ω E ∗ ■ (∀ E1 E2 P n, (|={E1}[E2]▷=>^n P) -∗ ω E1 -∗ Nat.iter n (λ P, |==> ▷ |==> ▷ P) (ω E1 ∗ P)).
+      £ m ∗ ω E ∗ ■ (∀ E1 E2 P n, (|={E1}[E2]▷=>^n P) -∗ ω E1 -∗ Nat.iter n (λ P, |==> ▷ |==> ▷ P) (ω E1 ∗ P))
+                ∗ ■ (∀ (E1 E2 : coPset) (P : iPropI Σ), (|={E1,E2}=> P) -∗ ω E1 ==∗ ◇ (ω E2 ∗ P)).
 Proof.
   iMod wsat_alloc as (Hw) "[Hw HE]".
   (* We don't actually want any credits, but we need the [lcGS]. *)
@@ -257,23 +258,28 @@ Proof.
   rewrite (union_difference_L E ⊤); [|set_solver].
   rewrite ownE_op; [|set_solver].
   iDestruct "HE" as "[HE _]". iFrame.
-  iIntros "!>!>" (E1 E2 P n) "HP HwE".
-  iInduction (n) as [|n] "IH" forall (P).
-  - simpl. iFrame.
-  - assert ((S n) = n + 1) as ->;[lia|].
-    rewrite step_fupdN_add.
-    iDestruct ("IH" with "HP HwE") as "t". simpl.
-    rewrite PeanoNat.Nat.add_1_r.
-    rewrite Nat.iter_succ_r.
-    iApply (iter_modal_mono with "[] t").
-    { intros. iIntros "H H'". iMod "H'". iIntros "!>!>".
-      iMod "H'". iIntros "!>!>". iApply "H". auto. }
-    iIntros "[HwE HP]".
+  iModIntro. iSplit.
+  { iIntros "!>" (E1 E2 P n) "HP HwE".
+    iInduction (n) as [|n] "IH" forall (P).
+    - simpl. iFrame.
+    - assert ((S n) = n + 1) as ->;[lia|].
+      rewrite step_fupdN_add.
+      iDestruct ("IH" with "HP HwE") as "t". simpl.
+      rewrite PeanoNat.Nat.add_1_r.
+      rewrite Nat.iter_succ_r.
+      iApply (iter_modal_mono with "[] t").
+      { intros. iIntros "H H'". iMod "H'". iIntros "!>!>".
+        iMod "H'". iIntros "!>!>". iApply "H". auto. }
+      iIntros "[HwE HP]".
+      rewrite fancy_updates.uPred_fupd_unseal
+        /fancy_updates.uPred_fupd_def -assoc /=.
+      iMod ("HP" with "HwE") as ">[Hwsat [HwE HP]]".
+      iDestruct ("HP" with "[$Hwsat $HwE]") as "Hr".
+      iModIntro. iNext. iMod "Hr". iModIntro. iMod "Hr". iNext. auto. }
+  { iIntros "!>" (E1 E2 P) "HP HwE".
     rewrite fancy_updates.uPred_fupd_unseal
-      /fancy_updates.uPred_fupd_def -assoc /=.
-    iMod ("HP" with "HwE") as ">[Hwsat [HwE HP]]".
-    iDestruct ("HP" with "[$Hwsat $HwE]") as "Hr".
-    iModIntro. iNext. iMod "Hr". iModIntro. iMod "Hr". iNext. auto.
+          /fancy_updates.uPred_fupd_def -assoc /=.
+    by iApply ("HP" with "HwE"). }
 Qed.
 
 Lemma bupd_laterN_plain_interweave :
@@ -305,17 +311,17 @@ Section bnextgen_n_open_soundness.
   Notation "⚡={[ l ]}▷=>>^ ( n ) P" := (@bnextgen_n_open _ _ f _ num_laters_per_step _ l n P)
          (at level 99, l at level 50, n at level 50, P at level 200, format "⚡={[ l ]}▷=>>^ ( n )  P") : bi_scope.
 
-  Lemma step_fupdN_nextgen_soundness_no_lc (l : list A) :
+  Lemma step_fupdN_nextgen_open_soundness_no_lc (l : list A) :
     invGpreS Σ → ∀ P : iProp Σ,
         Plain P → ∀ (n m : nat), (∀ (Hinv : invGS_gen HasNoLc Σ), £ m -∗ ⚡={[l]}▷=>>^(n) (* |={⊤,∅}=> *) P) → (⊢ P)%stdpp.
   Proof.
     intros until P. intros HPlain n m  Hiter.
     apply (laterN_soundness _ (steps_sum num_laters_per_step (n) (S (length l)) + steps_sum num_laters_per_step (n) (S (length l)))).
-    iMod (fupd_soundness_no_lc_unfold_alt (m + (steps_sum num_laters_per_step (n) (length l))) ∅) as (Hws ω) "[Hm [Hω #H]]".
+    iMod (fupd_soundness_no_lc_unfold_alt (m + (steps_sum num_laters_per_step (n) (length l))) ∅) as (Hws ω) "[Hm [Hω [#H #H']]]".
     specialize (Hiter Hws).
     rewrite lc_split. iDestruct "Hm" as "[Hm Hn]".
     iDestruct (Hiter with "Hm") as "HH". clear Hiter.
-    iStopProof. revert n. induction l;intros n;iIntros "[#H (Hn & Hω & HH)]".
+    iStopProof. revert n. induction l;intros n;iIntros "[#[H H'] (Hn & Hω & HH)]".
     - simpl. auto.
     - simpl. rewrite /= -Nat.add_succ_r.
       iDestruct "Hn" as "[Hone [Hm Hn]]".
@@ -337,9 +343,58 @@ Section bnextgen_n_open_soundness.
       iAssert (⚡={f a}=> ω ∅)%I with "[Hω]" as "HA1";[admit|].
       iAssert (⚡={f a}=> £ (steps_sum num_laters_per_step (S n) (length l)))%I with "[Hn]" as "HA2";[admit|].
       iModIntro.
-      iDestruct (IHl with "[$H $HA1 $HA2 $HP]") as "HH".
+      iDestruct (IHl with "[$H $H' $HA1 $HA2 $HP]") as "HH".
       rewrite /num. simpl. iNext. iApply (laterN_mono with "HH"). auto.
   Admitted.
+
+
+  Lemma step_fupdN_nextgen_soundness_no_lc (l : list A) :
+    invGpreS Σ → ∀ P : iProp Σ,
+        Plain P → ∀ (n m : nat), (∀ (Hinv : invGS_gen HasNoLc Σ), £ m ={⊤}=∗ ⚡={[l]}▷=>^(n) P) → (⊢ P)%stdpp.
+  Proof.
+    intros until P. intros HPlain n m  Hiter.
+    apply (laterN_soundness _ (steps_sum num_laters_per_step (n) (S (length l)) + steps_sum num_laters_per_step (n) (S (length l)))).
+    iMod (fupd_soundness_no_lc_unfold_alt (m + (steps_sum num_laters_per_step (n) (length l))) ⊤) as (Hws ω) "[Hm [Hω [#H #H']]]".
+    specialize (Hiter Hws).
+    rewrite lc_split. iDestruct "Hm" as "[Hm Hn]".
+    iDestruct (Hiter with "Hm") as "HH". clear Hiter.
+    iStopProof. revert n. induction l;intros n;iIntros "[#[H H'] (Hn & Hω & HH)]".
+    - simpl. iMod ("H'" with "HH Hω") as "[>Hω >HH]". auto.
+    - simpl. rewrite /= -Nat.add_succ_r.
+      iDestruct "Hn" as "[Hone [Hm Hn]]".
+
+      iApply bupd_plain.
+      iMod ("H'" with "HH Hω") as "[>Hω >HH]".
+      iModIntro.
+      iApply bupd_plain.
+      iMod ("H'" with "HH Hω") as "[>Hω >HH]".
+      iModIntro.
       
+      iAssert (|={∅}▷=>^(S $ num_laters_per_step n) |={∅,⊤}=> ⚡={f a}=> ⚡={[l]}▷=>^(S n) P)%I with "HH" as "HH".
+      iDestruct ("H" with "HH Hω") as "HH".
+
+      set (num:=S (num_laters_per_step (S n) + steps_sum num_laters_per_step (S (S n)) (length l))).
+      rewrite -plus_Sn_m Nat.add_assoc.
+      rewrite -later_laterN -!plus_Sn_m.
+      assert (S (num_laters_per_step n) + num + S (num_laters_per_step n) + num =
+                S (num_laters_per_step n) + S (num_laters_per_step n) + (num + num)) as ->;[lia|].
+      rewrite laterN_add.
+      iApply bupd_laterN_plain_interweave.
+      iApply (iter_modal_mono with "[-HH] HH").
+      { intros. iIntros "J H". iMod "H". iIntros "!>!>".
+        iMod "H". iIntros "!>!>". iApply "J". iFrame. }
+      iIntros "[Hω HP]".
+
+      iApply bupd_plain.
+      iMod ("H'" with "HP Hω") as "[>Hω >HP]".
+      iModIntro.      
+      
+      iApply (bnextgen_plain (f a)).
+      iAssert (⚡={f a}=> ω ⊤)%I with "[Hω]" as "HA1";[admit|].
+      iAssert (⚡={f a}=> £ (steps_sum num_laters_per_step (S n) (length l)))%I with "[Hn]" as "HA2";[admit|].
+      iModIntro.
+      iDestruct (IHl with "[$H $H' $HA1 $HA2 $HP]") as "HH";auto.
+  Admitted.
+  
 
 End bnextgen_n_open_soundness.

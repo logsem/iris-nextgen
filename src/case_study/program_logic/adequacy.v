@@ -280,9 +280,13 @@ Proof.
   intros Hwp ??.
   pose proof (@step_fupdN_nextgen_soundness_no_lc (expr Λ) Σ next_state _ num_laters_per_step es' _ (⌜not_stuck e2 σ2⌝)%I _ 0 (steps_sum num_laters_per_step 0 n)) as Hsound.
   eapply pure_soundness.
-  apply Hsound. intros.
-  iIntros "Hn".
-Abort.
+  apply Hsound.
+  iIntros (Hinv) "Hn".
+  destruct n.
+  { inversion H;subst. simpl. auto. }
+  iMod Hwp as (stateI Φ fork_post state_interp_mono) "(Hσ & Hwp)".
+
+  iDestruct (wptp_progress) as "HH";[apply H|apply H0|..].
 
 
 (*
