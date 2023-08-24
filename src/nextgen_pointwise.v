@@ -1,6 +1,6 @@
-From iris.algebra Require Import functions gmap agree excl csum.
+From iris.algebra Require Import functions gmap view gmap_view agree excl csum coPset gset.
 From iris.proofmode Require Import classes tactics.
-From iris.base_logic.lib Require Export iprop own invariants.
+From iris.base_logic.lib Require Export iprop own.
 From iris.prelude Require Import options.
 
 Import EqNotations. (* Get the [rew] notation. *)
@@ -101,6 +101,26 @@ Notation IntoPnextgen Ω := (IntoBnextgen (build_trans Ω.(gT_map))).
 Section nextgen_inG.
   Context {Σ} `{i : inG Σ A}.
   Implicit Types (t : A → A) (ts : iResUR Σ → iResUR Σ).
+
+  (** Lifting of useful lemmas *)
+  Lemma transmap_plain (Ω : gTransformations Σ) (P : iProp Σ) `{!Plain P} :
+    (⚡={Ω}=> P) ⊢ P.
+  Proof.
+    apply bnextgen_plain =>//.
+  Qed.
+
+  Lemma transmap_sep (Ω : gTransformations Σ) (P Q : iProp Σ) `{!Plain P} :
+    (⚡={Ω}=> P) ∗ (⚡={Ω}=> Q) ⊢ ⚡={Ω}=> P ∗ Q.
+  Proof.
+    apply bnextgen_sep_2 =>//.
+  Qed.
+
+  Lemma transmap_big_sepM_1 {K V : Type} `{EqDecision K} `{Countable K} (Ω : gTransformations Σ) (m : gmap K V) (Φ : K -> V -> iProp Σ) :
+    ([∗ map] k↦y1 ∈ m, ⚡={Ω}=> Φ k y1) ⊢ ⚡={Ω}=> ([∗ map] k↦y1 ∈ m, Φ k y1).
+  Proof.
+    apply bnextgen_big_sepM_1 => //.
+  Qed.
+  
 
   Lemma transmap_own_lookup_Some {Ω} γ a t `{!CmraMorphism t} :
     Ω.(gT_map) i.(inG_id) = Some (cmra_map_transport inG_prf t) →
@@ -259,6 +279,40 @@ Section nextgen_instances.
     unfold transmap_insert_inG. simpl.
     rewrite transmap_insert_lookup_eq.
     done.
+  Qed.
+
+  Lemma bnextgen_extensional_eq_iprop {Σ} P (f g : iResUR Σ -> iResUR Σ) `{!CmraMorphism f} `{!CmraMorphism g} :
+    (forall x i0, f x i0 = g x i0) ->
+    (uPred_bnextgen f P) ⊣⊢ uPred_bnextgen g P.
+  Proof.
+    intros Hext.
+    split; intros. try uPred.unseal; rewrite  /uPred_bnextgen seal_eq;
+      rewrite !/uPred_holds /=.
+    destruct P. rewrite /upred.uPred_holds.
+    split;intros.
+    - eapply uPred_mono;eauto. exists ε. simpl.
+      intros i. rewrite -Hext.
+      pose proof (ucmra_unit_right_id (f x)) as Heq. clear H H0.
+      specialize (Heq i). rewrite Heq. auto.
+    - eapply uPred_mono;eauto. exists ε. simpl.
+      intros i. rewrite Hext.
+      pose proof (ucmra_unit_right_id (g x)) as Heq. clear H H0.
+      specialize (Heq i). rewrite Heq. auto.
+  Qed.
+  
+  Lemma transmap_insert_extensional_eq {A} `{i : noTransInG Σ Ω A} (t : A → A) (g : A -> A) (C1 : CmraMorphism t) (C2 : CmraMorphism g) P :
+    (forall (x : A), t x = g x) ->
+    (⚡={transmap_insert_inG t Ω}=> P) ⊣⊢ ⚡={transmap_insert_inG g Ω}=> P.
+  Proof.
+    intros Hext.
+    apply bnextgen_extensional_eq_iprop.
+    intros. simpl. unfold build_trans.
+    erewrite map_imap_ext;eauto.
+    simpl. intros.
+    destruct (x i0 !! k) eqn:Hlook;rewrite Hlook /= //. rewrite /transmap_insert.
+    destruct (decide (inG_id noTransInG_inG = i0));auto. simplify_eq.
+    destruct i. destruct noTransInG_inG0;simpl in *. subst A.
+    simpl in *. rewrite Hext. auto.
   Qed.
 
   #[global]

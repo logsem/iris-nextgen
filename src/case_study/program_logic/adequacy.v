@@ -1,22 +1,26 @@
 From iris.algebra Require Import gmap auth agree gset coPset.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import wsat.
+(* From iris.base_logic.lib Require Import wsat. *)
 From nextgen.case_study.program_logic Require Export weakestpre.
 From iris.prelude Require Import options.
+From nextgen.lib Require Import wsat.
 From nextgen Require Export nextgen_soundness.
 Import uPred.
 
 (** This file contains the adequacy statements of the Iris program logic. First *)
 (* we prove a number of auxilary results. *)
 
-Notation "⚡={[ l ]}▷=>^ ( n ) P" := (@bnextgen_n _ _ (next_state) _ num_laters_per_step _ l n P)
+Notation "⚡={[ l ]}=> P" := (@bnextgen_repeat_n _ _ _ _ _ (next_state) _ num_laters_per_step _ _ l P)
+         (at level 99, l at level 50, P at level 200, format "⚡={[ l ]}=>  P") : bi_scope.
+
+Notation "⚡={[ l ]}▷=>^ ( n ) P" := (@bnextgen_n _ _ _ _ _ (next_state) _ num_laters_per_step _ _ l n P)
          (at level 99, l at level 50, n at level 50, P at level 200, format "⚡={[ l ]}▷=>^ ( n )  P") : bi_scope.
 
-Notation "⚡={[ l ]}▷=>>^ ( n ) P" := (@bnextgen_n_open _ _ (next_state) _ num_laters_per_step _ l n P)
+Notation "⚡={[ l ]}▷=>>^ ( n ) P" := (@bnextgen_n_open _ _ _ _ _ (next_state) _ num_laters_per_step _ _ l n P)
          (at level 99, l at level 50, n at level 50, P at level 200, format "⚡={[ l ]}▷=>>^ ( n )  P") : bi_scope.
 
 Section adequacy.
-Context `{!irisGS_gen HasNoLc Λ Σ}.
+Context `{!irisGS_gen HasNoLc Λ Σ Ω T}.
 Implicit Types e : expr Λ.
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ : val Λ → iProp Σ.
@@ -83,7 +87,7 @@ Local Lemma wp_step s e1 σ1 ns κ κs e2 σ2 efs nt Φ :
   £ (S (num_laters_per_step ns)) -∗
   WP e1 @ s; ⊤ {{ Φ }}
     ={⊤,∅}=∗ |={∅}▷=>^(S $ num_laters_per_step ns) |={∅,⊤}=>
-  (⚡={next_state e1}=> state_interp σ2 (S ns) κs (nt + length efs)) ∗ (⚡={next_state e1}=> WP e2 @ s; ⊤ {{ Φ }}).
+  (⚡={transmap_insert_inG (next_state e1) Ω}=> state_interp σ2 (S ns) κs (nt + length efs)) ∗ (⚡={transmap_insert_inG (next_state e1) Ω}=> WP e2 @ s; ⊤ {{ Φ }}).
 Proof.
   rewrite {1}wp_unfold /wp_pre. iIntros (?) "Hσ Hcred H".
   rewrite (val_stuck e1 σ1 κ e2 σ2 efs) //.
@@ -136,11 +140,11 @@ Proof.
   iApply (step_fupdN_wand with "HH").
   iIntros "HH". iModIntro.
   iMod "HH". iModIntro. iDestruct "HH" as "[? H]".
-  iAssert (⚡={next_state e1}=> £ (steps_sum num_laters_per_step (S ns) n))%I with "[Hc2]" as "Hc2";[admit|].
+  iDestruct (lc_ind_insert_intro with "Hc2") as "Hc2".
   iModIntro. rewrite /= Nat.add_0_r.
   iApply (IH with "[$] [H] [$]");first eauto.
   simpl. iFrame.
-Admitted.
+Qed.
 
 Local Lemma wp_not_stuck κs nt e σ ns Φ :
   state_interp σ ns κs nt -∗ WP e {{ Φ }} ={⊤, ∅}=∗ ⌜not_stuck e σ⌝.
@@ -197,16 +201,16 @@ Qed.
 End adequacy.
 
 (** Progress for nextgen-weakestpre, for single thread and without later credits *)
-Local Lemma wp_progress_no_lc_single_thread Σ Λ `{!invGpreS Σ} es σ1 n es' κs t2 σ2 e2
-  (num_laters_per_step : nat → nat) (next_state : expr Λ -> iResUR Σ -> iResUR Σ)
+Local Lemma wp_progress_no_lc_single_thread Σ (Ω : gTransformations Σ) T `{Htr : noTransInG Σ Ω T} Λ `{!invGIndpreS Σ Ω} es σ1 n es' κs t2 σ2 e2
+  (num_laters_per_step : nat → nat) (next_state : expr Λ -> T -> T)
   (next_state_ne : ∀ e : expr Λ, CmraMorphism (next_state e)) :
-    (∀ `{Hinv : invGS_gen HasNoLc Σ},
+    (∀ `{Hinv : invGIndS_gen HasNoLc Σ Ω},
     ⊢ |={⊤}=> ∃
          (stateI : state Λ → nat → list (observation Λ) → nat → iProp Σ)
          (Φs : list (val Λ → iProp Σ))
          (fork_post : val Λ → iProp Σ)
          state_interp_mono,
-       let _ : irisGS_gen HasNoLc Λ Σ := IrisG Hinv stateI fork_post next_state next_state_ne num_laters_per_step
+       let _ : irisGS_gen HasNoLc Λ Σ Ω T := IrisG Ω T Hinv Htr stateI fork_post next_state next_state_ne num_laters_per_step
                                   state_interp_mono
        in
        stateI σ1 0 κs 0 ∗
@@ -214,9 +218,10 @@ Local Lemma wp_progress_no_lc_single_thread Σ Λ `{!invGpreS Σ} es σ1 n es' �
   nsteps_single_thread es' n (es, σ1) κs (t2, σ2) →
   e2 ∈ t2 →
   not_stuck e2 σ2.
+
 Proof.
-  intros Hwp ??. inversion invGpreS0.
-  pose proof (@step_fupdN_nextgen_soundness_no_lc (expr Λ) Σ next_state _ num_laters_per_step es' _
+  intros Hwp ??. inversion invGIndpreS0.
+  pose proof (@step_fupdN_nextgen_soundness_no_lc (expr Λ) Σ Ω T Htr next_state _ num_laters_per_step es' _
                 (⌜not_stuck e2 σ2⌝)%I _ 0 (steps_sum num_laters_per_step 0 n)) as Hsound.
   eapply pure_soundness.
   apply Hsound.
@@ -225,19 +230,18 @@ Proof.
   apply nsteps_single_thread_expr_length in H as Hlen. destruct Hlen as [Hlen1 Hlen2];simpl in Hlen1, Hlen2.
   destruct es as [|e es];[done|destruct es;[|done]].
   iDestruct (big_sepL2_length with "Hwp") as %Hlen. destruct Φ as [|Φ0 Φ];[done|destruct Φ;[|done]].
-
-  iDestruct (@wptp_progress _ _ (IrisG Hinv stateI fork_post next_state next_state_ne num_laters_per_step state_interp_mono) _
+  iDestruct (@wptp_progress _ _ _ _ (IrisG Ω T Hinv Htr stateI fork_post next_state next_state_ne num_laters_per_step state_interp_mono) _
               with "[Hσ] [$Hn] [$Hwp]") as "HH";[apply H|apply H0|..].
   { instantiate (2:=[]). rewrite app_nil_r. unfold state_interp. iFrame. }
   simpl. auto.
 Qed.
 
 (** Adequacy for nextgen-weakestpre, for single thread and without later credits *)
-Lemma wp_strong_adequacy_no_lc_single_thread Σ Λ `{!invGpreS Σ} s es es' σ1 n κs t2 σ2 φ
-        (num_laters_per_step : nat → nat) (next_state : expr Λ -> iResUR Σ -> iResUR Σ)
+Lemma wp_strong_adequacy_no_lc_single_thread Σ (Ω : gTransformations Σ) T `{Htr : noTransInG Σ Ω T} Λ `{!invGIndpreS Σ Ω} s es es' σ1 n κs t2 σ2 φ
+        (num_laters_per_step : nat → nat) (next_state : expr Λ -> T -> T)
         (next_state_ne : ∀ e : expr Λ, CmraMorphism (next_state e)) :
   (* WP *)
-  (∀ `{Hinv : !invGS_gen HasNoLc Σ},
+  (∀ `{Hinv : !invGIndS_gen HasNoLc Σ Ω},
       ⊢ |={⊤}=> ∃
          (stateI : state Λ → nat → list (observation Λ) → nat → iProp Σ)
          (Φs : list (val Λ → iProp Σ))
@@ -245,7 +249,7 @@ Lemma wp_strong_adequacy_no_lc_single_thread Σ Λ `{!invGpreS Σ} s es es' σ1 
          (* Note: existentially quantifying over Iris goal! [iExists _] should *)
 (*          usually work. *)
          state_interp_mono,
-       let _ : irisGS_gen HasNoLc Λ Σ := IrisG Hinv stateI fork_post next_state next_state_ne num_laters_per_step
+       let _ : irisGS_gen HasNoLc Λ Σ Ω T := IrisG Ω T Hinv Htr stateI fork_post next_state next_state_ne num_laters_per_step
                                   state_interp_mono
        in
        stateI σ1 0 κs 0 ∗
@@ -269,16 +273,16 @@ Lemma wp_strong_adequacy_no_lc_single_thread Σ Λ `{!invGpreS Σ} s es es' σ1 
 Proof.
   intros Hwp ?.
   eapply pure_soundness.
-  eapply (@step_fupdN_nextgen_soundness_no_lc (expr Λ) Σ next_state _ num_laters_per_step es' _ 
+  eapply (@step_fupdN_nextgen_soundness_no_lc (expr Λ) Σ _ _ _ next_state _ num_laters_per_step es' _ 
             (⌜φ⌝)%I _ 0 (steps_sum num_laters_per_step 0 n)).
-  iIntros (Hinv) "Hcred". inversion invGpreS0.
+  iIntros (Hinv) "Hcred". inversion invGIndpreS0.
   iMod Hwp as (stateI Φ fork_post state_interp_mono) "(Hσ & Hwp & Hφ)".
   apply nsteps_single_thread_expr_length in H as Hlen. destruct Hlen as [Hlen1 Hlen2];simpl in Hlen1, Hlen2.
   destruct es as [|e es];[done|destruct es;[|done]].
   iDestruct (big_sepL2_length with "Hwp") as %Hlen. destruct Φ as [|Φ0 Φ];[done|destruct Φ;[|done]].
   
-  iDestruct (@wptp_postconditions _ _
-       (IrisG Hinv stateI fork_post next_state next_state_ne num_laters_per_step state_interp_mono) _ _ []
+  iDestruct (@wptp_postconditions _ _ _ _
+       (IrisG Ω T Hinv Htr stateI fork_post next_state next_state_ne num_laters_per_step state_interp_mono) _ _ []
               with "[Hσ] Hcred [Hwp]") as "H";[done|by rewrite right_id_L|..].
   { simpl. iDestruct "Hwp" as "[Hwp $]". instantiate (1:=Φ0). instantiate (1:=s).
     iApply (wp_mono with "Hwp"). intros. auto. }
@@ -297,36 +301,56 @@ Proof.
   iModIntro. iExists stateI, _, _, _. iFrame.
 Qed.
 
-(* (** Adequacy when using later credits (the default) *) *)
-(* Definition wp_strong_adequacy := wp_strong_adequacy_gen HasLc. *)
-(* Global Arguments wp_strong_adequacy _ _ {_}. *)
+(** Since the full adequacy statement is quite a mouthful, we prove some more *)
+(* intuitive and simpler corollaries. These lemmas are morover stated in terms of *)
+(* [rtc erased_step] so one does not have to provide the trace. *)
 
-(* (** Since the full adequacy statement is quite a mouthful, we prove some more *) *)
-(* (* intuitive and simpler corollaries. These lemmas are morover stated in terms of *) *)
-(* (* [rtc erased_step] so one does not have to provide the trace. *) *)
-(* Record adequate {Λ} (s : stuckness) (e1 : expr Λ) (σ1 : state Λ) *)
-(*     (φ : val Λ → state Λ → Prop) := { *)
-(*   adequate_result t2 σ2 v2 : *)
-(*    rtc erased_step ([e1], σ1) (of_val v2 :: t2, σ2) → φ v2 σ2; *)
-(*   adequate_not_stuck t2 σ2 e2 : *)
-(*    s = NotStuck → *)
-(*    rtc erased_step ([e1], σ1) (t2, σ2) → *)
-(*    e2 ∈ t2 → not_stuck e2 σ2 *)
-(* }. *)
+Definition erased_step {Λ} (ρ1 ρ2 : cfg Λ) := ∃ e1 κ, step_single_thread e1 ρ1 κ ρ2.
 
-(* Lemma adequate_alt {Λ} s e1 σ1 (φ : val Λ → state Λ → Prop) : *)
-(*   adequate s e1 σ1 φ ↔ ∀ t2 σ2, *)
-(*     rtc erased_step ([e1], σ1) (t2, σ2) → *)
-(*       (∀ v2 t2', t2 = of_val v2 :: t2' → φ v2 σ2) ∧ *)
-(*       (∀ e2, s = NotStuck → e2 ∈ t2 → not_stuck e2 σ2). *)
-(* Proof. *)
-(*   split. *)
-(*   - intros []; naive_solver. *)
-(*   - constructor; naive_solver. *)
-(* Qed. *)
+Record adequate_single_thread {Λ} (s : stuckness) (e1 : expr Λ) (σ1 : state Λ)
+    (φ : val Λ → state Λ → Prop) := {
+  adequate_result σ2 v2 :
+   rtc erased_step ([e1], σ1) ([of_val v2], σ2) → φ v2 σ2;
+  adequate_not_stuck σ2 e2 :
+   s = NotStuck →
+   rtc erased_step ([e1], σ1) ([e2], σ2) →
+   not_stuck e2 σ2
+}.
+
+Lemma adequate_single_thread_alt {Λ} s e1 σ1 (φ : val Λ → state Λ → Prop) :
+  adequate_single_thread s e1 σ1 φ ↔ ∀ e2 σ2,
+    rtc erased_step ([e1], σ1) ([e2], σ2) →
+      (∀ v2, e2 = of_val v2 → φ v2 σ2) ∧
+      (s = NotStuck → not_stuck e2 σ2).
+Proof.
+  split.
+  - intros []; naive_solver.
+  - constructor; naive_solver.
+Qed.
+
+(** [rtc erased_step] and [nsteps] encode the same thing, just packaged
+    in a different way. *)
+Lemma erased_steps_nsteps {Λ} (ρ1 ρ2 : cfg Λ) :
+  length ρ1.1 = 1 ->
+  (rtc erased_step ρ1 ρ2) ↔ ∃ es' n κs, nsteps_single_thread es' n ρ1 κs ρ2.
+Proof.
+  intros Hlen1.
+  split.
+  - intros Hstep. induction Hstep;eauto.
+    + destruct x;simplify_eq;simpl in *. destruct l as [|e l];[done|simpl in *;destruct l;[|done]].
+      exists [], 0, []. eapply nsteps_refl;eauto.
+    + destruct H as [e1 [κ Hss]]. inversion Hss;simplify_eq.
+      specialize (IHHstep eq_refl). destruct IHHstep as (es' & n & κs & Hnsteps).
+      exists (e1 :: es'), (S n), (κ ++ κs). econstructor;eauto.
+  - intros (es' & n & κs & Hsteps). apply nsteps_single_thread_expr_length in Hsteps as Hlen.
+    destruct Hlen as [? ?]. (* split;auto. *)
+    unfold erased_step. induction Hsteps; eauto using rtc_refl, rtc_l.
+    inversion H1;simplify_eq. apply IHHsteps in H0;auto.
+    eapply rtc_l;eauto.
+Qed.
 
 (* Theorem adequate_tp_safe {Λ} (e1 : expr Λ) t2 σ1 σ2 φ : *)
-(*   adequate NotStuck e1 σ1 φ → *)
+(*   adequate_single_thread NotStuck e1 σ1 φ → *)
 (*   rtc erased_step ([e1], σ1) (t2, σ2) → *)
 (*   Forall (λ e, is_Some (to_val e)) t2 ∨ ∃ t3 σ3, erased_step (t2, σ2) (t3, σ3). *)
 (* Proof. *)
@@ -340,47 +364,46 @@ Qed.
 (*   right; exists (t2' ++ e3 :: t2'' ++ efs), σ3, κ; econstructor; eauto. *)
 (* Qed. *)
 
-(* (** This simpler form of adequacy requires the [irisGS] instance that you use *) *)
-(* (* everywhere to syntactically be of the form *) *)
-(* (* {| *) *)
-(* (*   iris_invGS := ...; *) *)
-(* (*   state_interp σ _ κs _ := ...; *) *)
-(* (*   fork_post v := ...; *) *)
-(* (*   num_laters_per_step _ := 0; *) *)
-(* (*   state_interp_mono _ _ _ _ := fupd_intro _ _; *) *)
-(* (* |} *) *)
-(* (* In other words, the state interpretation must ignore [ns] and [nt], the number *) *)
-(* (* of laters per step must be 0, and the proof of [state_interp_mono] must have *) *)
-(* (* this specific proof term. *) *)
-(* (* *) *)
-(* (** Again, we first prove a lemma generic over the usage of credits. *) *)
-(* Lemma wp_adequacy_gen (hlc : has_lc) Σ Λ `{!invGpreS Σ} s e σ φ : *)
-(*   (∀ `{Hinv : !invGS_gen hlc Σ} κs, *)
-(*      ⊢ |={⊤}=> ∃ *)
-(*          (stateI : state Λ → list (observation Λ) → iProp Σ) *)
-(*          (fork_post : val Λ → iProp Σ), *)
-(*        let _ : irisGS_gen hlc Λ Σ := *)
-(*            IrisG Hinv (λ σ _ κs _, stateI σ κs) fork_post (λ _, 0) *)
-(*                  (λ _ _ _ _, fupd_intro _ _) *)
-(*        in *)
-(*        stateI σ κs ∗ WP e @ s; ⊤ {{ v, ⌜φ v⌝ }}) → *)
-(*   adequate s e σ (λ v _, φ v). *)
-(* Proof. *)
-(*   intros Hwp. apply adequate_alt; intros t2 σ2 [n [κs ?]]%erased_steps_nsteps. *)
-(*   eapply (wp_strong_adequacy_gen hlc Σ _); [ | done]=> ?. *)
-(*   iMod Hwp as (stateI fork_post) "[Hσ Hwp]". *)
-(*   iExists (λ σ _ κs _, stateI σ κs), [(λ v, ⌜φ v⌝%I)], fork_post, _ => /=. *)
-(*   iIntros "{$Hσ $Hwp} !>" (e2 t2' -> ? ?) "_ H _". *)
-(*   iApply fupd_mask_intro_discard; [done|]. iSplit; [|done]. *)
-(*   iDestruct (big_sepL2_cons_inv_r with "H") as (e' ? ->) "[Hwp H]". *)
-(*   iDestruct (big_sepL2_nil_inv_r with "H") as %->. *)
-(*   iIntros (v2 t2'' [= -> <-]). by rewrite to_of_val. *)
-(* Qed. *)
+(** This simpler form of adequacy requires the [irisGS] instance that you use *)
+(* everywhere to syntactically be of the form *)
+(* {| *)
+(*   iris_invGS := ...; *)
+(*   state_interp σ _ κs _ := ...; *)
+(*   fork_post v := ...; *)
+(*   num_laters_per_step _ := 0; *)
+(*   state_interp_mono _ _ _ _ := fupd_intro _ _; *)
+(* |} *)
+(* In other words, the state interpretation must ignore [ns] and [nt], the number *)
+(* of laters per step must be 0, and the proof of [state_interp_mono] must have *)
+(* this specific proof term. *)
+(* *)
+Lemma wp_adequacy_no_lc_single_thread Σ (Ω : gTransformations Σ) T `{Htr : noTransInG Σ Ω T} Λ `{!invGIndpreS Σ Ω} (next_state : expr Λ -> T -> T)
+        (next_state_ne : ∀ e : expr Λ, CmraMorphism (next_state e)) s e σ φ :
+  (∀ `{Hinv : !invGIndS_gen HasNoLc Σ Ω} κs,
+     ⊢ |={⊤}=> ∃
+         (stateI : state Λ → list (observation Λ) → iProp Σ)
+         (fork_post : val Λ → iProp Σ),
+       let _ : irisGS_gen HasNoLc Λ Σ Ω T :=
+           IrisG Ω T Hinv Htr (λ σ _ κs _, stateI σ κs) fork_post next_state next_state_ne (λ _, 0)
+                 (λ _ _ _ _, (entails_po).(PreOrder_Reflexive) _)
+       in
+       stateI σ κs ∗ WP e @ s; ⊤ {{ v, ⌜φ v⌝ }}) →
+  adequate_single_thread s e σ (λ v _, φ v).
+Proof.
+  intros Hwp. apply adequate_single_thread_alt. intros e2 σ2 (es' & n & κ & Hsteps)%erased_steps_nsteps;auto.
+  
+  eapply (wp_strong_adequacy_no_lc_single_thread Σ _ _ _); [ | done]=> ?.
+  iMod Hwp as (stateI fork_post) "[Hσ Hwp]".
+  iExists (λ σ _ κs _, stateI σ κs), [(λ v, ⌜φ v⌝%I)], fork_post, _ => /=.
+  iFrame. iModIntro. iStopProof. apply bnextgen_n_open_emp_intro.
+  iIntros (es_end Heq Hs) "Hσ [HΦ _]".
+  simplify_eq. iApply fupd_mask_intro_discard;auto.
+  iSplit;auto. iIntros (v Hv). simplify_eq.
+  by rewrite to_of_val /=.
+Qed.
 
-(* (** Instance for using credits *) *)
-(* Definition wp_adequacy := wp_adequacy_gen HasLc. *)
-(* Global Arguments wp_adequacy _ _ {_}. *)
 
+(* NO INVARIANTS DURING EXECUTION *)
 (* Lemma wp_invariance_gen (hlc : has_lc) Σ Λ `{!invGpreS Σ} s e1 σ1 t2 σ2 φ : *)
 (*   (∀ `{Hinv : !invGS_gen hlc Σ} κs, *)
 (*      ⊢ |={⊤}=> ∃ *)

@@ -12,16 +12,20 @@ Import uPred.
 (** Basic rules for language operations. *)
 
 (* CMRA for size *)
-Class stacksizeGS Σ := StackSizeGS {
+Class stacksizeGS (Σ : gFunctors) (Ω : gTransformations Σ) := StackSizeGS {
   heapG_stacksize_name : gname;
-  heapG_excl_nat_stacksizeGS :> inG Σ (excl_authUR natR)
+  heapG_excl_nat_stacksizeGS :> genIndInG Σ Ω (excl_authUR natR)
 }.
+
+Class invGS_gen hlc Σ Ω :=
+  
+
 (* CMRA for state interpretation *)
-Class heapGS Σ := HeapGS {
-  heapG_invGS : invGS Σ;
+Class heapGS (Σ : gFunctors) (Ω : gTransformations Σ) := HeapGS {
+  heapG_invGS : invGS_gen HasNoLc Σ;
   heapG_gen_heapGS :> gen_heapGS loc val Σ;
   heapG_gen_stackGS :> gen_heapGS (nat * loc) val Σ;
-  heapG_stacksizeGS :> stacksizeGS Σ
+  heapG_stacksizeGS :> stacksizeGS Σ Ω
 }.
 
 Section StackSize.
@@ -74,6 +78,7 @@ Proof.
   intros.
   unfold next_state_f. destruct (find_i e.2);apply _.
 Qed.
+
 
 Lemma intro_id {PROP: bi} (P : PROP) : (P ⊢ P)%I. Proof. auto. Qed.
 

@@ -411,6 +411,18 @@ Section bnextgen_rules_cmra_morphism.
     rewrite eq. done.
   Qed.
 
+  Lemma bnextgen_big_sepM_1 {K A : Type} `{EqDecision K} `{Countable K} (m : gmap K A) (Φ : K -> A -> uPredI M) :
+    ([∗ map] k↦y1 ∈ m, ⚡={f}=> Φ k y1) ⊢ ⚡={f}=> ([∗ map] k↦y1 ∈ m, Φ k y1).
+  Proof.
+    induction m using map_ind.
+    - rewrite !big_sepM_empty. iIntros "_". by iApply bnextgen_emp_2.
+    - rewrite !big_sepM_insert//.
+      iIntros "[H1 H2]".
+      iApply bnextgen_sep_2.
+      iSplitL "H1";[by iApply (bnextgen_mono with "H1")|].
+      iApply IHm. auto.
+  Qed.
+
   Lemma bnextgen_sep P Q :
     (∀ n a b1 b2,
        f a ≡{n}≡ b1 ⋅ b2 →
@@ -479,27 +491,6 @@ Section bnextgen_rules_cmra_morphism.
     iApply bnextgen_forall. iIntros (g).
     iApply bnextgen_forall. iIntros (GenTrans).
     iApply bnextgen_compose. iApply "Hcond".
-  Qed.
-
-  Lemma löb_wand_plainly (P : uPredI M) `{!Absorbing P} :
-    ■ ((■ ▷ P) -∗ P) ⊢ P.
-  Proof.
-    rewrite -{3}(plainly_elim P) -(löb (■ P)).
-    apply impl_intro_l. rewrite later_plainly_1.
-    rewrite -{1}(plainly_idemp (▷ P)).
-    rewrite -plainly_and plainly_and_sep. rewrite wand_elim_r. auto.
-  Qed.
-
-  Lemma löb_wand_plainly_and_intuitionistically (P : uPredI M) `{!Absorbing P} :
-    □ ■ ((□ ■ ▷ P) -∗ P) ⊢ P.
-  Proof.
-    rewrite -{3}(plainly_elim P) -{1}(intuitionistically_elim (■ P)) -(löb (□ ■ P)).
-    apply impl_intro_l. rewrite later_intuitionistically later_plainly_1.
-    rewrite -{1}(plainly_idemp (▷ P)).
-    rewrite -{1}(intuitionistically_idemp (■ ■ ▷ P)).
-    rewrite intuitionistically_plainly.
-    rewrite and_sep_intuitionistically.
-    rewrite intuitionistically_sep_2 -plainly_sep. rewrite wand_elim_r. auto.
   Qed.
 
 End bnextgen_rules_cmra_morphism.

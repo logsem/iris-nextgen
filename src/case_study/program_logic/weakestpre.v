@@ -1,16 +1,18 @@
 From iris.proofmode Require Import base proofmode classes.
-From iris.base_logic.lib Require Export fancy_updates.
+(* From iris.base_logic.lib Require Export fancy_updates. *)
 From iris.program_logic Require Export language.
 (* FIXME: If we import iris.bi.weakestpre earlier texan triples do not
    get pretty-printed correctly. *)
 From iris.bi Require Export weakestpre.
 From iris.prelude Require Import options.
+From nextgen.lib Require Export fancy_updates.
 Import uPred.
-From nextgen Require Export nextgen_basic nextgen_persistently.
+From nextgen Require Export utils nextgen_basic nextgen_persistently nextgen_pointwise.
 
-Class irisGS_gen (hlc : has_lc) (Λ : language) (Σ : gFunctors) := IrisG {
-  iris_invGS :> invGS_gen hlc Σ;
-
+Class irisGS_gen (hlc : has_lc) (Λ : language) (Σ : gFunctors) (Ω : gTransformations Σ) (A : cmra) := IrisG {
+  iris_invGS :> invGIndS_gen hlc Σ Ω;
+  iris_notrans :> noTransInG Σ Ω A;
+                                                                                               
   (** The state interpretation is an invariant that should hold in
   between each step of reduction. Here [Λstate] is the global state,
   the first [nat] is the number of steps already performed by the
@@ -26,7 +28,7 @@ Class irisGS_gen (hlc : has_lc) (Λ : language) (Σ : gFunctors) := IrisG {
   fork_post : val Λ → iProp Σ;
 
   (* A : Type;  *)(* a_inhabited : Inhabited A; *)
-  next_state : expr Λ -> iResUR Σ -> iResUR Σ;
+  next_state : expr Λ -> A -> A;
   (* next_a : expr Λ -> A -> A; *)
   next_state_GenTrans :> forall e, CmraMorphism (next_state e);
   (* next_state_contractive : forall (a : A) (x : iResUR Σ) (n : nat), next_state a x ≼{n} x; *)
@@ -54,13 +56,13 @@ Class irisGS_gen (hlc : has_lc) (Λ : language) (Σ : gFunctors) := IrisG {
   of the definition [state_interp_mono] does not significantly
   complicate the formalization in Iris, we prefer simplifying the
   client. *)
-  state_interp_mono σ ns κs nt:
+  state_interp_mono σ ns κs nt :
     (state_interp σ ns κs nt) ⊢ state_interp σ (S ns) κs nt
 }.
 Global Opaque iris_invGS.
 Global Arguments IrisG {hlc Λ Σ}.
 
-Notation irisGS := (irisGS_gen HasLc).
+Notation irisGS := (irisGS_gen HasNoLc).
 
 (** The predicate we take the fixpoint of in order to define the WP. *)
 (** In the step case, we both provide [S (num_laters_per_step ns)]
@@ -75,7 +77,7 @@ Notation irisGS := (irisGS_gen HasLc).
     can only be used by exactly one client.
   - The step-taking update can even be used by clients that opt out of
     later credits, e.g. because they use [BiFUpdPlainly]. *)
-Definition wp_pre `{!irisGS_gen hlc Λ Σ} (s : stuckness)
+Definition wp_pre `{!irisGS_gen hlc Λ Σ Ω A} (s : stuckness)
     (wp : coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ) :
   coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ := λ E e1 Φ,
   (match to_val e1 with
@@ -86,32 +88,32 @@ Definition wp_pre `{!irisGS_gen hlc Λ Σ} (s : stuckness)
        ∀ e2 σ2 efs, ⌜prim_step e1 σ1 κ e2 σ2 efs⌝ -∗
          £ (S (num_laters_per_step ns))
          ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-        (⚡={next_state e1}=> state_interp σ2 (S ns) κs (length efs + nt)) ∗
-         (⚡={next_state e1}=> wp E e2 Φ) ∗
+        (⚡={transmap_insert_inG (next_state e1) Ω}=> state_interp σ2 (S ns) κs (length efs + nt)) ∗
+         (⚡={transmap_insert_inG (next_state e1) Ω}=> wp E e2 Φ) ∗
          [∗ list] i ↦ ef ∈ efs, wp ⊤ ef fork_post
   end)%I.
 
-Local Instance wp_pre_contractive `{!irisGS_gen hlc Λ Σ} s : Contractive (wp_pre s).
+Local Instance wp_pre_contractive `{!irisGS_gen hlc Λ Σ Ω A} s : Contractive (wp_pre s).
 Proof.
   rewrite /wp_pre /= => n wp wp' Hwp E e1 Φ.
   do 25 (f_contractive || f_equiv).
   (* FIXME : simplify this proof once we have a good definition and a
      proper instance for step_fupdN. *)
   induction num_laters_per_step as [|k IH]; simpl.
-  - repeat (apply next_modality_ne || f_contractive || f_equiv); apply Hwp.
+  - repeat (apply nextgen_basic.bnextgen_ne || f_contractive || f_equiv); apply Hwp.
   - by rewrite -IH.
 Qed.
 
-Local Definition wp_def `{!irisGS_gen hlc Λ Σ} : Wp (iProp Σ) (expr Λ) (val Λ) (stuckness) := λ s, fixpoint (wp_pre s).
+Local Definition wp_def `{!irisGS_gen hlc Λ Σ Ω A} : Wp (iProp Σ) (expr Λ) (val Λ) (stuckness) := λ s, fixpoint (wp_pre s).
 Local Definition wp_aux : seal (@wp_def). Proof. by eexists. Qed.
 Definition wp' := wp_aux.(unseal).
 Global Arguments wp' {hlc Λ Σ _}.
 Global Existing Instance wp'.
-Local Lemma wp_unseal `{!irisGS_gen hlc Λ Σ} : wp = @wp_def hlc Λ Σ _.
+Local Lemma wp_unseal `{!irisGS_gen hlc Λ Σ Ω A} : wp = @wp_def hlc Λ Σ Ω A _.
 Proof. rewrite -wp_aux.(seal_eq) //. Qed.
 
 Section wp.
-Context `{!irisGS_gen hlc Λ Σ}.
+Context `{!irisGS_gen hlc Λ Σ Ω A}.
 Implicit Types s : (stuckness).
 Implicit Types P : iProp Σ.
 Implicit Types Φ : val Λ → iProp Σ.
@@ -131,11 +133,12 @@ Proof.
   (* FIXME: figure out a way to properly automate this proof *)
   (* FIXME: reflexivity, as being called many times by f_equiv and f_contractive
   is very slow here *)
-  do 25 (apply next_modality_ne || f_contractive || f_equiv).
+  do 25 (apply nextgen_basic.bnextgen_ne || f_contractive || f_equiv).
   (* FIXME : simplify this proof once we have a good definition and a
      proper instance for step_fupdN. *)
   induction num_laters_per_step as [|k IHk]; simpl; last by rewrite IHk.
-  rewrite IH; [done|lia|]. intros v. eapply dist_le; [apply HΦ|lia].
+  do 4
+    (apply nextgen_basic.bnextgen_ne || f_contractive || f_equiv). rewrite IH; [done|lia|]. intros v. eapply dist_le; [apply HΦ|lia].
 Qed.
 Global Instance wp_proper s E e :
   Proper (pointwise_relation _ (≡) ==> (≡)) (wp (PROP:=iProp Σ) s E e).
@@ -151,7 +154,7 @@ Proof.
   (* FIXME : simplify this proof once we have a good definition and a
      proper instance for step_fupdN. *)
   induction num_laters_per_step as [|k IHk]; simpl; last by rewrite IHk.
-  by do 5 f_equiv.
+  do 3 f_equiv. apply nextgen_basic.bnextgen_ne. do 2 f_equiv. auto.
 Qed.
 
 Lemma wp_value_fupd' s E Φ v : WP of_val v @ s; E {{ Φ }} ⊣⊢ |={E}=> Φ v.
@@ -227,8 +230,8 @@ Proof.
   iModIntro. iIntros (e2 σ2 efs Hstep) "Hcred".
   iApply (step_fupdN_wand with "(H [//] Hcred)").
   iIntros ">(Hσ & H & Hefs)".
-  apply atomic in Hstep as [v Hv].
-  rewrite !wp_unfold /wp_pre Hv. iFrame. simpl.
+  apply atomic in Hstep as [v Hv]. iFrame.
+  (* rewrite wp_unfold /wp_pre Hv. iFrame. simpl. *)
   
   Abort. (* TODO: define a new fancy update modality that can commute with the general update modality *)
 
@@ -252,8 +255,8 @@ Lemma wp_credit_access s E e Φ P :
   (∀ m k, num_laters_per_step m + num_laters_per_step k ≤ num_laters_per_step (m + k)) →
   (∀ σ1 ns κs nt, (state_interp σ1 ns κs nt) ={E}=∗
     ∃ k m, (state_interp σ1 m κs nt) ∗ ⌜ns = (m + k)%nat⌝ ∗
-    (∀ nt σ2 κs, £ (num_laters_per_step k) -∗ (⚡={next_state e}=> state_interp σ2 (S m) κs nt) ={E}=∗
-      (⚡={next_state e}=> state_interp σ2 (S ns) κs nt) ∗ ■ P)) -∗
+    (∀ nt σ2 κs, £ (num_laters_per_step k) -∗ (⚡={transmap_insert_inG (next_state e) Ω}=> state_interp σ2 (S m) κs nt) ={E}=∗
+      (⚡={transmap_insert_inG (next_state e) Ω}=> state_interp σ2 (S ns) κs nt) ∗ ■ P)) -∗
   WP e @ s; E {{ v, P ={E}=∗ Φ v }} -∗
   WP e @ s; E {{ Φ }}.
 Proof.
@@ -314,7 +317,6 @@ Proof.
   iInduction n as [|n] "IH" forall (n0 Hn).
   - iApply (step_fupdN_wand with "H"). iIntros ">($ & Hwp & $)". iMod "HP".
     iModIntro.
-    iDestruct (bnextgen_intro_plainly (next_state e) with "HP") as "HP".
     iModIntro.
     iApply (wp_strong_mono with "Hwp");auto. iDestruct "HP" as "#HP". iModIntro.
     iIntros (v) "HΦ". iApply ("HΦ" with "HP").
@@ -344,11 +346,10 @@ Proof.
   iMod "H". iModIntro. iApply (step_fupdN_wand with "H"). iIntros "H".
   iMod "H" as "(HH & H & Htp)". iModIntro.
   iSplitL "HH";[|iSplitR "Htp"].
-  1,2: iApply bnextgen_extensional_eq;[rewrite (next_state_ctx);eauto|].
-  1,2: iModIntro. 1: iFrame. 1: by iApply "IH".
-  iApply (big_sepL_mono with "Htp");intros. auto.
-  (* iIntros "H". iApply bnextgen_extensional_eq;[rewrite (next_state_ctx);eauto|]. *)
-  (* iModIntro. iFrame. *)
+  1,2: iApply transmap_insert_extensional_eq;[rewrite (next_state_ctx);eauto|].
+  1: iFrame. 2: iApply (big_sepL_mono with "Htp");intros;auto.
+  Unshelve. 2: apply next_state_GenTrans. iModIntro.
+  by iApply "IH".
 Qed.
 
 Lemma wp_bind_inv K `{!LanguageCtx K} s E e Φ :
@@ -370,11 +371,10 @@ Proof.
   iIntros "!> !>". iMod "H". iModIntro. iApply (step_fupdN_wand with "H").
   iIntros "H". iMod "H" as "(HH & H & Htp)". iModIntro.
   iSplitL "HH";[|iSplitR "Htp"].
-  1,2: iApply bnextgen_extensional_eq;[erewrite <-(next_state_ctx);eauto|].
-  1,2: iModIntro. 1: iFrame. 1: by iApply "IH". auto.
-  (* iApply (big_sepL_mono with "Htp");intros. *)
-  (* iIntros "H". iApply bnextgen_extensional_eq;[erewrite <-(next_state_ctx);eauto|]. *)
-  (* iModIntro. iFrame. *)
+  1,2: iApply transmap_insert_extensional_eq;[erewrite <-(next_state_ctx);eauto|].
+  1: iFrame. 2: iApply (big_sepL_mono with "Htp");intros;auto.
+  Unshelve. 2: apply next_state_GenTrans. iModIntro.
+  by iApply "IH".
 Qed.
 
 (** * Derived rules *)
@@ -489,7 +489,7 @@ End wp.
 
 (** Proofmode class instances *)
 Section proofmode_classes.
-  Context `{!irisGS_gen hlc Λ Σ}.
+  Context `{!irisGS_gen hlc Λ Σ Ω A}.
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : val Λ → iProp Σ.
   Implicit Types v : val Λ.
