@@ -149,15 +149,18 @@ Proof.
   iExists ∅. rewrite fmap_empty big_opM_empty. by iFrame.
 Qed.
 
-
-
 Lemma lc_ind_insert_intro `{lcGIndS Σ Ω} `{noTransInG Σ Ω A} (m : nat) (t : A → A) `{!CmraMorphism t} :
-  £ m -∗ ⚡={transmap_insert_inG t Ω}=> £ m.
+  £ m ⊢ ⚡={transmap_insert_inG t Ω}=> £ m.
 Proof.
   iIntros "Hm".
   unfold lc. rewrite seal_eq /= /later_credits.lc_def /=.
   iModIntro. iFrame.
 Qed.
+
+#[global]
+Instance lc_into_pnextgen `{lcGIndS Σ Ω} `{noTransInG Σ Ω A}
+    (m : nat) (t : A → A) `{!CmraMorphism t} : IntoPnextgen _ _ _ :=
+  lc_ind_insert_intro m t.
 
 Lemma lc_ind_intro `{lcGIndS Σ Ω} (m : nat) :
   £ m -∗ ⚡={Ω}=> £ m.

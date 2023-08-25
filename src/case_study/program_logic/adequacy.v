@@ -140,7 +140,6 @@ Proof.
   iApply (step_fupdN_wand with "HH").
   iIntros "HH". iModIntro.
   iMod "HH". iModIntro. iDestruct "HH" as "[? H]".
-  iDestruct (lc_ind_insert_intro with "Hc2") as "Hc2".
   iModIntro. rewrite /= Nat.add_0_r.
   iApply (IH with "[$] [H] [$]");first eauto.
   simpl. iFrame.
