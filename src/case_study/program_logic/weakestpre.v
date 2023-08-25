@@ -7,7 +7,7 @@ From iris.bi Require Export weakestpre.
 From iris.prelude Require Import options.
 From nextgen.lib Require Export fancy_updates.
 Import uPred.
-From nextgen Require Export utils nextgen_basic nextgen_persistently nextgen_pointwise.
+From nextgen Require Export utils nextgen_persistently nextgen_basic nextgen_pointwise.
 
 Class irisGS_gen (hlc : has_lc) (Λ : language) (Σ : gFunctors) (Ω : gTransformations Σ) (A : cmra) := IrisG {
   iris_invGS :> invGIndS_gen hlc Σ Ω;
@@ -30,7 +30,7 @@ Class irisGS_gen (hlc : has_lc) (Λ : language) (Σ : gFunctors) (Ω : gTransfor
   (* A : Type;  *)(* a_inhabited : Inhabited A; *)
   next_state : expr Λ -> A -> A;
   (* next_a : expr Λ -> A -> A; *)
-  next_state_GenTrans :> forall e, CmraMorphism (next_state e);
+  next_state_GenTrans :> forall e, (CmraMorphism (next_state e));
   (* next_state_contractive : forall (a : A) (x : iResUR Σ) (n : nat), next_state a x ≼{n} x; *)
   (* next_state_compose : ∀ a b : A, ∃ c : A, next_state a ∘ next_state b = next_state c;           *)
   (* next_state_idemp : forall (a : A) (x : iResUR Σ) (n : nat), next_state a x = (next_state a (next_state a x)); *)

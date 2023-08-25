@@ -6,7 +6,7 @@ From nextgen.case_study.program_logic Require Export weakestpre.
 From iris.prelude Require Import options.
 
 Section lifting.
-Context `{!irisGS_gen hlc Λ Σ}.
+Context `{!irisGS_gen hlc Λ Σ Ω T}.
 Implicit Types s : (stuckness).
 Implicit Types v : val Λ.
 Implicit Types e : expr Λ.
@@ -23,8 +23,8 @@ Lemma wp_lift_step_fupdN s E Φ e1 :
     ∀ e2 σ2 efs, ⌜prim_step e1 σ1 κ e2 σ2 efs⌝ -∗
       £ (S $ num_laters_per_step ns)
       ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-      (⚡={next_state e1}=> state_interp σ2 (S ns) κs (length efs + nt)) ∗
-      (⚡={next_state e1}=> WP e2 @ s; E {{ Φ }}) ∗
+      (⚡={transmap_insert_inG (next_state e1) Ω}=> state_interp σ2 (S ns) κs (length efs + nt)) ∗
+      (⚡={transmap_insert_inG (next_state e1) Ω}=> WP e2 @ s; E {{ Φ }}) ∗
       [∗ list] ef ∈ efs, (* ⚡={next_state e1}=>  *)WP ef @ s; ⊤ {{ fork_post }})
   ⊢ WP e1 @ s; E {{ Φ }}.
 Proof. by rewrite wp_unfold /wp_pre=>->. Qed.
@@ -34,8 +34,8 @@ Lemma wp_lift_step_fupd s E Φ e1 :
   (∀ σ1 ns κ κs nt, (state_interp σ1 ns (κ ++ κs) nt) ={E,∅}=∗
     ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
     ∀ e2 σ2 efs, ⌜prim_step e1 σ1 κ e2 σ2 efs⌝ -∗ £ 1 ={∅}=∗ ▷ |={∅,E}=>
-      (⚡={next_state e1}=> state_interp σ2 (S ns) κs (length efs + nt)) ∗
-      (⚡={next_state e1}=> WP e2 @ s; E {{ Φ }}) ∗
+      (⚡={transmap_insert_inG (next_state e1) Ω}=> state_interp σ2 (S ns) κs (length efs + nt)) ∗
+      (⚡={transmap_insert_inG (next_state e1) Ω}=> WP e2 @ s; E {{ Φ }}) ∗
       [∗ list] ef ∈ efs, (* ⚡={next_state e1}=>  *)WP ef @ s; ⊤ {{ fork_post }})
   ⊢ WP e1 @ s; E {{ Φ }}.
 Proof.
@@ -64,8 +64,8 @@ Lemma wp_lift_step s E Φ e1 :
   (∀ σ1 ns κ κs nt, (state_interp σ1 ns (κ ++ κs) nt) ={E,∅}=∗
     ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
     ▷ ∀ e2 σ2 efs, ⌜prim_step e1 σ1 κ e2 σ2 efs⌝ -∗ £ 1 ={∅,E}=∗
-      (⚡={next_state e1}=> state_interp σ2 (S ns) κs (length efs + nt)) ∗
-      (⚡={next_state e1}=> WP e2 @ s; E {{ Φ }}) ∗
+      (⚡={transmap_insert_inG (next_state e1) Ω}=> state_interp σ2 (S ns) κs (length efs + nt)) ∗
+      (⚡={transmap_insert_inG (next_state e1) Ω}=> WP e2 @ s; E {{ Φ }}) ∗
       [∗ list] ef ∈ efs, (* ⚡={next_state e1}=>  *)WP ef @ s; ⊤ {{ fork_post }})
   ⊢ WP e1 @ s; E {{ Φ }}.
 Proof.
@@ -77,7 +77,7 @@ Lemma wp_lift_pure_step_no_fork `{!Inhabited (state Λ)} s E E' Φ e1 :
   (∀ σ1, if s is NotStuck then reducible e1 σ1 else to_val e1 = None) →
   (∀ κ σ1 e2 σ2 efs, prim_step e1 σ1 κ e2 σ2 efs → κ = [] ∧ σ2 = σ1 ∧ efs = []) →
   (|={E}[E']▷=> ∀ κ κs e2 efs σ nt ns, ⌜prim_step e1 σ κ e2 σ efs⌝ -∗ £ 1 -∗ state_interp σ ns (κ ++ κs) nt
-                             -∗ (⚡={next_state e1}=> state_interp σ ns (κ ++ κs) nt) ∗ ⚡={next_state e1}=> WP e2 @ s; E {{ Φ }})
+                             -∗ (⚡={transmap_insert_inG (next_state e1) Ω}=> state_interp σ ns (κ ++ κs) nt) ∗ ⚡={transmap_insert_inG (next_state e1) Ω}=> WP e2 @ s; E {{ Φ }})
   ⊢ WP e1 @ s; E {{ Φ }}.
 Proof.
   iIntros (Hsafe Hstep) "H". iApply wp_lift_step.
@@ -110,8 +110,8 @@ Lemma wp_lift_atomic_step_fupd {s E1 E2 Φ} e1 :
   (∀ σ1 ns κ κs nt, (state_interp σ1 ns (κ ++ κs) nt) ={E1}=∗
     ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
     ∀ e2 σ2 efs, ⌜prim_step e1 σ1 κ e2 σ2 efs⌝ -∗ £ 1 ={E1}[E2]▷=∗
-      (⚡={next_state e1}=> state_interp σ2 (S ns) κs (length efs + nt)) ∗
-      from_option (λ v, ⚡={next_state e1}=> Φ v) False (to_val e2) ∗
+      (⚡={transmap_insert_inG (next_state e1) Ω}=> state_interp σ2 (S ns) κs (length efs + nt)) ∗
+      from_option (λ v, ⚡={transmap_insert_inG (next_state e1) Ω}=> Φ v) False (to_val e2) ∗
       [∗ list] ef ∈ efs, (* ⚡={next_state e1}=> *) WP ef @ s; ⊤ {{ fork_post }})
   ⊢ WP e1 @ s; E1 {{ Φ }}.
 Proof.
@@ -132,8 +132,8 @@ Lemma wp_lift_atomic_step {s E Φ} e1 :
   (∀ σ1 ns κ κs nt, (state_interp σ1 ns (κ ++ κs) nt) ={E}=∗
     ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
     ▷ ∀ e2 σ2 efs, ⌜prim_step e1 σ1 κ e2 σ2 efs⌝ -∗ £ 1 ={E}=∗
-      (⚡={next_state e1}=> state_interp σ2 (S ns) κs (length efs + nt)) ∗
-      from_option (λ v, ⚡={next_state e1}=> Φ v) False (to_val e2) ∗
+      (⚡={transmap_insert_inG (next_state e1) Ω}=> state_interp σ2 (S ns) κs (length efs + nt)) ∗
+      from_option (λ v, ⚡={transmap_insert_inG (next_state e1) Ω}=> Φ v) False (to_val e2) ∗
       [∗ list] ef ∈ efs, (* ⚡={next_state e1}=> *) WP ef @ s; ⊤ {{ fork_post }})
   ⊢ WP e1 @ s; E {{ Φ }}.
 Proof.
@@ -150,8 +150,8 @@ Lemma wp_lift_pure_det_step_no_fork `{!Inhabited (state Λ)} {s E E' Φ} e1 e2 :
   (* (∀ σ1 κ κs ns nt e2' σ2 efs', prim_step e1 σ1 κ e2' σ2 efs' → *)
   (*                            (state_interp σ1 ns κs nt) -∗ *)
   (*                             ⚡={next_state e1}=> state_interp σ2 ns (κ ++ κs) (length efs' + nt)) → *)
-  (∀ σ ns κs nt, prim_step e1 σ [] e2 σ [] -> state_interp σ ns κs nt -∗ ⚡={next_state e1}=> state_interp σ ns κs nt) ->
-  (|={E}[E']▷=> £ 1 -∗ (⚡={next_state e1}=> WP e2 @ s; E {{ Φ }})) ⊢ WP e1 @ s; E {{ Φ }}.
+  (∀ σ ns κs nt, prim_step e1 σ [] e2 σ [] -> state_interp σ ns κs nt -∗ ⚡={transmap_insert_inG (next_state e1) Ω}=> state_interp σ ns κs nt) ->
+  (|={E}[E']▷=> £ 1 -∗ (⚡={transmap_insert_inG (next_state e1) Ω}=> WP e2 @ s; E {{ Φ }})) ⊢ WP e1 @ s; E {{ Φ }}.
 Proof.
   iIntros (? Hpuredet Hcond) "H". iApply (wp_lift_pure_step_no_fork s E E'); try done.
   { naive_solver. }
@@ -166,7 +166,7 @@ Qed.
 Fixpoint n_next_state (n : nat) (e1 : expr Λ) (P : iProp Σ) :=
   match n with
   | 0 => P
-  | S n => (⚡={next_state e1}=> (n_next_state n e1 P))%I
+  | S n => (⚡={transmap_insert_inG (next_state e1) Ω}=> (n_next_state n e1 P))%I
   end.
 
 (* Lemma wp_pure_step_fupd `{!Inhabited (state Λ)} s E E' e1 e2 φ n Φ : *)

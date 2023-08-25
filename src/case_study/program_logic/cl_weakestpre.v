@@ -12,7 +12,7 @@ Import uPred.
 
 Section clwp_def.
   Context {expr val ectx state observation} {Λ : CCEctxLanguage expr val ectx state observation}.
-  Context `{irisGS_gen hlc (CC_ectx_lang expr) Σ}.
+  Context `{irisGS_gen hlc (CC_ectx_lang expr) Σ Ω T}.
 
 Definition clwp_def (E : coPset) (e : expr) (Φ : val → iProp Σ) : iProp Σ :=
   (∀ K Ψ, (∀ v, Φ v -∗ WP fill K (of_val v) @ E {{Ψ}})
@@ -42,7 +42,7 @@ Notation "'CLWP' e {{ v , Q } }" := (clwp ⊤ e%E (λ v, Q))
 
 Section clwp.
   Context {expr val ectx state observation} {Λ : CCEctxLanguage expr val ectx state observation}.
-  Context `{irisGS_gen hlc (CC_ectx_lang expr) Σ}.
+  Context `{irisGS_gen hlc (CC_ectx_lang expr) Σ Ω T}.
 
   Implicit Types P : iProp Σ.
   Implicit Types Φ Ψ : val → iProp Σ.
@@ -73,13 +73,13 @@ Section clwp.
   Qed.
 
   Global Instance clwp_ne E e n :
-    Proper (pointwise_relation _ (dist n) ==> dist n) (@clwp _ _ _ _ _ Λ _ Σ _ E e).
+    Proper (pointwise_relation _ (dist n) ==> dist n) (@clwp _ _ _ _ _ Λ _ Σ _ _ _ E e).
   Proof.
     repeat intros?; rewrite !unfold_clwp.
     repeat (repeat apply forall_ne=>?; repeat apply wand_ne; trivial).
   Qed.
   Global Instance clwp_proper E e :
-    Proper (pointwise_relation _ (≡) ==> (≡)) (@clwp _ _ _ _ _ Λ _ Σ _ E e).
+    Proper (pointwise_relation _ (≡) ==> (≡)) (@clwp _ _ _ _ _ Λ _ Σ _ _ _ E e).
   Proof.
       by intros Φ Φ' ?; apply equiv_dist=>n; apply clwp_ne=>v; apply equiv_dist.
   Qed.
@@ -124,7 +124,7 @@ Section clwp.
     iApply "H". iIntros (w) "Hw". iApply "HK"; by iApply HΦ.
   Qed.
   Global Instance clwp_mono' E e :
-    Proper (pointwise_relation _ (⊢) ==> (⊢)) (@clwp _ _ _ _ _ Λ _ Σ _ E e).
+    Proper (pointwise_relation _ (⊢) ==> (⊢)) (@clwp _ _ _ _ _ Λ _ Σ _ _ _ E e).
   Proof. by intros Φ Φ' ?; apply clwp_mono. Qed.
 
   Lemma clwp_value E Φ e v `{!IntoVal e v} : Φ v ⊢ CLWP e @ E {{ Φ }}.
@@ -167,7 +167,7 @@ End clwp.
 (** Proofmode class instances *)
 Section proofmode_classes.
   Context {expr val ectx state observation} {Λ : CCEctxLanguage expr val ectx state observation}.
-  Context `{irisGS_gen hlc (CC_ectx_lang expr) Σ}.
+  Context `{irisGS_gen hlc (CC_ectx_lang expr) Σ Ω T}.
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : val → iProp Σ.
 
