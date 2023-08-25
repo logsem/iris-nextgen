@@ -481,9 +481,8 @@ Section bnextgen_n_open_soundness.
       iApply (transmap_plain (transmap_insert_inG (f a) Ω)).
       iAssert (⚡={transmap_insert_inG (f a) Ω}=> ω ∅)%I with "[Hω]" as "HA1".
       { iApply "Hintro". iFrame. }
-      iDestruct (lc_ind_insert_intro with "Hn") as "HA2".
       iModIntro.
-      iDestruct (IHl with "[$H $H' $HA1 $HA2 $HP $Hintro]") as "HH".
+      iDestruct (IHl with "[$H $H' $HA1 $Hn $HP $Hintro]") as "HH".
       rewrite /num. simpl. iNext. iApply (laterN_mono with "HH"). auto.
   Qed.
 
@@ -531,9 +530,8 @@ Section bnextgen_n_open_soundness.
       iApply (transmap_plain (transmap_insert_inG (f a) Ω)).
       iAssert (⚡={transmap_insert_inG (f a) Ω}=> ω ⊤)%I with "[Hω]" as "HA1".
       { iApply "Hintro". iFrame. }
-      iDestruct (lc_ind_insert_intro with "Hn") as "HA2".
       iModIntro.
-      iDestruct (IHl with "[$H $H' $HA1 $HA2 $HP $Hintro]") as "HH";auto.
+      iDestruct (IHl with "[$H $H' $HA1 $Hn $HP $Hintro]") as "HH";auto.
   Qed.
   
 
