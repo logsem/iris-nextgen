@@ -2,12 +2,11 @@ From iris.base_logic Require Export gen_heap.
 From iris.algebra Require Export list excl_auth.
 From nextgen.case_study.program_logic Require Import CC_ectx_lifting
      CC_ectxi_language CC_ectx_lifting weakestpre.
-From nextgen.case_study Require Export stack_lang stack_transform rules_unary.
+From nextgen.case_study Require Export stack_lang stack_transform.
 From iris.proofmode Require Import tactics.
 From stdpp Require Import fin_maps.
-From nextgen Require Import nextgen_basic gen_trans gmap_view_transformation nextgen_pointwise nextgen_id.
 
-From nextgen.case_study Require Import stack_lang_notation.
+From nextgen.case_study Require Import rules_unary stack_lang_notation.
 
 Set Default Proof Using "Type".
 Import uPred.
@@ -48,60 +47,61 @@ End examples.
 Section stack_lang_examples.
   Context `{heapGS Σ}.
 
-
   Lemma example1_spec :
     {{{ [size] 0 }}} (0,example1) {{{ v, RET v; ⌜v.2 = NatV 42⌝ }}}.
   Proof.
     iIntros (Φ) "Hsize #HΦ /=". rewrite /example1. prepare_ctx.
-    iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /=". prepare_ctx.
+    iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /= !>". prepare_ctx.
     iApply wp_stack_alloc;[lia|repeat constructor|iFrame].
-    iNext. iIntros (l) "[Hsize Hl]". peel_ctx.
-    iApply wp_LetIn. iNext. simpl subst'.
+    iNext. iIntros (l) "[Hsize Hl] !>". peel_ctx.
+    iApply wp_LetIn. iIntros "!>!>". simpl subst'.
     iApply wp_stack_load;[constructor;lia|iFrame].
-    iNext. iIntros "[Hsize Hl]". peel_ctx.
+    iNext. iIntros "[Hsize Hl] !>". peel_ctx.
     iApply wp_return;[lia..|iFrame]. iNext. iIntros "Hsize".
-    simpl. iModIntro. iApply wp_value. iApply "HΦ". simpl. auto.
+    iModIntro.
+    simpl. iApply wp_value. iApply "HΦ". simpl. auto.
   Qed.
 
   Lemma example2_spec :
     {{{ [size] 0 }}} (0,example2) {{{ v, RET v; ⌜v.2 = NatV 42⌝ }}}.
   Proof.
     iIntros (Φ) "Hsize #HΦ /=". rewrite /example2. prepare_ctx.
-    iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /=". prepare_ctx.
+    iApply wp_call_global;[eauto|iFrame]. iIntros "!>". iIntros "Hsize /= !>". prepare_ctx.
     iApply wp_stack_alloc;[lia|repeat constructor|iFrame].
-    iNext. iIntros (l) "[Hsize Hl]". peel_ctx.
-    iApply wp_LetIn. iNext. simpl subst'.
-    iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /=".
+    iNext. iIntros (l) "[Hsize Hl] !>". peel_ctx.
+    iApply wp_LetIn. iIntros "!>!>". simpl subst'.
+    iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /= !>".
     prepare_ctx.
     iApply wp_stack_load;[constructor;lia|iFrame].
-    iNext. iIntros "[Hsize Hl]". peel_ctx.
+    iNext. iIntros "[Hsize Hl] !>". peel_ctx.
     iApply wp_return;[lia..|iFrame]. iNext. iIntros "Hsize /=".
-    iDestruct (stack_stack_pop_intro _ _ _ _ 1 with "Hl") as "Hl";[lia|].
-    iDestruct (stack_size_frag_stack_pop _ 1 with "Hsize") as "Hsize".
+    iDestruct (stack_stack_pop_intro with "Hl") as "Hl";[eauto|].
     iModIntro. prepare_ctx.
-    iApply wp_return;[lia..|iFrame]. iNext. iIntros "Hsize /=".
-    iModIntro. iApply wp_value. iApply "HΦ";auto.
+    iApply wp_return;[lia..|iFrame]. iNext. iClear "Hl".
+    iIntros "Hsize /= !>".
+    iApply wp_value. iApply "HΦ";auto.
   Qed.
 
   Lemma example3_spec :
     {{{ [size] 0 }}} (0,example3) {{{ v, RET v; ⌜v.2 = NatV 42⌝ }}}.
   Proof.
     iIntros (Φ) "Hsize #HΦ /=". rewrite /example2. prepare_ctx.
-    iApply wp_LetIn. iNext. simpl subst'.
-    iApply wp_LetIn. iNext. simpl subst'.
-    iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /=". prepare_ctx.
-    iApply wp_stack_alloc;[lia|repeat constructor|iFrame]. iNext. iIntros (l) "[Hsize Hl]". peel_ctx.
-    iApply wp_LetIn. iNext. simpl subst'.
-    iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /=". prepare_ctx.
+    iApply wp_LetIn. iIntros "!>!>". simpl subst'.
+    iApply wp_LetIn. iIntros "!>!>". simpl subst'.
+    iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /= !>". prepare_ctx.
+    iApply wp_stack_alloc;[lia|repeat constructor|iFrame]. iNext. iIntros (l) "[Hsize Hl] !>". peel_ctx.
+    iApply wp_LetIn. iIntros "!>!>". simpl subst'.
+    iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /= !>". prepare_ctx.
     iApply wp_call_local;[eauto..|iFrame];[constructor;lia|]. simpl. prepare_ctx.
-    iNext. iIntros "Hsize".
+    iNext. iIntros "Hsize !>".
     (* NOTE: the local stack pointer has been shifted to point two frame down *)
-    iApply wp_stack_load;[constructor;lia|iFrame]. iNext. iIntros "[Hsize Hl]". peel_ctx.
-    iApply wp_return;[lia..|]. iFrame. iNext. iIntros "Hsize /=".
-    iDestruct (stack_size_frag_stack_pop _ 2 with "Hsize") as "Hsize".
+    iApply wp_stack_load;[constructor;lia|iFrame]. iNext. iIntros "[Hsize Hl] !>". peel_ctx.
+    iApply wp_return;[lia..|]. iFrame. iNext.
+    iIntros "Hsize /=".
+    iDestruct (stack_stack_pop_intro _ _ _ _ 2 with "Hl") as "Hl";[lia|].
     iModIntro. prepare_ctx.
     iApply wp_return;[lia..|]. iFrame. iNext. iIntros "Hsize /=".
-    iDestruct (stack_size_frag_stack_pop _ 1 with "Hsize") as "Hsize".
+    iDestruct (stack_stack_pop_intro _ _ _ _ 1 with "Hl") as "Hl";[lia|].
     iModIntro. prepare_ctx.
     iApply wp_return;[lia..|]. iFrame. iNext. iIntros "Hsize /=".
     iModIntro. iApply wp_value. iApply "HΦ";auto.
@@ -114,11 +114,9 @@ Section stack_lang_examples.
     {{{ [size] 1 }}} (1,stuck_example) {{{ v, RET v; False }}}.
   Proof.
     iIntros (Φ) "Hsize #HΦ /=". rewrite /stuck_example. prepare_ctx.
-    iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /=". prepare_ctx.
-    iApply wp_stack_alloc;[lia|repeat constructor|iFrame]. iNext. iIntros (l) "[Hsize Hl]". peel_ctx.
-    iApply wp_return;[lia..|iFrame]. iNext. iIntros "Hsize /=".
-    iDestruct (stack_stack_pop_intro _ _ _ _ 1 with "Hl") as "Hl";cycle 1.
-    - iModIntro.
+    iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /= !>". prepare_ctx.
+    iApply wp_stack_alloc;[lia|repeat constructor|iFrame]. iNext. iIntros (l) "[Hsize Hl] !>". peel_ctx.
+    iApply wp_return;[lia..|iFrame]. iNext. iIntros "Hsize /= !>".
     (* STUCK! the points-to for l gets lost, its lifetime is not less than 1 *)
   Abort.
 
