@@ -39,7 +39,66 @@ Section nextgen_pointwise.
   #[global]
   Instance build_trans_cmra_morphism transmap :
     TransMapValid transmap → CmraMorphism (build_trans transmap).
-  Proof. Admitted.
+  Proof.
+    intros V.
+    split.
+    - intros ??? eq i γ.
+      move: (eq i γ).
+      rewrite /build_trans.
+      rewrite 2!map_lookup_imap.
+      destruct (x i !! γ) eqn:look1; destruct (y i !! γ) eqn:look2;
+        rewrite look1; rewrite look2; simpl; inversion 1; last done.
+      do 2 f_equiv.
+      destruct (transmap i) eqn:look3; simpl; last solve_proper.
+      specialize (V _ _ look3).
+      solve_proper.
+    - intros ?? val i γ.
+      rewrite /build_trans.
+      rewrite map_lookup_imap.
+      move: (val i γ).
+      destruct (x i !! γ) eqn:look; rewrite look; simpl; last done.
+      rewrite 2!Some_validN.
+      intros val2.
+      apply: cmra_morphism_validN.
+      destruct (transmap i) eqn:lookT; simpl.
+      + specialize (V _ _ lookT).
+        do 2 apply: cmra_morphism_validN. done.
+      + apply: cmra_morphism_validN. done.
+    - intros ?.
+      rewrite 2!cmra_pcore_core. simpl.
+      f_equiv.
+      intros i γ.
+      rewrite /build_trans.
+      rewrite map_lookup_imap.
+      rewrite 2!discrete_fun_lookup_core.
+      rewrite !lookup_core.
+      rewrite map_lookup_imap.
+      destruct (x i !! γ) eqn:look; rewrite look; simpl; last done.
+      unfold core. simpl.
+      rewrite -cmra_morphism_pcore.
+      destruct (transmap i) eqn:lookT; simpl.
+      + specialize (V _ _ lookT).
+        rewrite -cmra_morphism_pcore.
+        rewrite -cmra_morphism_pcore.
+        destruct (pcore c); done.
+      + rewrite -cmra_morphism_pcore.
+        destruct (pcore c); done.
+    - intros ?? i γ.
+      unfold build_trans.
+      rewrite 2!discrete_fun_lookup_op.
+      rewrite map_lookup_imap.
+      rewrite 2!lookup_op.
+      rewrite 2!map_lookup_imap.
+      destruct (x i !! γ) eqn:look1; destruct (y i !! γ) eqn:look2;
+        rewrite look1; rewrite look2; simpl; try inversion 1; try done.
+      rewrite -Some_op. f_equiv.
+      rewrite -cmra_morphism_op. f_equiv.
+      destruct (transmap i) eqn:lookT; simpl;
+        last by rewrite -cmra_morphism_op.
+      specialize (V _ _ lookT).
+      rewrite -2!cmra_morphism_op.
+      done.
+  Qed.
 
   Definition transmap_empty : TransMap Σ :=
     λ i, None.
