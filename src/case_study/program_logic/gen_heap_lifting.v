@@ -66,3 +66,39 @@ Arguments GenHeapNoMetaGS (L V)%type_scope Σ Ω {_ _ _} no_meta_gen_heap_name.
 
 #[global] Instance into_gen_heap_from_no {L V Σ Ω} `{eqK: EqDecision L} `{countK: @Countable L eqK} (Hwsat: gen_heapNoGS L V Σ Ω) : gen_heapGS L V Σ :=
   @GenHeapGS L V Σ eqK countK (into_gen_heap_pre_from_no gen_heap_inNoG) no_gen_heap_name no_gen_meta_name.
+
+
+(** variants of gen_heap_init that take Ω into account *)
+
+Lemma gen_heap_init_no_names `{Countable L, !gen_heapNoGpreS L V Σ Ω} σ :
+  ⊢ |==> ∃ γh γm : gname,
+    let hG := GenHeapNoGS L V Σ Ω γh γm in
+    gen_heap_interp σ ∗ ([∗ map] l ↦ v ∈ σ, mapsto l (DfracOwn 1) v) ∗ ([∗ map] l ↦ _ ∈ σ, meta_token l ⊤).
+Proof.
+  iMod (ghost_map.ghost_map_alloc_empty (K:=L) (V:=V)) as (γh) "Hh".
+  iMod (ghost_map.ghost_map_alloc_empty (K:=L) (V:=gname)) as (γm) "Hm".
+  iExists γh, γm.
+  iAssert (gen_heap_interp (hG:=GenHeapGS _ _ _ γh γm) ∅) with "[Hh Hm]" as "Hinterp".
+  { iExists ∅; simpl. iFrame "Hh Hm". by rewrite dom_empty_L. }
+  iMod (gen_heap_alloc_big with "Hinterp") as "(Hinterp & $ & $)".
+  { apply map_disjoint_empty_r. }
+  rewrite right_id_L. done.
+Qed.
+
+Lemma gen_heap_init_no `{Countable L, !gen_heapNoGpreS L V Σ Ω} σ :
+  ⊢ |==> ∃ _ : gen_heapNoGS L V Σ Ω,
+    gen_heap_interp σ ∗ ([∗ map] l ↦ v ∈ σ, mapsto l (DfracOwn 1) v) ∗ ([∗ map] l ↦ _ ∈ σ, meta_token l ⊤).
+Proof.
+  iMod (gen_heap_init_names σ) as (γh γm) "Hinit".
+  iExists (GenHeapNoGS _ _ _ _ γh γm).
+  done.
+Qed.
+
+Lemma gen_heap_init_ind `{Countable L, !gen_heapIndGpreS L V Σ Ω} σ :
+  ⊢ |==> ∃ _ : gen_heapIndGS L V Σ Ω,
+    gen_heap_interp σ ∗ ([∗ map] l ↦ v ∈ σ, mapsto l (DfracOwn 1) v) ∗ ([∗ map] l ↦ _ ∈ σ, meta_token l ⊤).
+Proof.
+  iMod (gen_heap_init_names σ) as (γh γm) "Hinit".
+  iExists (GenHeapIndGS _ _ _ _ γh γm).
+  done.
+Qed.

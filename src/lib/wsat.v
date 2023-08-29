@@ -170,6 +170,23 @@ Proof.
   iModIntro. iFrame.
 Qed.
 
+Lemma ls_ind_intro `{lcGIndS Σ Ω} (m : nat) :
+  later_credits.lc_supply m -∗ ⚡={Ω}=> later_credits.lc_supply m.
+Proof.
+  iIntros "Hm".
+  unfold later_credits.lc_supply. rewrite seal_eq /= /later_credits.lc_supply_def.
+  iModIntro. iFrame.
+Qed.
+
+Lemma ls_ind_insert_intro `{lcGIndS Σ Ω} `{noTransInG Σ Ω A} (t : A → A) `{!CmraMorphism t} (m : nat) :
+  later_credits.lc_supply m -∗ ⚡={transmap_insert_inG t Ω}=> later_credits.lc_supply m.
+Proof.
+  iIntros "Hm".
+  unfold later_credits.lc_supply. rewrite seal_eq /= /later_credits.lc_supply_def.
+  iModIntro. iFrame.
+Qed.
+
+
 Lemma ownE_ind_insert_intro `{wsatGIndS Σ Ω} `{noTransInG Σ Ω A} (E: coPset) (t : A → A) `{!CmraMorphism t} :
   ownE E -∗ ⚡={transmap_insert_inG t Ω}=> ownE E.
 Proof.

@@ -29,7 +29,7 @@ Class heapGS (Σ : gFunctors) (Ω : gTransformations Σ) := HeapGS {
 }.
 
 Section StackSize.
-  Context `{!heapGS Σ Ω}.
+  Context `{!stacksizeGS Σ Ω}.
 
   Lemma stacksizeRA_valid_full (m n : natR) : ✓ (●E m ⋅ ◯E n) → n = m.
   Proof.
@@ -74,7 +74,7 @@ Definition state_trans (n : nat) := (map_entry_lift_gmap_view (stack_location_cu
 Definition state_trans_state (σ : state) := state_trans (length σ.2).
 Definition stack_gname `{heapGS Σ} : gname := heapG_gen_stackGS.(no_gen_heap_name).
 
-Definition next_state_f `{heapGS Σ Ω} (e : stack_expr) : (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) → (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) :=
+Definition next_state_f (e : stack_expr) : (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) → (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) :=
   match find_i e.2 with
   | Some i => state_trans (e.1 - (Z.abs_nat i))
   | None => id
@@ -87,14 +87,14 @@ Definition next_state_f `{heapGS Σ Ω} (e : stack_expr) : (gmap_view.gmap_viewR
 (* Global Arguments next_state_f {Σ Ω H} e. *)
 
 #[global]
-Instance next_state_f_cmra_morphism : ∀ (Σ : gFunctors) (Ω : gTransformations Σ) (H : heapGS Σ Ω) (e : language.expr lang), CmraMorphism (next_state_f e).
+Instance next_state_f_cmra_morphism : ∀ (Σ : gFunctors) (Ω : gTransformations Σ) (e : language.expr lang), CmraMorphism (next_state_f e).
 Proof.
   intros. rewrite /next_state_f.
   destruct (find_i e.2);apply _.
 Qed.
 
 #[global]
-Instance state_trans_cmra_morphism : ∀ (Σ : gFunctors) (Ω : gTransformations Σ) (H : heapGS Σ Ω) n,
+Instance state_trans_cmra_morphism : ∀ (Σ : gFunctors) (Ω : gTransformations Σ) n,
  CmraMorphism (state_trans n).
 Proof.
   intros. rewrite /state_trans /=. apply _.
@@ -111,6 +111,7 @@ Instance heapG_irisGS `{heapGS Σ Ω} : irisGS_gen _ lang Σ Ω (gmap_view.gmap_
          ∗ (* gen_heap_interp (list_to_gmap_stack s) *) gen_stack_interp s
          ∗ own heapG_stacksize_name (excl_auth_auth (length s)))%I;
     next_state := next_state_f;
+    next_state_GenTrans := next_state_f_cmra_morphism Σ Ω;
     num_laters_per_step _ := 0;
     fork_post _ := True%I;
     state_interp_mono _ _ _ _ := (entails_po).(PreOrder_Reflexive) _
