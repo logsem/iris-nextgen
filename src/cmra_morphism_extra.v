@@ -113,6 +113,13 @@ Section fmap_auth.
     - apply: cmra_morphism_validN. done.
   Qed.
 
+  Lemma fmap_auth_auth a t :
+    fmap_auth t (● a) ≡ ● (t a) ⋅ ◯ (t ε).
+  Proof.
+    rewrite /fmap_auth /fmap_view view.view_op_eq /=.
+    rewrite right_id left_id /fmap_pair agree_map_to_agree //.
+  Qed.
+
   Lemma fmap_auth_frag a t :
     fmap_auth t (◯ a) = ◯ (t a).
   Proof. done. Qed.
