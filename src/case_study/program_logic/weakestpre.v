@@ -223,7 +223,7 @@ Proof. iIntros "H". iApply (wp_strong_mono s s E with "H"); auto. Qed.
 Lemma wp_atomic E1 E2 e Φ `{!Atomic StronglyAtomic e} :
   (|={E1,E2}=> WP e @ E2 {{ v, |={E2,E1}=> Φ v }}) ⊢ WP e @ E1 {{ Φ }}.
 Proof.
-  iIntros "H". rewrite !wp_unfold /wp_pre.  
+  iIntros "H". rewrite !wp_unfold /wp_pre.
   destruct (to_val e) as [v|] eqn:He.
   { by iDestruct "H" as ">>> $". }
   iIntros (σ1 ns κ κs nt) "Hσ". iMod "H". iMod ("H" $! σ1 with "Hσ") as "[$ H]".

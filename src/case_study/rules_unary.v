@@ -721,7 +721,7 @@ Section lifting.
   Proof.
     iIntros (Hperm Hδ) "[HΦ >Hl]".
     iApply wp_lift_nonthrow_head_step; auto.
-    iIntros ([h1 s1] ns κ κs nt) "(Hh & Hs & Hn)".
+    iIntros ([h1 s1] ns κ κs nt) "(Hh & Hs & Hn)".      
     iApply fupd_mask_intro;[set_solver|]. iIntros "Hcls".
     iDestruct "Hl" as (w) "Hl".
     iDestruct (gen_heap_valid with "Hh Hl") as %Hlookup.
