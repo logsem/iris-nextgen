@@ -13,51 +13,6 @@ this way. *)
 Local Coercion uPred_holds : uPred >-> Funclass.
 
 (** a basic update modality where updated result is not altered by a function t *)
-(* Local Program Definition uPred_restr_bupd_def {M : ucmra} *)
-(*   (t : M → M) `{!CmraMorphism t} (Q : uPred M) : uPred M := *)
-(*   {| uPred_holds n x := ∀ k yf, *)
-(*       k ≤ n → ✓{k} (x ⋅ yf) -> t x ≡ x -> ∃ x', ✓{k} (x' ⋅ yf) ∧ t x' ≡ x' /\ Q k x' *)
-(*   |}. *)
-(* Next Obligation. *)
-(*   intros M t Htrans Q n1 n2 x1 x2 HQ [x3 Hx] Hn k yf Hk. *)
-(*   rewrite {1}(dist_le _ _ _ _ Hx); last lia. intros Hxy Heq. *)
-(*   simpl in *. *)
-(*   destruct (HQ k ((yf))) as (x'&?&?&?); [lia| |auto|]. *)
-(*   { rewrite comm assoc in Hxy. apply cmra_validN_op_l in Hxy. *)
-(*     rewrite comm. auto. } *)
-(*   exists x'. repeat split;auto. *)
-(* Qed. *)
-
-(* Local Program Definition uPred_restr_bupd_def {M : ucmra} *)
-(*   (t : M → M) `{!CmraMorphism t} (Q : uPred M) : uPred M := *)
-(*   {| uPred_holds n x := ∀ k yf, *)
-(*       k ≤ n → ✓{k} (t (x ⋅ yf)) -> ∃ x', ✓{k} (t x' ⋅ yf) /\ Q k (t x') *)
-(*   |}. *)
-(* Next Obligation. *)
-(*   intros M t Htrans Q n1 n2 x1 x2 HQ [x3 Hx] Hn k yf Hk. *)
-(*   rewrite {1}(dist_le _ _ _ _ Hx); last lia. intros Hxy. *)
-(*   simpl in *. *)
-(*   destruct (HQ k (t x3 ⋅ yf)) as (x'&?&?); [lia|auto|]. *)
-(*   { rewrite assoc -cmra_morphism_op. auto. } *)
-(*   exists x'. repeat split;auto. *)
-(*   rewrite assoc comm assoc in H. *)
-(*   apply cmra_validN_op_l in H. *)
-(*   by rewrite comm. *)
-(* Qed. *)
-
-(* Local Program Definition uPred_restr_bupd_def {M : ucmra} *)
-(*   (t : M → M) `{!CmraMorphism t} (Q : uPred M) : uPred M := *)
-(*   {| uPred_holds n x := ∀ k yf m, *)
-(*       k ≤ n → ✓{k} (x ⋅ (Nat.iter m t yf)) -> ∃ x', ✓{k} (x' ⋅ (Nat.iter m t yf)) /\ t x' ≡ x' /\ Q k (x') *)
-(*   |}. *)
-(* Next Obligation. *)
-(*   intros M t Htrans Q n1 n2 x1 x2 HQ [x3 Hx] Hn k yf m Hk. *)
-(*   rewrite {1}(dist_le _ _ _ _ Hx); last lia. intros Hxy. *)
-(*   simpl in *. *)
-(*   destruct (HQ k ((* x3 ⋅  *)yf) m) as (x'&Hx'); [lia|auto|]. *)
-(*   { rewrite comm assoc in Hxy. apply cmra_validN_op_l in Hxy. rewrite comm;auto. } *)
-(*   exists x';auto. *)
-(* Qed. *)
 
 #[global] Instance iter_ne {M : ucmra} (f : M -> M) m : NonExpansive f -> NonExpansive (Nat.iter m f).
 Proof.
@@ -79,30 +34,45 @@ Proof.
   revert k. apply equiv_dist. auto.
 Qed.
 
+
+Class GenTransExtra {A : cmra} (f : A -> A) := {
+    gen_trans_op_inv n a :
+    (∀ b1 b2, f a ≡{n}≡ b1 ⋅ b2 →
+              ∃ a1 a2, a ≡{n}≡ a1 ⋅ a2 ∧ f a1 ≡{n}≡ b1 ∧ f a2 ≡{n}≡ b2)
+}.
+
 Local Program Definition uPred_restr_bupd_def {M : ucmra}
-  (t : M → M) `{!CmraMorphism t} (Q : uPred M) : uPred M :=
+  (t : M → M) `{!CmraMorphism t} `{!GenTransExtra t} (Q : uPred M) : uPred M :=
   {| uPred_holds n x := ∀ k yf,
-      k ≤ n → ✓{k} (t x ⋅ yf) -> ∃ x', ✓{k} (x' ⋅ yf) /\ t x' ≡{k}≡ x' /\ Q k x'
-  |}.
+      k ≤ n -> ✓{k} (x ⋅ yf) -> ∃ x' x1' x2', x' ≡{k}≡ x1' ⋅ x2' /\ x1' ≡{k}≡ t x1' /\ (∃ x2, x ≡{k}≡ x2 ⋅ x2')
+                                            /\ (∀ x2'' yf', x2' ≡{k}≡ t x2'' -> yf ≡{k}≡ t yf' -> ✓{k} (x1' ⋅ x2'' ⋅ yf'))
+                                            /\ ✓{k} (x' ⋅ yf)
+                                            /\ Q k x' |}.
 Next Obligation.
-  intros M t Htrans Q n1 n2 x1 x2 HQ [x3 Hx] Hn k yf Hk.
+  intros M t Htrans Htransextra Q n1 n2 x1 x2 HQ [x3 Hx] Hn k yf Hk (* [x1' [x2' [Heq1 Ht]]] *).
   rewrite {1}(dist_le _ _ _ _ Hx); last lia. intros Hxy.
   simpl in *.
-  
-  destruct (HQ k (t x3 ⋅ yf)) as (x'&?&?&?); [lia|auto|].
-  { rewrite assoc. rewrite cmra_morphism_op in Hxy. auto. }
-  exists x'. repeat split;auto.
-  rewrite assoc comm assoc in H.
-  apply cmra_validN_op_l in H.
-  by rewrite comm.
+  destruct (HQ k (x3 ⋅ yf)) as (x'&x1'&x2'&Heq'&Heq2&Hx'&Himpl&Hv&HQ'); [lia|auto|..].
+  { by rewrite assoc. (* rewrite -assoc (comm _ x3 yf) assoc in Hxy. apply cmra_validN_op_l in Hxy; auto.  *)}
+  exists (x' ⋅ x3),x1',(x2' ⋅ x3). rewrite (assoc op) -Heq'.
+  split;[|split];auto. rewrite assoc in Hv. split;[|split];auto.
+  - destruct Hx' as [x2'' Hx2']. exists (x2'').
+    rewrite (dist_le _ _ _ _ Hx); last lia. rewrite assoc Hx2' //.
+  - intros x2'' yf' Heqx2'' Heqyf.
+    symmetry in Heqx2''.
+    apply gen_trans_op_inv in Heqx2'' as Ha.
+    destruct Ha as [a1 [a2 [Ha12 [Ha1 Ha2]]]].
+    symmetry in Ha1. apply (Himpl _ (a2 ⋅ yf')) in Ha1 as Hii;[|rewrite cmra_morphism_op Ha2 -Heqyf//].
+    rewrite Ha12. rewrite assoc in Hii. rewrite assoc. auto.
+  - split;auto. eapply uPred_mono;eauto. by exists x3.
 Qed.
-  
+
 
 Local Definition uPred_restr_bupd_aux : seal (@uPred_restr_bupd_def).
 Proof. by eexists. Qed.
 
-Definition uPred_restr_bupd {M : ucmra} f {g} :=
-   uPred_restr_bupd_aux.(unseal) M f g.
+Definition uPred_restr_bupd {M : ucmra} f {g} {g'} :=
+   uPred_restr_bupd_aux.(unseal) M f g g'.
 
 Local Definition uPred_restr_bupd_unseal :
   @uPred_restr_bupd = @uPred_restr_bupd_def := uPred_restr_bupd_aux.(seal_eq).
@@ -113,7 +83,7 @@ Notation "|=/ f => P" := (uPred_restr_bupd f P)
 
 
 Section restr_bupd_rules.
-  Context {M : ucmra} (f : M → M) `{!CmraMorphism f}.
+  Context {M : ucmra} (f : M → M) `{!CmraMorphism f} `{!GenTransExtra f}.
 
   Notation "P ⊢ Q" := (@uPred_entails M P%I Q%I) : stdpp_scope.
   Notation "⊢ Q" := (bi_entails (PROP:=uPredI M) True Q).
@@ -123,7 +93,7 @@ Section restr_bupd_rules.
 
   Ltac unseal := try uPred.unseal; rewrite !uPred_restr_bupd_unseal !/uPred_holds /=.
 
-  Lemma next_gen_bupd_commute P :
+  Lemma nextgen_restr_bupd_commute P :
     (forall x, f x = f (f x)) ->
     (⚡={f}=> |=/f=> P) ⊢ |=/f=> ⚡={f}=> P.
   Proof.
@@ -131,30 +101,60 @@ Section restr_bupd_rules.
     intros n x Hx Hcond.
     simpl in *.
     intros k yf Hkn Hv.
-    rewrite Hidemp in Hv.
+    assert (✓{k} (x ⋅ yf)) as Hv_copy;auto.
+    apply (cmra_morphism_validN f) in Hv.
+    rewrite cmra_morphism_op in Hv.
     apply Hcond in Hv as Hx';auto.
-    destruct Hx' as [x' [Hvm [Heq Hx']]].
-    exists x'. repeat split;auto. rewrite Heq//.
+    destruct Hx' as (x'&x1'&x2'&Heq1&Heq2&Hfeq&Himpl&Hv'&HP).
+    destruct Hfeq as [x2 Hfeq].
+    apply gen_trans_op_inv in Hfeq as Ha.
+    destruct Ha as [a1 [a2 [Ha12 [Ha1 Ha2]]]].
+    exists (x1' ⋅ a2). eexists. eexists.
+    repeat split;eauto.
+    { intros. rewrite H in Ha2. rewrite -Hidemp in Ha2. symmetry in Ha2. eapply Himpl in Ha2;[eauto|].
+      rewrite H0. rewrite -Hidemp. auto.
+    }
+    { rewrite cmra_morphism_op Ha2 -Heq2 -Heq1. auto. }
   Qed.
 
-  Lemma bupd_ne : NonExpansive (@uPred_restr_bupd M f _).
+  Lemma restr_bupd_ne : NonExpansive (@uPred_restr_bupd M f _ _).
   Proof.
     intros n P Q HPQ.
     unseal. split. intros. simpl in *.
-    split =>HH k ? Hle B;pose proof (HH _ _ Hle B) as (?&?&?&?); eexists;eexists; repeat split;eauto.
-    all: apply HPQ;auto;[lia|];eauto using cmra_validN_op_l.
+    split =>HH k ? Hle B;pose proof (HH _ _ Hle B) as (?&?&?&?&?&(?&?)&?&?&?); do 3 eexists;(split;[apply H1|..]);repeat (split;eauto).
+    all: (apply HPQ;auto;[lia|..]; eauto using cmra_validN_op_l).
   Qed.
 
-  Lemma test P : (|=/f=> P) ⊢ |==> P.
+  Lemma restr_bupd_bupd P : (|=/f=> P) ⊢ |==> P.
   Proof.
-    unseal. split;intros.
-    simpl in *. intros.
-    apply (cmra_morphism_validN f) in H2.
-    rewrite cmra_morphism_op in H2.
-    apply H0 in H2 as [x'[? [? ?]]];eauto.
-  Abort.
-    
-    
+    unseal. split;intros ??? Hcond.
+    simpl in *. intros k yf Hle Hv.
+    apply Hcond in Hv as (?&?&?&?&?&(?&?)&?&?&?);eauto.
+  Qed.
+
+  Lemma restr_bupd_frame_l P R : (|=/f=> P) ∗ R ⊢ |=/f=> P ∗ R.
+  Proof.
+    unseal. split.
+    intros n x Hx [x1 [x2 [Heq [Hop HR]]]].
+    intros k yf Hk. rewrite {1}(dist_le _ _ _ _ Heq); last lia. intros Hv. simpl in *.
+    edestruct (Hop k (x2 ⋅ yf)) as [x' [x1' [x2' [Heq1 [Heq2 [[x3 Hx3] [Hcond2 [Hv' HP']]]]]]]];auto.
+    { by rewrite assoc. (* rewrite -assoc (comm _ x2 yf) assoc in Hv. by apply cmra_validN_op_l in Hv.  *)}
+    (* rewrite assoc in Hx'. *)
+    exists (x' ⋅ x2),(x1'),(x2' ⋅ x2).
+    repeat split;eauto.
+    - rewrite Heq1 assoc. auto.
+    - exists (x3). rewrite assoc -Hx3. rewrite (dist_le _ _ _ _ Heq);auto.
+    - intros x2'' yf' Heqf Hyf'.
+      symmetry in Heqf.
+      apply gen_trans_op_inv in Heqf as Ha.
+      destruct Ha as [a1 [a2 [Ha12 [Ha1 Ha2]]]].
+      symmetry in Ha1. eapply Hcond2 in Ha1 as Ha1';cycle 1.
+      { instantiate (1:=a2 ⋅ yf'). rewrite cmra_morphism_op -Ha2 -Hyf'. auto. }
+      rewrite Ha12. rewrite assoc in Ha1'. rewrite assoc. auto.
+    - by rewrite -assoc.
+    - exists x', x2. repeat split; auto.
+      eapply uPred_mono;eauto.
+  Qed.
 
   (* Lemma bupd_ownM_updateP x (Φ : M → Prop) : *)
   (*   x ~~>:{f} Φ → uPred_ownM x ⊢ |=/f=> ∃ y, ⌜Φ (f y)⌝ ∧ uPred_ownM (f y). *)
@@ -166,26 +166,6 @@ Section restr_bupd_rules.
   (*   exists y; split; eauto using cmra_morphism_op, cmra_includedN_l. *)
   (*   exists (f x3). rewrite cmra_morphism_op;auto. *)
   (* Qed. *)
-  
-  
-  Lemma test P R : (forall x, f x = f (f x)) ->
-                   (|=/f=> P) ∗ R ⊢ |=/f=> P ∗ R.
-  Proof.
-    intros Hidemp. unseal. split.
-    intros n x Hx [x1 [x2 [Heq [Hop HR]]]].
-    intros k yf Hk Hv.
-    rewrite /uPred_restr_bupd_def in Hop.
-    simpl in *. assert (✓{k} (f x ⋅ yf)) as Hv';auto.
-    rewrite {1}(dist_le _ _ _ _ Heq) in Hv; last auto.
-    rewrite cmra_morphism_op -assoc in Hv.
-    apply Hop in Hv as Hx';auto.
-    destruct Hx' as [x' [Hx' [Heq' HP]]].
-    exists (x' ⋅ f x2). repeat split;auto.
-    { by rewrite -assoc. }
-    { rewrite cmra_morphism_op -Hidemp Heq'. auto. }
-    exists x',x2.
-  Abort.
-    
 
 (* (** Basic update modality *) *)
 (*   Lemma bupd_intro P : P ⊢ |==> P. *)
