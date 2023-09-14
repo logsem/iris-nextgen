@@ -51,12 +51,12 @@ Section stack_lang_examples.
     {{{ [size] 0 }}} (0,example1) {{{ v, RET v; ⌜v.2 = NatV 42⌝ }}}.
   Proof.
     iIntros (Φ) "Hsize #HΦ /=". rewrite /example1. prepare_ctx.
-    iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /= !>". prepare_ctx.
+    iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /=". prepare_ctx.
     iApply wp_stack_alloc;[lia|repeat constructor|iFrame].
-    iNext. iIntros (l) "[Hsize Hl] !>". peel_ctx.
-    iApply wp_LetIn. iIntros "!>!>". simpl subst'.
+    iNext. iIntros (l) "[Hsize Hl]". peel_ctx.
+    iApply wp_LetIn. iIntros "!>". simpl subst'.
     iApply wp_stack_load;[constructor;lia|iFrame].
-    iNext. iIntros "[Hsize Hl] !>". peel_ctx.
+    iNext. iIntros "[Hsize Hl]". peel_ctx.
     iApply wp_return;[lia..|iFrame]. iNext. iIntros "Hsize".
     iModIntro.
     simpl. iApply wp_value. iApply "HΦ". simpl. auto.
@@ -66,14 +66,14 @@ Section stack_lang_examples.
     {{{ [size] 0 }}} (0,example2) {{{ v, RET v; ⌜v.2 = NatV 42⌝ }}}.
   Proof.
     iIntros (Φ) "Hsize #HΦ /=". rewrite /example2. prepare_ctx.
-    iApply wp_call_global;[eauto|iFrame]. iIntros "!>". iIntros "Hsize /= !>". prepare_ctx.
+    iApply wp_call_global;[eauto|iFrame]. iIntros "!>". iIntros "Hsize /=". prepare_ctx.
     iApply wp_stack_alloc;[lia|repeat constructor|iFrame].
-    iNext. iIntros (l) "[Hsize Hl] !>". peel_ctx.
-    iApply wp_LetIn. iIntros "!>!>". simpl subst'.
-    iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /= !>".
+    iNext. iIntros (l) "[Hsize Hl]". peel_ctx.
+    iApply wp_LetIn. iIntros "!>". simpl subst'.
+    iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /=".
     prepare_ctx.
     iApply wp_stack_load;[constructor;lia|iFrame].
-    iNext. iIntros "[Hsize Hl] !>". peel_ctx.
+    iNext. iIntros "[Hsize Hl]". peel_ctx.
     iApply wp_return;[lia..|iFrame]. iNext. iIntros "Hsize /=".
     iDestruct (stack_stack_pop_intro with "Hl") as "Hl";[eauto|].
     iModIntro. prepare_ctx.
@@ -86,16 +86,16 @@ Section stack_lang_examples.
     {{{ [size] 0 }}} (0,example3) {{{ v, RET v; ⌜v.2 = NatV 42⌝ }}}.
   Proof.
     iIntros (Φ) "Hsize #HΦ /=". rewrite /example2. prepare_ctx.
-    iApply wp_LetIn. iIntros "!>!>". simpl subst'.
-    iApply wp_LetIn. iIntros "!>!>". simpl subst'.
-    iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /= !>". prepare_ctx.
-    iApply wp_stack_alloc;[lia|repeat constructor|iFrame]. iNext. iIntros (l) "[Hsize Hl] !>". peel_ctx.
-    iApply wp_LetIn. iIntros "!>!>". simpl subst'.
-    iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /= !>". prepare_ctx.
+    iApply wp_LetIn. iIntros "!>". simpl subst'.
+    iApply wp_LetIn. iIntros "!>". simpl subst'.
+    iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /=". prepare_ctx.
+    iApply wp_stack_alloc;[lia|repeat constructor|iFrame]. iNext. iIntros (l) "[Hsize Hl]". peel_ctx.
+    iApply wp_LetIn. iIntros "!>". simpl subst'.
+    iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /=". prepare_ctx.
     iApply wp_call_local;[eauto..|iFrame];[constructor;lia|]. simpl. prepare_ctx.
-    iNext. iIntros "Hsize !>".
+    iNext. iIntros "Hsize".
     (* NOTE: the local stack pointer has been shifted to point two frame down *)
-    iApply wp_stack_load;[constructor;lia|iFrame]. iNext. iIntros "[Hsize Hl] !>". peel_ctx.
+    iApply wp_stack_load;[constructor;lia|iFrame]. iNext. iIntros "[Hsize Hl]". peel_ctx.
     iApply wp_return;[lia..|]. iFrame. iNext.
     iIntros "Hsize /=".
     iDestruct (stack_stack_pop_intro _ _ _ _ 2 with "Hl") as "Hl";[lia|].
@@ -114,8 +114,8 @@ Section stack_lang_examples.
     {{{ [size] 1 }}} (1,stuck_example) {{{ v, RET v; False }}}.
   Proof.
     iIntros (Φ) "Hsize #HΦ /=". rewrite /stuck_example. prepare_ctx.
-    iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /= !>". prepare_ctx.
-    iApply wp_stack_alloc;[lia|repeat constructor|iFrame]. iNext. iIntros (l) "[Hsize Hl] !>". peel_ctx.
+    iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /=". prepare_ctx.
+    iApply wp_stack_alloc;[lia|repeat constructor|iFrame]. iNext. iIntros (l) "[Hsize Hl]". peel_ctx.
     iApply wp_return;[lia..|iFrame]. iNext. iIntros "Hsize /=". iModIntro.
     (* STUCK! the points-to for l gets lost, its lifetime is not less than 1 *)
   Abort.

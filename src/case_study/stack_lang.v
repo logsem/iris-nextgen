@@ -1445,6 +1445,23 @@ Qed.
 Lemma is_atomic_normal e : is_atomic e → is_normal e.
 Proof. destruct e;simpl. by destruct e; inversion 1; intros ????; inversion 1; simpl. Qed.
 
+Lemma is_atomic_find_i_none :
+  ∀ (e : stack_expr), is_atomic e → find_i e.2 = None.
+Proof.
+  intros e Hatomic.
+  destruct (find_i e.2) eqn:Hsome =>//.
+  exfalso. (* apply find_i_throw_reducible in Hsome. *)
+  destruct e;simpl in *. destruct e;try done.
+  4: destruct Hatomic as [ [v1 Hv] [v2 Hv2] ].
+  1,2,3: destruct Hatomic as [v Hv].
+  all: unfold find_i in Hsome; simpl in Hsome.
+  all: apply construct_ctx_to_val in Hv as Hv'.
+  4: apply construct_ctx_to_val in Hv2 as Hv2'.
+  all: rewrite Hv' /= in Hsome; try done.
+  by rewrite Hv Hv2' /= in Hsome.
+Qed.
+  
+
 Ltac solve_atomic :=
   apply is_atomic_correct; simpl; repeat split;
   rewrite ?to_of_val; eapply mk_is_Some; fast_done.

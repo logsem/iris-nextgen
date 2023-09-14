@@ -10,13 +10,13 @@ Import uPred.
 (** This file contains the adequacy statements of the Iris program logic. First *)
 (* we prove a number of auxilary results. *)
 
-Notation "⚡={[ l ]}=> P" := (@bnextgen_repeat_n _ _ _ _ _ (next_state) _ num_laters_per_step _ _ l P)
+Notation "⚡={[ l ]}=> P" := (@bnextgen_repeat_n _ _ _ _ _ _ _ next_choose next_state _ num_laters_per_step _ _ l P)
          (at level 99, l at level 50, P at level 200, format "⚡={[ l ]}=>  P") : bi_scope.
 
-Notation "⚡={[ l ]}▷=>^ ( n ) P" := (@bnextgen_n _ _ _ _ _ (next_state) _ num_laters_per_step _ _ l n P)
+Notation "⚡={[ l ]}▷=>^ ( n ) P" := (@bnextgen_n _ _ _ _ _ _ next_choose next_state _ num_laters_per_step _ _ l n P)
          (at level 99, l at level 50, n at level 50, P at level 200, format "⚡={[ l ]}▷=>^ ( n )  P") : bi_scope.
 
-Notation "⚡={[ l ]}▷=>>^ ( n ) P" := (@bnextgen_n_open _ _ _ _ _ (next_state) _ num_laters_per_step _ _ l n P)
+Notation "⚡={[ l ]}▷=>>^ ( n ) P" := (@bnextgen_n_open _ _ _ _ _ _ next_choose next_state _ num_laters_per_step _ _ l n P)
          (at level 99, l at level 50, n at level 50, P at level 200, format "⚡={[ l ]}▷=>>^ ( n )  P") : bi_scope.
 
 Section adequacy.
@@ -87,7 +87,7 @@ Local Lemma wp_step s e1 σ1 ns κ κs e2 σ2 efs nt Φ :
   £ (S (num_laters_per_step ns)) -∗
   WP e1 @ s; ⊤ {{ Φ }}
     ={⊤,∅}=∗ |={∅}▷=>^(S $ num_laters_per_step ns) |={∅,⊤}=>
-  (⚡={transmap_insert_inG (next_state e1) Ω}=> state_interp σ2 (S ns) κs (nt + length efs)) ∗ (⚡={transmap_insert_inG (next_state e1) Ω}=> WP e2 @ s; ⊤ {{ Φ }}).
+  (?={Ω <- e1}=> state_interp σ2 (S ns) κs (nt + length efs)) ∗ (?={Ω <- e1}=> WP e2 @ s; ⊤ {{ Φ }}).
 Proof.
   rewrite {1}wp_unfold /wp_pre. iIntros (?) "Hσ Hcred H".
   rewrite (val_stuck e1 σ1 κ e2 σ2 efs) //.
@@ -118,6 +118,7 @@ Proof.
     inversion H0;simplify_eq;auto.
 Qed.
 
+
 Local Lemma wptp_preservation s n es' es1 es2 κs κs' σ1 ns σ2 Φ nt :
   nsteps_single_thread es' n (es1, σ1) κs (es2, σ2) →
   £ (steps_sum num_laters_per_step ns n) -∗
@@ -140,9 +141,9 @@ Proof.
   iApply (step_fupdN_wand with "HH").
   iIntros "HH". iModIntro.
   iMod "HH". iModIntro. iDestruct "HH" as "[? H]".
-  iModIntro. rewrite /= Nat.add_0_r.
-  iApply (IH with "[$] [H] [$]");first eauto.
-  simpl. iFrame.
+  unfold bnextgen_option. case_match;[iModIntro|]; rewrite /= Nat.add_0_r.
+  all: iApply (IH with "[$] [H] [$]");first eauto.
+  all: simpl; iFrame.
 Qed.
 
 Local Lemma wp_not_stuck κs nt e σ ns Φ :
@@ -201,15 +202,15 @@ End adequacy.
 
 (** Progress for nextgen-weakestpre, for single thread and without later credits *)
 Local Lemma wp_progress_no_lc_single_thread Σ (Ω : gTransformations Σ) T `{Htr : noTransInG Σ Ω T} Λ `{!invGIndpreS Σ Ω} es σ1 n es' κs t2 σ2 e2
-  (num_laters_per_step : nat → nat) (next_state : expr Λ -> T -> T)
-  (next_state_ne : ∀ e : expr Λ, CmraMorphism (next_state e)) :
+  (num_laters_per_step : nat → nat) {B : Type} (next_choose : expr Λ -> option B) (next_state : B -> T -> T)
+  (next_state_ne : ∀ e : B, CmraMorphism (next_state e)) :
     (∀ `{Hinv : invGIndS_gen HasNoLc Σ Ω},
     ⊢ |={⊤}=> ∃
          (stateI : state Λ → nat → list (observation Λ) → nat → iProp Σ)
          (Φs : list (val Λ → iProp Σ))
          (fork_post : val Λ → iProp Σ)
          state_interp_mono,
-       let _ : irisGS_gen HasNoLc Λ Σ Ω T := IrisG Ω T Hinv Htr stateI fork_post next_state next_state_ne num_laters_per_step
+       let _ : irisGS_gen HasNoLc Λ Σ Ω T := IrisG Ω T Hinv Htr stateI fork_post B next_state next_choose next_state_ne num_laters_per_step
                                   state_interp_mono
        in
        stateI σ1 0 κs 0 ∗
@@ -220,7 +221,7 @@ Local Lemma wp_progress_no_lc_single_thread Σ (Ω : gTransformations Σ) T `{Ht
 
 Proof.
   intros Hwp ??. inversion invGIndpreS0.
-  pose proof (@step_fupdN_nextgen_soundness_no_lc (expr Λ) Σ Ω T Htr next_state _ num_laters_per_step es' _
+  pose proof (@step_fupdN_nextgen_soundness_no_lc (expr Λ) Σ Ω T Htr B next_choose next_state _ num_laters_per_step es' _
                 (⌜not_stuck e2 σ2⌝)%I _ 0 (steps_sum num_laters_per_step 0 n)) as Hsound.
   eapply pure_soundness.
   apply Hsound.
@@ -229,7 +230,7 @@ Proof.
   apply nsteps_single_thread_expr_length in H as Hlen. destruct Hlen as [Hlen1 Hlen2];simpl in Hlen1, Hlen2.
   destruct es as [|e es];[done|destruct es;[|done]].
   iDestruct (big_sepL2_length with "Hwp") as %Hlen. destruct Φ as [|Φ0 Φ];[done|destruct Φ;[|done]].
-  iDestruct (@wptp_progress _ _ _ _ (IrisG Ω T Hinv Htr stateI fork_post next_state next_state_ne num_laters_per_step state_interp_mono) _
+  iDestruct (@wptp_progress _ _ _ _ (IrisG Ω T Hinv Htr stateI fork_post B next_state next_choose next_state_ne num_laters_per_step state_interp_mono) _
               with "[Hσ] [$Hn] [$Hwp]") as "HH";[apply H|apply H0|..].
   { instantiate (2:=[]). rewrite app_nil_r. unfold state_interp. iFrame. }
   simpl. auto.
@@ -237,8 +238,8 @@ Qed.
 
 (** Adequacy for nextgen-weakestpre, for single thread and without later credits *)
 Lemma wp_strong_adequacy_no_lc_single_thread Σ (Ω : gTransformations Σ) T `{Htr : noTransInG Σ Ω T} Λ `{!invGIndpreS Σ Ω} s es es' σ1 n κs t2 σ2 φ
-        (num_laters_per_step : nat → nat) (next_state : expr Λ -> T -> T)
-        (next_state_ne : ∀ e : expr Λ, CmraMorphism (next_state e)) :
+        (num_laters_per_step : nat → nat) {B : Type} (next_choose : expr Λ -> option B) (next_state : B -> T -> T)
+        (next_state_ne : ∀ e : B, CmraMorphism (next_state e)) :
   (* WP *)
   (∀ `{Hinv : !invGIndS_gen HasNoLc Σ Ω},
       ⊢ |={⊤}=> ∃
@@ -248,7 +249,7 @@ Lemma wp_strong_adequacy_no_lc_single_thread Σ (Ω : gTransformations Σ) T `{H
          (* Note: existentially quantifying over Iris goal! [iExists _] should *)
 (*          usually work. *)
          state_interp_mono,
-       let _ : irisGS_gen HasNoLc Λ Σ Ω T := IrisG Ω T Hinv Htr stateI fork_post next_state next_state_ne num_laters_per_step
+       let _ : irisGS_gen HasNoLc Λ Σ Ω T := IrisG Ω T Hinv Htr stateI fork_post B next_state next_choose next_state_ne num_laters_per_step
                                   state_interp_mono
        in
        stateI σ1 0 κs 0 ∗
@@ -272,7 +273,7 @@ Lemma wp_strong_adequacy_no_lc_single_thread Σ (Ω : gTransformations Σ) T `{H
 Proof.
   intros Hwp ?.
   eapply pure_soundness.
-  eapply (@step_fupdN_nextgen_soundness_no_lc (expr Λ) Σ _ _ _ next_state _ num_laters_per_step es' _ 
+  eapply (@step_fupdN_nextgen_soundness_no_lc (expr Λ) Σ _ _ _ _ next_choose next_state _ num_laters_per_step es' _ 
             (⌜φ⌝)%I _ 0 (steps_sum num_laters_per_step 0 n)).
   iIntros (Hinv) "Hcred". inversion invGIndpreS0.
   iMod Hwp as (stateI Φ fork_post state_interp_mono) "(Hσ & Hwp & Hφ)".
@@ -281,7 +282,7 @@ Proof.
   iDestruct (big_sepL2_length with "Hwp") as %Hlen. destruct Φ as [|Φ0 Φ];[done|destruct Φ;[|done]].
   
   iDestruct (@wptp_postconditions _ _ _ _
-       (IrisG Ω T Hinv Htr stateI fork_post next_state next_state_ne num_laters_per_step state_interp_mono) _ _ []
+       (IrisG Ω T Hinv Htr stateI fork_post B next_state next_choose next_state_ne num_laters_per_step state_interp_mono) _ _ []
               with "[Hσ] Hcred [Hwp]") as "H";[done|by rewrite right_id_L|..].
   { simpl. iDestruct "Hwp" as "[Hwp $]". instantiate (1:=Φ0). instantiate (1:=s).
     iApply (wp_mono with "Hwp"). intros. auto. }
@@ -376,14 +377,15 @@ Qed.
 (* of laters per step must be 0, and the proof of [state_interp_mono] must have *)
 (* this specific proof term. *)
 (* *)
-Lemma wp_adequacy_no_lc_single_thread Σ (Ω : gTransformations Σ) T `{Htr : noTransInG Σ Ω T} Λ `{!invGIndpreS Σ Ω} (next_state : expr Λ -> T -> T)
-        (next_state_ne : ∀ e : expr Λ, CmraMorphism (next_state e)) s e σ φ :
+Lemma wp_adequacy_no_lc_single_thread Σ (Ω : gTransformations Σ) T `{Htr : noTransInG Σ Ω T} Λ `{!invGIndpreS Σ Ω}
+  {B : Type} (next_choose : expr Λ -> option B) (next_state : B -> T -> T)
+  (next_state_ne : ∀ e : B, CmraMorphism (next_state e)) s e σ φ :
   (∀ `{Hinv : !invGIndS_gen HasNoLc Σ Ω} κs,
      ⊢ |={⊤}=> ∃
          (stateI : state Λ → list (observation Λ) → iProp Σ)
          (fork_post : val Λ → iProp Σ),
        let _ : irisGS_gen HasNoLc Λ Σ Ω T :=
-           IrisG Ω T Hinv Htr (λ σ _ κs _, stateI σ κs) fork_post next_state next_state_ne (λ _, 0)
+           IrisG Ω T Hinv Htr (λ σ _ κs _, stateI σ κs) fork_post B next_state next_choose next_state_ne (λ _, 0)
                  (λ _ _ _ _, (entails_po).(PreOrder_Reflexive) _)
        in
        stateI σ κs ∗ WP e @ s; ⊤ {{ v, ⌜φ v⌝ }}) →

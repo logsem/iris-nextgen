@@ -74,11 +74,9 @@ Definition state_trans (n : nat) := (map_entry_lift_gmap_view (stack_location_cu
 Definition state_trans_state (σ : state) := state_trans (length σ.2).
 Definition stack_gname `{heapGS Σ} : gname := heapG_gen_stackGS.(no_gen_heap_name).
 
-Definition next_state_f (e : stack_expr) : (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) → (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) :=
-  match find_i e.2 with
-  | Some i => state_trans (e.1 - (Z.abs_nat i))
-  | None => id
-  end.
+Definition next_choose_f (e : stack_expr) : option nat :=
+  (find_i e.2) ≫= λ i, Some (e.1 - Z.abs_nat i).
+
 (* Definition next_state_f_aux : seal (@next_state_f_def). *)
 (* Proof. by eexists. Qed. *)
 (* Definition next_state_f := (next_state_f_aux).(unseal). *)
@@ -86,19 +84,19 @@ Definition next_state_f (e : stack_expr) : (gmap_view.gmap_viewR (nat * loc) (le
 (*   @next_state_f = @next_state_f_def := next_state_f_aux.(seal_eq). *)
 (* Global Arguments next_state_f {Σ Ω H} e. *)
 
-#[global]
-Instance next_state_f_cmra_morphism : ∀ (Σ : gFunctors) (Ω : gTransformations Σ) (e : language.expr lang), CmraMorphism (next_state_f e).
-Proof.
-  intros. rewrite /next_state_f.
-  destruct (find_i e.2);apply _.
-Qed.
+(* #[global] *)
+(* Instance next_state_f_cmra_morphism : ∀ (Σ : gFunctors) (Ω : gTransformations Σ) (e : nat), CmraMorphism (next_state_f e). *)
+(* Proof. apply _. *)
+(*   intros. rewrite /next_state_f. *)
+(*   destruct (find_i e.2);apply _. *)
+(* Qed. *)
 
-#[global]
-Instance state_trans_cmra_morphism : ∀ (Σ : gFunctors) (Ω : gTransformations Σ) n,
- CmraMorphism (state_trans n).
-Proof.
-  intros. rewrite /state_trans /=. apply _.
-Qed.
+(* #[global] *)
+(* Instance state_trans_cmra_morphism : ∀ (Σ : gFunctors) (Ω : gTransformations Σ) n, *)
+(*  CmraMorphism (state_trans n). *)
+(* Proof. *)
+(*   intros. rewrite /state_trans /=. apply _. *)
+(* Qed. *)
 
 Definition gen_stack_interp `{H : heapGS Σ Ω} s :=
   @ghost_map.ghost_map_auth Σ _ _ _ _ _ (stack_gname) 1 (list_to_gmap_stack s).
@@ -110,8 +108,10 @@ Instance heapG_irisGS `{heapGS Σ Ω} : irisGS_gen _ lang Σ Ω (gmap_view.gmap_
       (gen_heap_interp h
          ∗ (* gen_heap_interp (list_to_gmap_stack s) *) gen_stack_interp s
          ∗ own heapG_stacksize_name (excl_auth_auth (length s)))%I;
-    next_state := next_state_f;
-    next_state_GenTrans := next_state_f_cmra_morphism Σ Ω;
+    B := nat;
+    next_choose := next_choose_f;
+    next_state := state_trans;
+    next_state_GenTrans := _;
     num_laters_per_step _ := 0;
     fork_post _ := True%I;
     state_interp_mono _ _ _ _ := (entails_po).(PreOrder_Reflexive) _
@@ -156,7 +156,7 @@ Proof.
   destruct e1;simpl in *. rewrite /stack_to_val in H0.
   simpl in H0.
   destruct (to_val e) eqn:He;try done.
-  unfold next_state_f. rewrite fill_proj /=.
+  unfold next_choose_f. rewrite fill_proj /=.
   destruct (find_i e) eqn:Hfind.
   - eapply find_i_fill in Hfind as ->.
     rewrite fill_proj_fst_eq. simpl. auto.
@@ -459,130 +459,97 @@ Section lifting.
   (** ------------------- Stateless reductions ------------------- *)
   (** ------------------------------------------------------------ *)
 
-  Lemma next_state_letin_id n x e1 v1 e2 `{!IntoVal (n,e1) v1} :
-    next_state_f (n, LetIn x e1 e2) = id.
-  Proof.
-    inv_head_step.
-    rewrite /next_state_f /find_i /=.
-    by erewrite construct_ctx_to_val;[|apply to_of_val].
-  Qed.
+  (* Lemma next_state_letin_id n x e1 v1 e2 `{!IntoVal (n,e1) v1} : *)
+  (*   next_state_f (n, LetIn x e1 e2) = id. *)
+  (* Proof. *)
+  (*   inv_head_step. *)
+  (*   rewrite /next_state_f /find_i /=. *)
+  (*   by erewrite construct_ctx_to_val;[|apply to_of_val]. *)
+  (* Qed. *)
 
-  Ltac resolve_next_state :=
+  (* Ltac resolve_next_state := *)
+  (*        match goal with *)
+  (*        | |- ∀ x, next_choose_f _ _ = _ _ => *)
+  (*            inv_head_step; rewrite /next_choose_f /find_i /=; (try rewrite !to_of_val); (try rewrite construct_ctx_of_val /=); (try rewrite !to_of_val); simpl; auto *)
+  (*        | |- ∀ x, next_state _ _ = _ _ => *)
+  (*            inv_head_step; rewrite /next_state /next_choose_f /find_i /=; (try rewrite !to_of_val); (try rewrite construct_ctx_of_val /=); (try rewrite !to_of_val); simpl; auto *)
+  (*        end. *)
+
+   Ltac resolve_next_state :=
          match goal with
-         | |- ∀ x, next_state_f _ _ = _ _ =>
-             inv_head_step; rewrite /next_state_f /find_i /=; (try rewrite !to_of_val); (try rewrite construct_ctx_of_val /=); (try rewrite !to_of_val); simpl; auto
-         | |- ∀ x, next_state _ _ = _ _ =>
-             inv_head_step; rewrite /next_state /next_state_f /find_i /=; (try rewrite !to_of_val); (try rewrite construct_ctx_of_val /=); (try rewrite !to_of_val); simpl; auto
+         | |- context [ (?={ ?Ω <- ?e }=> ?P)%I ] =>
+             rewrite /bnextgen_option; simpl next_choose; inv_head_step; rewrite /next_choose_f /find_i /=; (try rewrite !to_of_val); (try rewrite construct_ctx_of_val /=); (try rewrite !to_of_val); simpl
          end.
 
   Notation id := (id : (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) -> (gmap_view.gmap_viewR (nat * loc) (leibnizO val))).
 
   Lemma wp_LetIn K E e1 e2 v1 x Φ (n : nat) `{!IntoVal (n,e1) v1} :
-                               ▷ (⚡={next_state_option Ω None}=> WP fill K (n,subst' x v1.2 e2) @ E {{ Φ }}) ⊢ WP fill K (n,LetIn x e1 e2) @ E {{ Φ }}.
+                               ▷ (WP fill K (n,subst' x v1.2 e2) @ E {{ Φ }}) ⊢ WP fill K (n,LetIn x e1 e2) @ E {{ Φ }}.
   Proof.
     iIntros "H".
     iApply (wp_lift_nonthrow_pure_det_head_step_no_fork' K (n,LetIn _ _ _) _);eauto.
     intros; inv_head_step;eauto.
-    { intros. iIntros "Hs". iApply (transmap_insert_extensional_eq _ id);[resolve_next_state|].
-      erewrite <-next_state_option_id_eq. iModIntro. iFrame. }
-    iNext. iIntros "H1".
-    iApply (transmap_insert_extensional_eq _ id);[resolve_next_state|].
-    erewrite <-next_state_option_id_eq.
-    iModIntro. inv_head_step. iFrame.
+    { intros. iIntros "Hs". by resolve_next_state. }
+    iNext. iIntros "H1". by resolve_next_state.
   Qed.
 
   Lemma wp_bin_op K E op e1 e2 n v1 v2 w Φ `{!IntoVal (n,e1) (n,v1), !IntoVal (n,e2) (n,v2)} :
     binop_eval op v1 v2 = Some w →
-    ▷ (⚡={next_state_option Ω None}=> WP fill K (n, of_val w) @ E {{ Φ }})
+    ▷ (WP fill K (n, of_val w) @ E {{ Φ }})
       ⊢ WP fill K (n, BinOp op e1 e2) @ E {{ Φ }}.
   Proof.
     iIntros (?) "H".
     iApply (wp_lift_nonthrow_pure_det_head_step_no_fork' K (n,BinOp op _ _) _);eauto.
     intros; inv_head_step;eauto.
-    { intros. iIntros "Hs". iApply (transmap_insert_extensional_eq _ id);[resolve_next_state|].
-      erewrite <-next_state_option_id_eq. iModIntro. iFrame. }
-    iNext. iIntros "H1".
-    iApply (transmap_insert_extensional_eq _ id);[resolve_next_state|].
-    erewrite <-next_state_option_id_eq.
-    iApply (bnextgen_mono with "H"). iIntros "H". inv_head_step. iFrame.
+    { intros. iIntros "Hs". by resolve_next_state. }
+    iNext. iIntros "H1". by resolve_next_state.
   Qed.
 
   Lemma wp_if_true K E e1 e2 n Φ :
-    ▷ (⚡={next_state_option Ω None}=> WP fill K (n,e1) @ E {{ Φ }}) ⊢ WP fill K (n,If (#♭ true) e1 e2) @ E {{ Φ }}.
+    ▷ (WP fill K (n,e1) @ E {{ Φ }}) ⊢ WP fill K (n,If (#♭ true) e1 e2) @ E {{ Φ }}.
   Proof.
     iIntros "H".
     iApply (wp_lift_nonthrow_pure_det_head_step_no_fork' K (n,If _ _ _) _);eauto.
     intros; inv_head_step;eauto.
-    { intros. iIntros "Hs". iApply (transmap_insert_extensional_eq _ id);[resolve_next_state|].
-      erewrite <-next_state_option_id_eq.
-      iApply state_interp_insert_id_intro. iFrame. }
-    iNext. iIntros "H1".
-    iApply (transmap_insert_extensional_eq _ id);[resolve_next_state|].
-    erewrite <-next_state_option_id_eq.
-    iApply (bnextgen_mono with "H"). iIntros "H". inv_head_step. iFrame.
   Qed.
 
   Lemma wp_if_false K E e1 e2 n Φ :
-    ▷ (⚡={next_state_option Ω None}=> WP fill K (n,e2) @ E {{ Φ }}) ⊢ WP fill K (n, If (#♭ false) e1 e2) @ E {{ Φ }}.
+    ▷ (WP fill K (n,e2) @ E {{ Φ }}) ⊢ WP fill K (n, If (#♭ false) e1 e2) @ E {{ Φ }}.
   Proof.
     iIntros "H".
     iApply (wp_lift_nonthrow_pure_det_head_step_no_fork' K (n,If _ _ _) _);eauto.
     intros; inv_head_step;eauto.
-    { intros. iIntros "Hs". iApply (transmap_insert_extensional_eq _ id);[resolve_next_state|].
-      erewrite <-next_state_option_id_eq.
-      iApply state_interp_insert_id_intro. iFrame. }
-    iNext. iIntros "H1".
-    iApply (transmap_insert_extensional_eq _ id);[resolve_next_state|].
-    erewrite <-next_state_option_id_eq.
-    iApply (bnextgen_mono with "H"). iIntros "H". inv_head_step. iFrame.
   Qed.
 
   Lemma wp_fst K E e1 e2 v1 n Φ `{!IntoVal (n,e1) v1, !AsVal (n,e2)} :
-    ▷ (⚡={next_state_option Ω None}=> WP fill K (n,e1) @ E {{ Φ }})
+    ▷ (WP fill K (n,e1) @ E {{ Φ }})
       ⊢ WP fill K (n,Fst (Pair e1 e2)) @ E {{ Φ }}.
   Proof.
     iIntros "H".
     iApply (wp_lift_nonthrow_pure_det_head_step_no_fork' K (n,Fst _) _);eauto.
     inv_head_step. eauto. intros; inv_head_step;eauto.
-    { intros. iIntros "Hs". iApply (transmap_insert_extensional_eq _ id);[resolve_next_state|].
-      erewrite <-next_state_option_id_eq.
-      iApply state_interp_insert_id_intro. iFrame. }
-    iNext. iIntros "H1".
-    iApply (transmap_insert_extensional_eq _ id);[resolve_next_state|].
-    erewrite <-next_state_option_id_eq.
-    iApply (bnextgen_mono with "H"). iIntros "H". inv_head_step. iFrame.
+    { intros. iIntros "Hs". by resolve_next_state. }
+    iNext. iIntros "H1". by resolve_next_state.
   Qed.
 
   Lemma wp_snd K E e1 e2 n v2 Φ `{!AsVal (n,e1), !IntoVal (n,e2) v2} :
-    ▷ (⚡={next_state_option Ω None}=> WP fill K (n,e2) @ E {{ Φ }})
+    ▷ (WP fill K (n,e2) @ E {{ Φ }})
       ⊢ WP fill K (n, Snd (Pair e1 e2)) @ E {{ Φ }}.
   Proof.
     iIntros "H".
     iApply (wp_lift_nonthrow_pure_det_head_step_no_fork' K (n,Snd _) _);eauto.
     inv_head_step. eauto. intros; inv_head_step;eauto.
-    { intros. iIntros "Hs". iApply (transmap_insert_extensional_eq _ id);[resolve_next_state|].
-      erewrite <-next_state_option_id_eq.
-      iApply state_interp_insert_id_intro. iFrame. }
-    iNext. iIntros "H1".
-    iApply (transmap_insert_extensional_eq _ id);[resolve_next_state|].
-    erewrite <-next_state_option_id_eq.
-    iApply (bnextgen_mono with "H"). iIntros "H". inv_head_step. iFrame.
+    { intros. iIntros "Hs". by resolve_next_state. }
+    iNext. iIntros "H1". by resolve_next_state.
   Qed.
 
   Lemma wp_mask K E l n Φ :
-    ▷ (⚡={next_state_option Ω None}=> WP fill K (n,Loc borrow l) @ E {{ Φ }})
+    ▷ (WP fill K (n,Loc borrow l) @ E {{ Φ }})
       ⊢ WP fill K (n, Mask (Loc global l)) @ E {{ Φ }}.
   Proof.
     iIntros "H".
     iApply (wp_lift_nonthrow_pure_det_head_step_no_fork' K (n,Mask _) _);eauto.
-    inv_head_step. eauto. intros; inv_head_step;eauto.
-    { intros. iIntros "Hs". iApply (transmap_insert_extensional_eq _ id);[resolve_next_state|].
-      erewrite <-next_state_option_id_eq.
-      iApply state_interp_insert_id_intro. Unshelve. iExact "Hs". apply 0. apply []. apply 0. }
-    iNext. iIntros "H1".
-    iApply (transmap_insert_extensional_eq _ id);[resolve_next_state|].
-    erewrite <-next_state_option_id_eq.
-    iApply (bnextgen_mono with "H"). iIntros "H". inv_head_step. iFrame.
+    inv_head_step. eauto.
   Qed.
 
   (** ------------------------------------------------------------ *)
@@ -592,7 +559,7 @@ Section lifting.
   Lemma wp_stack_alloc K E n e v Φ `{!IntoVal (n,e) (n,v)} :
     0 < n -> (* stack is non empty *)
     scope v 0 ->
-    ▷ (∀ l, [size] n ∗ (n - 1) @@ l ↦ v -∗ ⚡={next_state_option Ω None}=>  WP fill K (n,Loc (local 0) l) @ E {{ Φ }})
+    ▷ (∀ l, [size] n ∗ (n - 1) @@ l ↦ v -∗ WP fill K (n,Loc (local 0) l) @ E {{ Φ }})
       ∗ ▷ [size] n
       ⊢ WP fill K (n,Salloc e) @ E {{ Φ }}.
   Proof.
@@ -607,7 +574,7 @@ Section lifting.
     { iPureIntro. exists NormalMode. do 5 econstructor;[constructor|].
       simpl. apply salloc_fresh;eauto. }
     iNext. iIntros (rm r0 σ2 efs Hstep) "Hp".
-    inv_head_step. iMod "Hcls".
+    resolve_next_state. iMod "Hcls".
     rewrite /insert /= PeanoNat.Nat.sub_0_r Hs' /state_trans_state insert_length /=.
     rewrite -/(state_trans_state (h1,s1)). (* rewrite -/(state_interp (h1,s1) ns κs nt). *)
     iDestruct (gen_heap_alloc_stack_ng (h1,s1) ns κs nt l v0 with "Hstate") as ">[Hstate Hl]".
@@ -617,16 +584,12 @@ Section lifting.
     rewrite /insert /insert_state_Insert /insert_state /= PeanoNat.Nat.sub_0_r /= Hs' /=.
     iDestruct "Hstate" as "[? [? ?]]". rewrite insert_length. iFrame.
     iModIntro.
-    iSplitR "HΦ Hsize Hp Hl".
-    all: iApply (transmap_insert_extensional_eq _ id);[resolve_next_state;simpl;auto|].
-    { erewrite <-next_state_option_id_eq. iModIntro. iFrame. }
-    erewrite <-next_state_option_id_eq.
     iApply "HΦ". iFrame.
   Qed.
 
   Lemma wp_heap_alloc K E n e v Φ `{!IntoVal (n,e) (n,v)} :
     permanent v ->
-    ▷ (∀ l, l ↦ v -∗ ⚡={next_state_option Ω None}=> WP fill K (n,Loc global l) @ E {{ Φ }})
+    ▷ (∀ l, l ↦ v -∗ WP fill K (n,Loc global l) @ E {{ Φ }})
       ⊢ WP fill K (n,Halloc e) @ E {{ Φ }}.
   Proof.
     iIntros (Hperm) "HΦ".
@@ -637,16 +600,11 @@ Section lifting.
     { iPureIntro. exists NormalMode. do 5 econstructor;[constructor|].
       simpl. apply halloc_fresh;eauto. }
     iNext. iIntros (rm r0 σ2 efs Hstep) "Hp".
-    inv_head_step. iMod "Hcls".
+    resolve_next_state.
+    iMod "Hcls".
     iMod (gen_heap_alloc _ l v0 with "Hh") as "[Hh [Hl _]]";[auto|].
     iDestruct ("HΦ" with "Hl") as "Hwp".
     iModIntro. iFrame.
-    iSplitR "Hwp".
-    - iApply (transmap_insert_extensional_eq _ id);[resolve_next_state;simpl;auto|].
-      erewrite <-next_state_option_id_eq.
-      iModIntro. iFrame.
-    - iApply (transmap_insert_extensional_eq _ id);[resolve_next_state;simpl;auto|].
-      erewrite <-next_state_option_id_eq. iModIntro. iFrame.
   Qed.
 
   (** ------------------------------------------------------------ *)
@@ -655,7 +613,7 @@ Section lifting.
 
   Lemma wp_heap_load K E l δ n v Φ :
     heap_tag δ ->
-    ▷ (l ↦ v -∗ ⚡={next_state_option Ω None}=> WP fill K (n,of_val v) @ E {{ Φ }})
+    ▷ (l ↦ v -∗ WP fill K (n,of_val v) @ E {{ Φ }})
       ∗ ▷ l ↦ v
       ⊢ WP fill K (n,Load (Loc δ l)) @ E {{ Φ }}.
   Proof.
@@ -668,22 +626,17 @@ Section lifting.
     { iPureIntro. exists NormalMode. do 5 econstructor;[constructor|].
       simpl. constructor;eauto. }
     iNext. iIntros (rm r0 σ2 efs Hstep) "Hp".
-    inv_head_step.
+    resolve_next_state.
     2: { inversion Hδ. }
     rewrite /lookup_heap /= Hlookup in H10. simplify_eq.
     iMod "Hcls".
     iDestruct ("HΦ" with "Hl") as "Hwp".
     iModIntro. iFrame.
-    iSplitR "Hwp".
-    - iApply (transmap_insert_extensional_eq _ id);[resolve_next_state;simpl;auto|].
-      erewrite <-next_state_option_id_eq. iModIntro. iFrame.
-    - iApply (transmap_insert_extensional_eq _ id);[resolve_next_state;simpl;auto|].
-      erewrite <-next_state_option_id_eq. iFrame.
   Qed.
 
   Lemma wp_stack_load K E l j v n Φ :
     scope_tag (local j) ->
-    ▷ ([size] n ∗ (n - 1 - Z.abs_nat j) @@ l ↦ v -∗ ⚡={next_state_option Ω None}=> WP fill K (n,of_val (shift_val v j)) @ E {{ Φ }})
+    ▷ ([size] n ∗ (n - 1 - Z.abs_nat j) @@ l ↦ v -∗ WP fill K (n,of_val (shift_val v j)) @ E {{ Φ }})
       ∗ ▷ (n - 1 - Z.abs_nat j) @@ l ↦ v
       ∗ ▷ [size] n
       ⊢ WP fill K (n,Load (Loc (local j) l)) @ E {{ Φ }}.
@@ -701,21 +654,16 @@ Section lifting.
     { iPureIntro. exists NormalMode. do 5 econstructor;[constructor|].
       simpl. eapply LoadStackS;eauto. }
     iNext. iIntros (rm r0 σ2 efs Hstep) "Hp".
-    inv_head_step. inversion H11.
+    resolve_next_state. inversion H11.
     iMod "Hcls". 
     iModIntro. iDestruct ("HΦ" with "[$]") as "Hwp".
     iFrame.
-    iSplitR "Hwp".
-    - iApply (transmap_insert_extensional_eq _ id);[resolve_next_state;simpl;auto|].
-      erewrite <-next_state_option_id_eq. iModIntro. iFrame.
-    - iApply (transmap_insert_extensional_eq _ id);[resolve_next_state;simpl;auto|].
-      erewrite <-next_state_option_id_eq. iModIntro. iFrame.
   Qed.
 
   Lemma wp_heap_store K E e l δ v Φ `{!IntoVal (n,e) (n,v)} :
     permanent v ->
     heap_tag δ ->
-    ▷ (l ↦ v -∗ ⚡={next_state_option Ω None}=> WP fill K (n,lang.Unit) @ E {{ Φ }})
+    ▷ (l ↦ v -∗ WP fill K (n,lang.Unit) @ E {{ Φ }})
       ∗ ▷ l ↦ -
       ⊢ WP fill K (n,Store (Loc δ l) e) @ E {{ Φ }}.
   Proof.
@@ -729,23 +677,18 @@ Section lifting.
     { iPureIntro. exists NormalMode. do 5 econstructor;[constructor|].
       simpl. constructor;auto. }
     iNext. iIntros (rm r0 σ2 efs Hstep) "Hp".
-    inv_head_step.
+    resolve_next_state.
     2: { inversion Hδ. }
     iMod "Hcls".
     iMod (gen_heap_update _ _ _ v0 with "Hh Hl") as "[Hh Hl]".
     iDestruct ("HΦ" with "Hl") as "Hwp".
     iModIntro. iFrame.
-    iSplitR "Hwp".
-    - iApply (transmap_insert_extensional_eq _ id);[resolve_next_state;simpl;auto|].
-      erewrite <-next_state_option_id_eq. iModIntro. iFrame.
-    - iApply (transmap_insert_extensional_eq _ id);[resolve_next_state;simpl;auto|].
-      erewrite <-next_state_option_id_eq. iModIntro. iFrame.
   Qed.
 
   Lemma wp_stack_store K E e l j v v' w Φ `{!IntoVal (n,e) (n,v)} :
     scope v j ->
     shift_val v (Z.abs_nat j) = v' ->
-    ▷ ([size] n ∗ (n - 1 - Z.abs_nat j) @@ l ↦ v -∗ ⚡={next_state_option Ω None}=> WP fill K (n,lang.Unit) @ E {{ Φ }})
+    ▷ ([size] n ∗ (n - 1 - Z.abs_nat j) @@ l ↦ v -∗ WP fill K (n,lang.Unit) @ E {{ Φ }})
       ∗ ▷ (n - 1 - Z.abs_nat j) @@ l ↦ w
       ∗ ▷ [size] n
       ⊢ WP fill K (n,Store (Loc (local j) l) e) @ E {{ Φ }}.
@@ -763,17 +706,12 @@ Section lifting.
     { iPureIntro. exists NormalMode. do 5 econstructor;[constructor|].
       simpl. eapply StoreStackS;eauto. }
     iNext. iIntros (rm r0 σ2 efs Hstep) "Hp".
-    inv_head_step. inversion H13.
+    resolve_next_state. inversion H13.
     iMod "Hcls". 
     iMod (gen_stack_update _ _ _ _ _ v0 with "Hl Hs") as "[Hl Hs]";eauto.
     rewrite /insert /insert_state_Insert /insert_state /insert_stack /= Hs0.
     iModIntro. iDestruct ("HΦ" with "[$]") as "Hwp".
-    iFrame.
-    iSplitR "Hwp".
-    - iApply (transmap_insert_extensional_eq _ id);[resolve_next_state;simpl;auto|].
-      erewrite <-next_state_option_id_eq. iModIntro. iFrame. rewrite insert_length. iFrame.
-    - iApply (transmap_insert_extensional_eq _ id);[resolve_next_state;simpl;auto|].
-      erewrite <-next_state_option_id_eq. iModIntro. iFrame.
+    rewrite insert_length. iFrame.
   Qed.
 
   (** ------------------------------------------------------------ *)
@@ -783,50 +721,44 @@ Section lifting.
   (** Control flow -- stateful due to stack frames *)
   Lemma wp_call_global K E n k x e1 e2 v2' v2 Φ `{!IntoVal (n,e2) (n,v2)} :
     shift_val v2 (-1) = v2' ->
-    ▷ ([size] (S n) -∗ ⚡={next_state_option Ω None}=> WP fill K (S n,Return (Cont (-1) K) (subst' k (ContV (-1) K) (subst' x v2' e1))) @ E {{ Φ }})
+    ▷ ([size] (S n) -∗ WP fill K (S n,Return (Cont (-1) K) (subst' k (ContV (-1) K) (subst' x v2' e1))) @ E {{ Φ }})
       ∗ ▷ [size] n
       ⊢ WP fill K (n,Call (Lam global k x e1) e2) @ E {{ Φ }}.
   Proof.
     iIntros (Hshift) "[HΦ >Hs]".
     iApply wp_lift_nonthrow_head_step; auto.
-    iIntros ([h1 s1] ns κ κs nt) "(Hh & Hstk & Hsize) /=".
+    iIntros ([h1 s1] ns κ κs nt) "(Hh & Hstk & Hsize)".
     iDestruct (stacksize_own_agree with "[$]") as %Heq;subst.
     iMod (stacksize_own_update (S (length s1)) with "[$]") as "[Hsize Hs]".
     iApply fupd_mask_intro;[set_solver|]. iIntros "Hcls".
     iSplit. { iPureIntro. exists CaptureMode. repeat econstructor; eauto. }
     iNext. iIntros (rm r0 σ2 efs Hstep) "Hp".
-    inv_head_step. iMod "Hcls". iModIntro.
+    resolve_next_state. iMod "Hcls". iModIntro.
     rewrite /gen_stack_interp.
     rewrite list_to_gmap_stack_push_stack push_stack_length.
-    iFrame.
-    iSplitR "HΦ Hs".
-    all: iApply (transmap_insert_extensional_eq _ id);[resolve_next_state;simpl;auto|].
-    all: erewrite <-next_state_option_id_eq. iModIntro. iFrame.
-    rewrite PeanoNat.Nat.add_1_r. iApply "HΦ". iFrame.
+    rewrite PeanoNat.Nat.add_1_r. iFrame.
+    by iApply "HΦ".
   Qed.
 
   Lemma wp_call_local K E n (i : Z) k x e1 e2 e1' v2' v2 Φ `{!IntoVal (n,e2) (n,v2)} :
     scope_tag (local i) ->
     shift_expr e1 (i - 1) = e1' ->
     shift_val v2 (-1) = v2' ->
-    ▷ ([size] (S n) -∗ ⚡={next_state_option Ω None}=> WP fill K (S n, Return (Cont (-1) K) (subst' k (ContV (-1) K) (subst' x v2' e1'))) @ E {{ Φ }})
+    ▷ ([size] (S n) -∗ WP fill K (S n, Return (Cont (-1) K) (subst' k (ContV (-1) K) (subst' x v2' e1'))) @ E {{ Φ }})
       ∗ ▷ [size] n
       ⊢ WP fill K (n, Call (Lam (local i) k x e1) e2) @ E {{ Φ }}.
   Proof.
     iIntros (Hscope Hshift1 Hshift2) "[HΦ >Hs]".
     iApply wp_lift_nonthrow_head_step; auto.
-    iIntros ([h1 s1] ns κ κs nt) "(Hh & Hstk & Hsize) /=".
+    iIntros ([h1 s1] ns κ κs nt) "(Hh & Hstk & Hsize)".
     iDestruct (stacksize_own_agree with "[$]") as %Heq;subst.
     iMod (stacksize_own_update (S (length s1)) with "[$]") as "[Hsize Hs]".
     iApply fupd_mask_intro;[set_solver|]. iIntros "Hcls".
     iSplit. { iPureIntro. exists CaptureMode. repeat econstructor; eauto. inversion Hscope;subst;auto. }
     iNext. iIntros (rm r0 σ2 efs Hstep) "Hp".
-    inv_head_step. iMod "Hcls". iModIntro.
+    resolve_next_state. iMod "Hcls". iModIntro.
     rewrite /gen_stack_interp list_to_gmap_stack_push_stack push_stack_length. iFrame.
-    iSplitR "HΦ Hs".
-    all: iApply (transmap_insert_extensional_eq _ id);[resolve_next_state;simpl;auto|].
-    all: erewrite <-next_state_option_id_eq. iModIntro. iFrame.
-    rewrite PeanoNat.Nat.add_1_r. iApply "HΦ". iFrame.
+    rewrite PeanoNat.Nat.add_1_r. by iApply "HΦ".
   Qed.
 
   Lemma wp_return K K' E n i e v Φ `{!IntoVal (n,e) v} :
@@ -846,7 +778,7 @@ Section lifting.
     iSplit.
     { iPureIntro. inv_head_step. repeat econstructor;eauto. }
     iNext. iIntros (r0 σ2 efs Hstep) "Hp".
-    inv_head_step. iMod "Hcls". rewrite H1.
+    resolve_next_state. iMod "Hcls". rewrite H1.
     iDestruct "Hstate" as "(Hh & Hs & Hsize)".
     iDestruct (gen_stack_interp_stack_pop with "Hs") as "Hs";[eauto|].
     iDestruct (gen_heap_interp_stack_pop _ (Some (length s1 - Z.abs_nat i)) with "Hh") as "Hh".
@@ -855,12 +787,12 @@ Section lifting.
     iModIntro.
     iDestruct ("HΦ" with "Hn") as "Hwp". iFrame.
     iSplitR "Hwp".
-    - iApply transmap_insert_extensional_eq;[resolve_next_state|].
-      erewrite <- next_state_option_some_eq.
-      iModIntro. iFrame. rewrite popN_stack_length. iFrame.
-    - iApply transmap_insert_extensional_eq;[resolve_next_state|].
-      rewrite /CC_ectxi_language.fill /= fill_proj_eq.
-      erewrite <- next_state_option_some_eq. iFrame.
+    - erewrite <- next_state_option_some_eq.
+      rewrite popN_stack_length.
+      iModIntro. iFrame.
+    - erewrite <- next_state_option_some_eq.
+      iModIntro. rewrite /CC_ectxi_language.fill /= fill_proj_eq.
+      iFrame.
   Qed.
 
 

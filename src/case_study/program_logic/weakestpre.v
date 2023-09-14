@@ -7,7 +7,7 @@ From iris.bi Require Export weakestpre.
 From iris.prelude Require Import options.
 From nextgen.lib Require Export fancy_updates.
 Import uPred.
-From nextgen Require Export utils nextgen_persistently nextgen_basic nextgen_pointwise.
+From nextgen Require Export utils nextgen_soundness nextgen_persistently nextgen_basic nextgen_pointwise.
 
 Class irisGS_gen (hlc : has_lc) (Λ : language) (Σ : gFunctors) (Ω : gTransformations Σ) (A : cmra) := IrisG {
   iris_invGS :> invGIndS_gen hlc Σ Ω;
@@ -27,9 +27,9 @@ Class irisGS_gen (hlc : has_lc) (Λ : language) (Σ : gFunctors) (Ω : gTransfor
   keep track of resources precisely, as in e.g. Iron. *)
   fork_post : val Λ → iProp Σ;
 
-  (* A : Type;  *)(* a_inhabited : Inhabited A; *)
-  next_state : expr Λ -> A -> A;
-  (* next_a : expr Λ -> A -> A; *)
+  B : Type; (* a_inhabited : Inhabited A; *)
+  next_state : B -> A -> A;
+  next_choose : expr Λ -> option B;
   next_state_GenTrans :> forall e, (CmraMorphism (next_state e));
   (* next_state_contractive : forall (a : A) (x : iResUR Σ) (n : nat), next_state a x ≼{n} x; *)
   (* next_state_compose : ∀ a b : A, ∃ c : A, next_state a ∘ next_state b = next_state c;           *)
@@ -64,6 +64,13 @@ Global Arguments IrisG {hlc Λ Σ}.
 
 Notation irisGS := (irisGS_gen HasNoLc).
 
+Class SameGeneration `{irisgen : irisGS_gen hlc Λ Σ Ω A} (e : expr Λ) : Prop :=
+  same_generation : next_choose e = None.
+
+Notation "?={ Ω <- e }=> P" := (@bnextgen_option _ Ω _ _ _ _ next_choose next_state _ e P)
+                            (at level 99, Ω at level 50, e at level 50, P at level 200, format "?={ Ω  <-  e }=>  P") : bi_scope.
+
+  
 (** The predicate we take the fixpoint of in order to define the WP. *)
 (** In the step case, we both provide [S (num_laters_per_step ns)]
   later credits, as well as an iterated update modality that allows
@@ -88,8 +95,8 @@ Definition wp_pre `{!irisGS_gen hlc Λ Σ Ω A} (s : stuckness)
        ∀ e2 σ2 efs, ⌜prim_step e1 σ1 κ e2 σ2 efs⌝ -∗
          £ (S (num_laters_per_step ns))
          ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-        (⚡={transmap_insert_inG (next_state e1) Ω}=> state_interp σ2 (S ns) κs (length efs + nt)) ∗
-         (⚡={transmap_insert_inG (next_state e1) Ω}=> wp E e2 Φ) ∗
+        (?={Ω <- e1}=> state_interp σ2 (S ns) κs (length efs + nt)) ∗
+         (?={Ω <- e1}=> wp E e2 Φ) ∗
          [∗ list] i ↦ ef ∈ efs, wp ⊤ ef fork_post
   end)%I.
 
@@ -100,7 +107,7 @@ Proof.
   (* FIXME : simplify this proof once we have a good definition and a
      proper instance for step_fupdN. *)
   induction num_laters_per_step as [|k IH]; simpl.
-  - repeat (apply nextgen_basic.bnextgen_ne || f_contractive || f_equiv); apply Hwp.
+  - unfold bnextgen_option. case_match; repeat (apply nextgen_basic.bnextgen_ne || f_contractive || f_equiv); apply Hwp.
   - by rewrite -IH.
 Qed.
 
@@ -137,8 +144,10 @@ Proof.
   (* FIXME : simplify this proof once we have a good definition and a
      proper instance for step_fupdN. *)
   induction num_laters_per_step as [|k IHk]; simpl; last by rewrite IHk.
-  do 4
-    (apply nextgen_basic.bnextgen_ne || f_contractive || f_equiv). rewrite IH; [done|lia|]. intros v. eapply dist_le; [apply HΦ|lia].
+  unfold bnextgen_option. case_match;
+    [do 4 (apply nextgen_basic.bnextgen_ne || f_contractive || f_equiv)
+    | do 3 (f_contractive || f_equiv)].
+  all: rewrite IH; [done|lia|]; intros v'; eapply dist_le; [apply HΦ|lia].
 Qed.
 Global Instance wp_proper s E e :
   Proper (pointwise_relation _ (≡) ==> (≡)) (wp (PROP:=iProp Σ) s E e).
@@ -154,7 +163,8 @@ Proof.
   (* FIXME : simplify this proof once we have a good definition and a
      proper instance for step_fupdN. *)
   induction num_laters_per_step as [|k IHk]; simpl; last by rewrite IHk.
-  do 3 f_equiv. apply nextgen_basic.bnextgen_ne. do 2 f_equiv. auto.
+  do 3 f_equiv. unfold bnextgen_option.
+  case_match;[apply bnextgen_ne|]; do 2 f_equiv;auto.
 Qed.
 
 Lemma wp_value_fupd' s E Φ v : WP of_val v @ s; E {{ Φ }} ⊣⊢ |={E}=> Φ v.
@@ -178,9 +188,10 @@ Proof.
   iMod ("H" with "[//] Hcred") as "H". iIntros "!> !>".  iMod "H". iModIntro.
   iApply (step_fupdN_wand with "[H]"); first by iApply "H".
   iIntros ">($ & H & Hefs)". iMod "Hclose" as "_". iModIntro. iSplitR "Hefs".
-  - iModIntro. iApply ("IH" $! e2 with "[//] H"). auto.
+  - unfold bnextgen_option. destruct (next_choose e);[iModIntro|];
+    iApply ("IH" $! e2 with "[//] H"); auto.
   - iApply (big_sepL_impl with "Hefs"); iIntros "!>" (k ef _).
-    iIntros "H". (* iModIntro.  *)iApply ("IH" with "[] H"); auto.
+    iIntros "H". (* iModIntro.  *) iApply ("IH" with "[] H"); auto.
 Qed.
 
 (* ALTERNATIVE: TODO => discuss *)
@@ -220,20 +231,27 @@ Qed.
 Lemma wp_fupd s E e Φ : WP e @ s; E {{ v, |={E}=> Φ v }} ⊢ WP e @ s; E {{ Φ }}.
 Proof. iIntros "H". iApply (wp_strong_mono s s E with "H"); auto. Qed.
 
-Lemma wp_atomic E1 E2 e Φ `{!Atomic StronglyAtomic e} :
-  (|={E1,E2}=> WP e @ E2 {{ v, |={E2,E1}=> Φ v }}) ⊢ WP e @ E1 {{ Φ }}.
+Lemma wp_atomic s E1 E2 e Φ `{!Atomic (stuckness_to_atomicity s) e} `{!SameGeneration e} :
+  (|={E1,E2}=> WP e @ s; E2 {{ v, |={E2,E1}=> Φ v }}) ⊢ WP e @ s; E1 {{ Φ }}.
 Proof.
-  iIntros "H". rewrite !wp_unfold /wp_pre.
+  iIntros "H".
+  rewrite !wp_unfold /wp_pre.
   destruct (to_val e) as [v|] eqn:He.
   { by iDestruct "H" as ">>> $". }
   iIntros (σ1 ns κ κs nt) "Hσ". iMod "H". iMod ("H" $! σ1 with "Hσ") as "[$ H]".
   iModIntro. iIntros (e2 σ2 efs Hstep) "Hcred".
   iApply (step_fupdN_wand with "(H [//] Hcred)").
-  iIntros ">(Hσ & H & Hefs)".
-  apply atomic in Hstep as [v Hv]. iFrame.
-  (* rewrite wp_unfold /wp_pre Hv. iFrame. simpl. *)
-  
-  Abort. (* TODO: define a new fancy update modality that can commute with the general update modality *)
+  iIntros ">(Hσ & H & Hefs)". destruct s.
+  - rewrite /bnextgen_option SameGeneration0.
+    rewrite !wp_unfold /wp_pre. destruct (to_val e2) as [v2|] eqn:He2.
+    + iDestruct "H" as ">> $". by iFrame.
+    + iMod ("H" $! _ _ [] with "[$]") as "[H _]". iDestruct "H" as %(? & ? & ? & ? & ?).
+      by edestruct (atomic _ _ _ _ _ Hstep).
+  - rewrite /bnextgen_option SameGeneration0.
+    destruct (atomic _ _ _ _ _ Hstep) as [v <-%of_to_val].
+    rewrite wp_value_fupd'. iMod "H" as ">H".
+    iModIntro. iFrame "Hσ Hefs". by iApply wp_value_fupd'.
+Qed.
 
 (** This lemma gives us access to the later credits that are generated in each step,
   assuming that we have instantiated [num_laters_per_step] with a non-trivial (e.g. linear)
@@ -255,8 +273,8 @@ Lemma wp_credit_access s E e Φ P :
   (∀ m k, num_laters_per_step m + num_laters_per_step k ≤ num_laters_per_step (m + k)) →
   (∀ σ1 ns κs nt, (state_interp σ1 ns κs nt) ={E}=∗
     ∃ k m, (state_interp σ1 m κs nt) ∗ ⌜ns = (m + k)%nat⌝ ∗
-    (∀ nt σ2 κs, £ (num_laters_per_step k) -∗ (⚡={transmap_insert_inG (next_state e) Ω}=> state_interp σ2 (S m) κs nt) ={E}=∗
-      (⚡={transmap_insert_inG (next_state e) Ω}=> state_interp σ2 (S ns) κs nt) ∗ ■ P)) -∗
+    (∀ nt σ2 κs, £ (num_laters_per_step k) -∗ (?={Ω <- e}=> state_interp σ2 (S m) κs nt) ={E}=∗
+      (?={Ω <- e}=> state_interp σ2 (S ns) κs nt) ∗ ■ P)) -∗
   WP e @ s; E {{ v, P ={E}=∗ Φ v }} -∗
   WP e @ s; E {{ Φ }}.
 Proof.
@@ -274,10 +292,10 @@ Proof.
   { etrans; last apply Htri. lia. }
   iApply (step_fupdN_wand with "Hwp"). iIntros ">(SI & Hwp & $)".
   iMod ("Hpost" with "Hk SI") as "[$ #HP]". iModIntro.
-  iModIntro.
-  iApply (wp_strong_mono with "Hwp"); [by auto..|].
-  iModIntro.
-  iIntros (v) "HΦ". iApply ("HΦ" with "HP").
+  unfold bnextgen_option;case_match;[iModIntro|].
+  all: iApply (wp_strong_mono with "Hwp"); [by auto..|].
+  all: iModIntro.
+  all: iIntros (v) "HΦ"; iApply ("HΦ" with "HP").
 Qed.
 
 (** In this stronger version of [wp_step_fupdN], the masks in the
@@ -317,16 +335,17 @@ Proof.
   iInduction n as [|n] "IH" forall (n0 Hn).
   - iApply (step_fupdN_wand with "H"). iIntros ">($ & Hwp & $)". iMod "HP".
     iModIntro.
-    iModIntro.
-    iApply (wp_strong_mono with "Hwp");auto. iDestruct "HP" as "#HP". iModIntro.
-    iIntros (v) "HΦ". iApply ("HΦ" with "HP").
+    unfold bnextgen_option;case_match;[iModIntro|].
+    all: iApply (wp_strong_mono with "Hwp");auto; iDestruct "HP" as "#HP"; iModIntro.
+    all: iIntros (v) "HΦ".
+    all: iApply ("HΦ" with "HP").
   - destruct n0 as [|n0]; [lia|]=>/=. iMod "HP". iMod "H". iIntros "!> !>".
     iMod "HP". iMod "H". iModIntro. iApply ("IH" with "[] HP H").
     auto with lia.
 Qed.
 
 Lemma wp_bind K `{!LanguageCtx K} s E e Φ :
-  (forall e, to_val e = None -> next_state (K e) = next_state e) ->
+  (forall e, to_val e = None -> next_choose (K e) = next_choose e) ->
   WP e @ s; E {{ v, WP K (of_val v) @ s; E {{ Φ }} }} ⊢ WP K e @ s; E {{ Φ }}.
 Proof.
   intros next_state_ctx.
@@ -345,15 +364,12 @@ Proof.
   iMod ("H" $! e2' σ2 efs with "[//] Hcred") as "H". iIntros "!>!>".
   iMod "H". iModIntro. iApply (step_fupdN_wand with "H"). iIntros "H".
   iMod "H" as "(HH & H & Htp)". iModIntro.
-  iSplitL "HH";[|iSplitR "Htp"].
-  1,2: iApply transmap_insert_extensional_eq;[rewrite (next_state_ctx);eauto|].
-  1: iFrame. 2: iApply (big_sepL_mono with "Htp");intros;auto.
-  Unshelve. 2: apply next_state_GenTrans. iModIntro.
-  by iApply "IH".
+  unfold bnextgen_option. rewrite next_state_ctx//.
+  iFrame. destruct (next_choose e);[iModIntro|];by iApply "IH".
 Qed.
 
 Lemma wp_bind_inv K `{!LanguageCtx K} s E e Φ :
-  (forall e, to_val e = None -> next_state (K e) = next_state e) ->
+  (forall e, to_val e = None -> next_choose (K e) = next_choose e) ->
   WP K e @ s; E {{ Φ }} ⊢ WP e @ s; E {{ v, WP K (of_val v) @ s; E {{ Φ }} }}.
 Proof.
   intros next_state_ctx. iRevert (E e Φ).
@@ -370,11 +386,8 @@ Proof.
   iMod ("H" $! _ _ _ with "[] Hcred") as "H"; first eauto using fill_step.
   iIntros "!> !>". iMod "H". iModIntro. iApply (step_fupdN_wand with "H").
   iIntros "H". iMod "H" as "(HH & H & Htp)". iModIntro.
-  iSplitL "HH";[|iSplitR "Htp"].
-  1,2: iApply transmap_insert_extensional_eq;[erewrite <-(next_state_ctx);eauto|].
-  1: iFrame. 2: iApply (big_sepL_mono with "Htp");intros;auto.
-  Unshelve. 2: apply next_state_GenTrans. iModIntro.
-  by iApply "IH".
+  unfold bnextgen_option. rewrite next_state_ctx//.
+  iFrame. destruct (next_choose e);[iModIntro|];by iApply "IH".
 Qed.
 
 (** * Derived rules *)
@@ -518,7 +531,7 @@ Section proofmode_classes.
   Qed.
 
   (* Global Instance elim_modal_fupd_wp_atomic p s E1 E2 e P Φ : *)
-  (*   ElimModal (Atomic (stuckness_to_atomicity s.1) e) p false *)
+  (*   ElimModal (Atomic (stuckness_to_atomicity s) e) p false *)
   (*           (|={E1,E2}=> P) P *)
   (*           (WP e @ s; E1 {{ Φ }}) (WP e @ s; E2 {{ v, |={E2,E1}=> Φ v }})%I | 100. *)
   (* Proof. *)
@@ -533,10 +546,16 @@ Section proofmode_classes.
   (* Global Instance elim_acc_wp_atomic {X} E1 E2 α β γ e s Φ : *)
   (*   ElimAcc (X:=X) (Atomic (stuckness_to_atomicity s) e) *)
   (*           (fupd E1 E2) (fupd E2 E1) *)
-  (*           α β γ (WP e @ s.1; E1 {{ Φ }}) *)
-  (*           (λ x, WP e @ s.1; E2 {{ v, |={E2}=> β x ∗ (γ x -∗? Φ v) }})%I | 100. *)
+  (*           α β γ (WP e @ s; E1 {{ Φ }}) *)
+  (*           (λ x, WP e @ s; E2 {{ v, |={E2}=> β x ∗ (γ x -∗? Φ v) }})%I | 100. *)
   (* Proof. *)
-  (*   iIntros (?) "Hinner >Hacc". iDestruct "Hacc" as (x) "[Hα Hclose]". *)
+  (*   iIntros (?) "Hinner Hacc". unfold accessor. *)
+  (*   iApply (wp_atomic _ _ E2). *)
+  (*   iMod "Hacc". iDestruct "Hacc" as (x) "[Hα Hclose]". *)
+  (*   iApply (wp_wand with "(Hinner Hα)"). *)
+    
+  (*   iIntros (v) ">[Hβ HΦ]". iApply "HΦ". by iApply "Hclose". *)
+  (*   rewrite -wp_atomic. iDestruct "Hacc" as (x) "[Hα Hclose]". *)
   (*   iApply (wp_wand with "(Hinner Hα)"). *)
   (*   iIntros (v) ">[Hβ HΦ]". iApply "HΦ". by iApply "Hclose". *)
   (* Qed. *)

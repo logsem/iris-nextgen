@@ -256,15 +256,24 @@ Local Notation "⚡={ M }=> P" := (nextgen_omega M P)
   (at level 99, M at level 50, P at level 200, format "⚡={ M }=>  P") : bi_scope.
 
 Section bnextgen_pred_imod.
-  Context {Σ : gFunctors} {Ω : gTransformations Σ} {A : Type} `{!noTransInG Σ Ω C} (f : A -> C → C) `{!forall a, CmraMorphism (f a)} {num_laters_per_step : nat -> nat}
-  `{!invGIndS_gen hlc Σ Ω}.
+  Context {Σ : gFunctors} {Ω : gTransformations Σ} {A : Type} `{!noTransInG Σ Ω C}
+    {B : Type} (f : A -> option B) (g : B -> (C → C)) `{!forall a, CmraMorphism (g a)} {num_laters_per_step : nat -> nat}
+    `{!invGIndS_gen hlc Σ Ω}.
 
+  Definition bnextgen_option (a : A) (P : iProp Σ) : iProp Σ :=
+    match f a with
+    | Some b => ⚡={transmap_insert_inG (g b) Ω}=> P
+    | None => P
+    end.
+
+  Notation "?={ e }=> P" := (bnextgen_option e P)
+                              (at level 99, e at level 50, P at level 200, format "?={ e }=>  P") : bi_scope.
   
   Fixpoint bnextgen_repeat_n
     (l : list A) (P : iProp Σ) : iProp Σ :=
     match l with
     | [] => P
-    | a :: l' => ⚡={transmap_insert_inG (f a) Ω}=> (bnextgen_repeat_n l' P)
+    | a :: l' => ?={a}=> (bnextgen_repeat_n l' P)
     end.
   
   Fixpoint bnextgen_n
@@ -272,7 +281,7 @@ Section bnextgen_pred_imod.
     match l with
     | [] => P
     | a :: l' => |={⊤,∅}=> |={∅}▷=>^(S $ num_laters_per_step start) |={∅,⊤}=>
-        ⚡={transmap_insert_inG (f a) Ω}=> (bnextgen_n l' (S start) P)
+        ?={a}=> (bnextgen_n l' (S start) P)
     end.
   
   Fixpoint bnextgen_n_open
@@ -280,7 +289,7 @@ Section bnextgen_pred_imod.
     match l with
     | [] =>  P
     | a :: l' => |={∅}▷=>^(S $ num_laters_per_step start)
-                          ⚡={transmap_insert_inG (f a) Ω}=> (bnextgen_n_open l' (S start) P)
+                          ?={a}=> (bnextgen_n_open l' (S start) P)
     end.
 
   Notation "⚡={[ l ]}=> P" := (bnextgen_repeat_n l P)
@@ -300,7 +309,9 @@ Section bnextgen_pred_imod.
     iIntros "H". simpl.
     iMod "H". iModIntro.
     iApply (step_fupdN_mono with "H"). iIntros "H".
-    iMod "H". iModIntro. iApply (bnextgen_mono with "H"). iApply IHl.
+    iMod "H". iModIntro.
+    unfold bnextgen_option. case_match;
+      [iApply (bnextgen_mono with "H")|]; by iApply IHl.
   Qed.
 
   Lemma bnextgen_n_open_mono P Q l n :
@@ -310,7 +321,8 @@ Section bnextgen_pred_imod.
     iIntros "H". simpl.
     iMod "H". iModIntro.
     iApply (step_fupdN_mono with "H"). iIntros "H".
-    iModIntro. iApply IHl. auto.
+    unfold bnextgen_option. case_match;
+      [iApply (bnextgen_mono with "H")|]; by iApply IHl.
   Qed.
 
   Global Instance bnextgen_n_mono' l n :
@@ -324,45 +336,49 @@ Section bnextgen_pred_imod.
   Global Instance nextgen_n_ne l n : NonExpansive (bnextgen_n l n).
   Proof.
     revert n; induction l =>n;simpl;auto;try apply _.
-    (* { apply fupd_ne. } *)
     intros x P Q Hne.
-    destruct H with a. simpl in *.
     apply fupd_ne.
     apply fupd_ne,later_ne, fupd_ne.
     apply step_fupdN_ne. apply fupd_ne.
-    apply bnextgen_ne.  apply IHl. auto.
+    unfold bnextgen_option. case_match.
+    - apply bnextgen_ne. apply IHl. auto.
+    - apply IHl. auto.
   Qed.
 
   Global Instance bnextgen_n_proper l n :
     Proper ((≡) ==> (≡)) (bnextgen_n l n) := ne_proper _.
 
   Lemma bnextgen_n_open_snoc l x n P :
-    (⚡={[(l ++ [x])]}▷=>>^(n) P) ⊣⊢ ⚡={[l]}▷=>>^(n) (|={∅}▷=> |={∅}▷=>^(num_laters_per_step (n + length l)) ⚡={transmap_insert_inG (f x) Ω}=> P).
+    (⚡={[(l ++ [x])]}▷=>>^(n) P) ⊣⊢ ⚡={[l]}▷=>>^(n) (|={∅}▷=> |={∅}▷=>^(num_laters_per_step (n + length l)) ?={x}=> P).
   Proof.
     revert n; induction l => n.
     - simpl. iSplit; iIntros "H"; rewrite Nat.add_0_r; auto.
     - simpl. iSplit;iIntros ">H".
       all: iModIntro.
       all: iApply (step_fupdN_mono with "H"); iIntros "H".
-      all: iApply (bnextgen_mono with "H"); iIntros "H".
-      + iDestruct (IHl with "H") as "H".
-        rewrite Nat.add_succ_r. iFrame.
-      + iApply IHl. rewrite Nat.add_succ_r. iFrame.
+      + rewrite {1}/bnextgen_option {1}/bnextgen_option;case_match.
+        1: iApply (bnextgen_mono with "H"); iIntros "H".
+        all: rewrite -PeanoNat.Nat.add_succ_comm; iApply IHl; iFrame.
+      + rewrite {1}/bnextgen_option {3}/bnextgen_option;case_match.
+        1: iApply (bnextgen_mono with "H"); iIntros "H".
+        all: rewrite -PeanoNat.Nat.add_succ_comm; iApply IHl; iFrame.
   Qed.
 
   Lemma bnextgen_n_snoc l x n P :
-    (⚡={[(l ++ [x])]}▷=>^(n) P) ⊣⊢ ⚡={[l]}▷=>^(n) (|={⊤,∅}=> |={∅}▷=> |={∅}▷=>^(num_laters_per_step (n + length l)) |={∅,⊤}=> ⚡={transmap_insert_inG (f x) Ω}=> P).
+    (⚡={[(l ++ [x])]}▷=>^(n) P) ⊣⊢ ⚡={[l]}▷=>^(n) (|={⊤,∅}=> |={∅}▷=> |={∅}▷=>^(num_laters_per_step (n + length l)) |={∅,⊤}=> ?={x}=> P).
   Proof.
     revert n; induction l => n.
-    - simpl. iSplit; iIntros "H"; rewrite Nat.add_0_r; auto. (* rewrite fupd_trans. auto. *)
+    - simpl. iSplit; iIntros "H"; rewrite Nat.add_0_r; auto.
     - simpl. iSplit;iIntros ">H".
       all: iModIntro.
       all: iApply (step_fupdN_mono with "H"); iIntros "H".
-      all: iApply (bnextgen_mono with "H"); iIntros "H".
-      + iDestruct (IHl with "H") as "H".
-        rewrite Nat.add_succ_r. iFrame.
-      + iApply IHl. rewrite Nat.add_succ_r. iFrame.
-  Qed. 
+      + rewrite {1}/bnextgen_option {1}/bnextgen_option;case_match.
+        1: iApply (bnextgen_mono with "H"); iIntros "H".
+        all: rewrite -PeanoNat.Nat.add_succ_comm; iApply IHl; iFrame.
+      + rewrite {1}/bnextgen_option {3}/bnextgen_option;case_match.
+        1: iApply (bnextgen_mono with "H"); iIntros "H".
+        all: rewrite -PeanoNat.Nat.add_succ_comm; iApply IHl; iFrame.
+  Qed.
   
   Lemma bnextgen_n_sep l n P Q :
     (⚡={[ l ]}▷=>>^(n) P) ∗ (⚡={[ l ]}▷=>^(n) Q) -∗ ⚡={[ l ]}▷=>^(n) P ∗ Q.
@@ -375,8 +391,9 @@ Section bnextgen_pred_imod.
       { simpl. iFrame. }
       iApply (step_fupdN_wand with "H").
       iIntros "[H1 H2]".
-      iMod "H1". iModIntro. iModIntro. iApply IHl.
-      iFrame.
+      iMod "H1". iModIntro.
+      unfold bnextgen_option;case_match.
+      1: iModIntro. all: iApply IHl;iFrame.
   Qed.
 
   Lemma bnextgen_n_sep_nextgen l n P Q :
@@ -388,8 +405,9 @@ Section bnextgen_pred_imod.
       iMod "H2". iModIntro.
       iApply (step_fupdN_wand with "H2").
       iNext. iIntros "H2".
-      iMod "H2". iModIntro. iModIntro. iApply IHl.
-      iFrame.
+      iMod "H2". iModIntro.
+      unfold bnextgen_option;case_match.
+      1: iModIntro. all: iApply IHl;iFrame.
   Qed.
 
   Lemma bnextgen_n_open_emp_intro P l n :
@@ -399,8 +417,9 @@ Section bnextgen_pred_imod.
     revert n; induction l =>n;simpl;auto.
     iApply step_fupdN_intro;auto.
     iModIntro. iNext. iModIntro.
-    iNext. iModIntro. iStopProof;eauto.
-    apply IHl.
+    iNext. unfold bnextgen_option;case_match;[iModIntro|].
+    all: iStopProof;eauto.
+    all: apply IHl.
   Qed.
 
   Lemma bnextgen_n_emp_intro P l n :
@@ -411,8 +430,10 @@ Section bnextgen_pred_imod.
     iApply step_fupdN_intro;auto.
     iApply fupd_mask_intro;auto. iIntros "Hcls".
     iModIntro. iNext. iModIntro.
-    iNext. iMod "Hcls". iModIntro. iModIntro. iStopProof;eauto.
-    apply IHl.
+    iNext. iMod "Hcls". iModIntro.
+    unfold bnextgen_option;case_match;[iModIntro|].
+    all: iStopProof;eauto.
+    all: apply IHl.
   Qed.
 
   Lemma bnextgen_repeat_n_emp_intro P l :
@@ -420,7 +441,8 @@ Section bnextgen_pred_imod.
   Proof.
     intros HP.
     induction l;simpl;auto.
-    iModIntro. auto.
+    unfold bnextgen_option;case_match;[iModIntro|].
+    all: auto.
   Qed.
     
 End bnextgen_pred_imod.
@@ -457,13 +479,16 @@ Fixpoint steps_sum (num_laters_per_step : nat → nat) (start ns : nat) : nat :=
   end.
 
 Section bnextgen_n_open_soundness.
-  Context {A : Type} {Σ : gFunctors} {Ω : gTransformations Σ} `{!noTransInG Σ Ω C} (f : A -> C → C) `{!forall (a : A), CmraMorphism (f a)}
+  Context {A : Type} {Σ : gFunctors} {Ω : gTransformations Σ} `{!noTransInG Σ Ω C} {B : Type} (f : A -> option B) (g : B -> C → C) `{!forall (a : B), CmraMorphism (g a)}
     {num_laters_per_step : nat -> nat}.
-
-  Notation "⚡={[ l ]}▷=>^ ( n ) P" := (@bnextgen_n _ _ _ _ _ f _ num_laters_per_step _ _ l n P)
+  
+  Notation "?={ e }=> P" := (@bnextgen_option _ _ _ _ _ _ f g _ e P)
+                              (at level 99, e at level 50, P at level 200, format "?={ e }=>  P") : bi_scope.
+  
+  Notation "⚡={[ l ]}▷=>^ ( n ) P" := (@bnextgen_n _ _ _ _ _ _ f g _ num_laters_per_step _ _ l n P)
          (at level 99, l at level 50, n at level 50, P at level 200, format "⚡={[ l ]}▷=>^ ( n )  P") : bi_scope.
 
-  Notation "⚡={[ l ]}▷=>>^ ( n ) P" := (@bnextgen_n_open _ _ _ _ _ f _ num_laters_per_step _ _ l n P)
+  Notation "⚡={[ l ]}▷=>>^ ( n ) P" := (@bnextgen_n_open _ _ _ _ _ _ f g _ num_laters_per_step _ _ l n P)
          (at level 99, l at level 50, n at level 50, P at level 200, format "⚡={[ l ]}▷=>>^ ( n )  P") : bi_scope.
 
   Lemma step_fupdN_nextgen_open_soundness_no_lc (l : list A) :
@@ -481,7 +506,7 @@ Section bnextgen_n_open_soundness.
     - simpl. rewrite /= -Nat.add_succ_r.
       iDestruct "Hn" as "[Hone [Hm Hn]]".
       iDestruct (@fupd_unfold_implies Σ Ω Hws C noTransInG0 ω with "H") as "#H'".
-      iAssert (|={∅}▷=>^(S $ num_laters_per_step n) ⚡={transmap_insert_inG (f a) Ω}=> ⚡={[l]}▷=>>^(S n) P)%I with "HH" as "HH".
+      iAssert (|={∅}▷=>^(S $ num_laters_per_step n) ?={a}=> ⚡={[l]}▷=>>^(S n) P)%I with "HH" as "HH".
       iDestruct ("H'" with "HH Hω") as "HH".
       set (num:=S (num_laters_per_step (S n) + steps_sum num_laters_per_step (S (S n)) (length l))).
       rewrite -plus_Sn_m Nat.add_assoc.
@@ -494,12 +519,15 @@ Section bnextgen_n_open_soundness.
       { intros. iIntros "J H". iMod "H". iIntros "!>!>".
         iMod "H". iIntros "!>!>". iApply "J". iFrame. }
       iIntros "[Hω HP]".
-      iApply (transmap_plain (transmap_insert_inG (f a) Ω)).
-      iAssert (⚡={transmap_insert_inG (f a) Ω}=> ω ∅)%I with "[Hω]" as "HA1".
-      { iApply "Hintro". iFrame. }
-      iModIntro.
-      iDestruct (IHl with "[$H $HA1 $Hn $HP $Hintro]") as "HH".
-      rewrite /num. simpl. iNext. iApply (laterN_mono with "HH"). auto.
+      unfold bnextgen_option. destruct (f a).
+      + iApply (transmap_plain (transmap_insert_inG (g b) Ω)).
+        iAssert (⚡={transmap_insert_inG (g b) Ω}=> ω ∅)%I with "[Hω]" as "HA1".
+        { iApply "Hintro". iFrame. }
+        iModIntro.
+        iDestruct (IHl with "[$H $HA1 $Hn $HP $Hintro]") as "HH".
+        rewrite /num. simpl. iNext. iApply (laterN_mono with "HH"). auto.
+      + iDestruct (IHl with "[$H $Hω $Hn $HP $Hintro]") as "HH".
+        rewrite /num. simpl. iNext. iApply (laterN_mono with "HH"). auto.
   Qed.
 
 
@@ -523,7 +551,7 @@ Section bnextgen_n_open_soundness.
       iApply bupd_elim.
       iMod ("H" with "HH Hω") as "[>Hω >HH]".
       iModIntro.
-      iAssert (|={∅}▷=>^(S $ num_laters_per_step n) |={∅,⊤}=> ⚡={transmap_insert_inG (f a) Ω}=> ⚡={[l]}▷=>^(S n) |={⊤,∅}=> P)%I with "HH" as "HH".
+      iAssert (|={∅}▷=>^(S $ num_laters_per_step n) |={∅,⊤}=> ?={a}=> ⚡={[l]}▷=>^(S n) |={⊤,∅}=> P)%I with "HH" as "HH".
       iDestruct ("H'" with "HH Hω") as "HH".
       set (num:=S (num_laters_per_step (S n) + steps_sum num_laters_per_step (S (S n)) (length l))).
       rewrite -plus_Sn_m Nat.add_assoc.
@@ -539,11 +567,13 @@ Section bnextgen_n_open_soundness.
       iApply bupd_elim.
       iMod ("H" with "HP Hω") as "[>Hω >HP]".
       iModIntro.
-      iApply (transmap_plain (transmap_insert_inG (f a) Ω)).
-      iAssert (⚡={transmap_insert_inG (f a) Ω}=> ω ⊤)%I with "[Hω]" as "HA1".
-      { iApply "Hintro". iFrame. }
-      iModIntro.
-      iDestruct (IHl with "[$H $HA1 $Hn $HP $Hintro]") as "HH";auto.
+      unfold bnextgen_option. destruct (f a).
+      + iApply (transmap_plain (transmap_insert_inG (g b) Ω)).
+        iAssert (⚡={transmap_insert_inG (g b) Ω}=> ω ⊤)%I with "[Hω]" as "HA1".
+        { iApply "Hintro". iFrame. }
+        iModIntro.
+        iDestruct (IHl with "[$H $HA1 $Hn $HP $Hintro]") as "HH";auto.
+      + iDestruct (IHl with "[$H $Hω $Hn $HP $Hintro]") as "HH";auto.
   Qed.
 
   Lemma fupdN_lc_elim `{!invGIndS_gen HasLc Σ Ω} E1 P n :

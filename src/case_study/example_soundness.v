@@ -1,6 +1,6 @@
 From nextgen Require Import examples.
 From nextgen.lib Require Import wsat fancy_updates.
-From nextgen Require Import nextgen_soundness.
+From nextgen Require Import gmap_view_transformation nextgen_soundness.
 From nextgen.case_study.program_logic Require Import adequacy gen_heap_lifting.
 From nextgen.case_study Require Import stack_lang rules_unary.
 From iris.proofmode Require Import proofmode.
@@ -38,7 +38,7 @@ Proof.
   cut (adequate_single_thread NotStuck ((0,example1) : stack_expr) (∅,[]) (λ v _, v.2 = NatV 42)).
   { intros Hadequate. inversion Hadequate. apply adequate_result in Hsteps. auto. }
   eapply (@wp_adequacy_no_lc_single_thread Σ Ω _ (heap_preG_stack.(gen_heapNoGpreS_heap)).(ghost_map_inNoG)
-            lang heap_preG_invGS next_state_f (next_state_f_cmra_morphism Σ Ω) NotStuck).
+            lang heap_preG_invGS nat next_choose_f state_trans _ NotStuck).
   intros Hinv κs. simpl.
   iMod (gen_heap_init_ind (∅ : gmap loc val)) as (Hheap) "[Hh _]".
   iMod (gen_heap_init_no_names (∅ : gmap (nat * loc) val)) as (γs1 γs2) "[Hs _]".

@@ -45,7 +45,7 @@ Local Program Definition uPred_restr_bupd_def {M : ucmra}
   (t : M → M) `{!CmraMorphism t} `{!GenTransExtra t} (Q : uPred M) : uPred M :=
   {| uPred_holds n x := ∀ k yf,
       k ≤ n -> ✓{k} (x ⋅ yf) -> ∃ x' x1' x2', x' ≡{k}≡ x1' ⋅ x2' /\ x1' ≡{k}≡ t x1'
-                                            /\ (∃ x2, x ≡{k}≡ x2 ⋅ x2' /\ (∀ x3 x2'' yf', x2 ≡{k}≡ t x3 -> x2' ≡{k}≡ t x2'' -> yf ≡{k}≡ t yf' ->
+          /\ (∃ x2, x ≡{k}≡ x2 ⋅ x2' /\ (∀ x3 x2'' yf', x2 ≡{k}≡ t x3 -> x2' ≡{k}≡ t x2'' -> yf ≡{k}≡ t yf' ->
                                                                                         ✓{k} (x3 ⋅ x2'' ⋅ yf') -> ✓{k} (x1' ⋅ x2'' ⋅ yf')))
                                             /\ ✓{k} (x' ⋅ yf)
                                             /\ Q k x' |}.
@@ -140,7 +140,7 @@ Section restr_bupd_rules.
     apply Hcond in Hv as (?&?&?&?&?&(?&?&?)&?&?);eauto.
   Qed.
 
-  Lemma restr_bupd_frame_l P R : (|=/f=> P) ∗ R ⊢ |=/f=> P ∗ R.
+  Lemma restr_bupd_frame_r P R : (|=/f=> P) ∗ R ⊢ |=/f=> P ∗ R.
   Proof.
     unseal. split.
     intros n x Hx [x1 [x2 [Heq [Hop HR]]]].
@@ -168,11 +168,17 @@ Section restr_bupd_rules.
       eapply uPred_mono;eauto.
   Qed.
 
+  (* Definition cmra_updateP {A : cmra} (t : A → A) `{!CmraMorphism t} (x : A) (P : A → Prop) := ∀ n (mz : option A), *)
+  (*     ✓{n} (x ⋅? mz) /\ t x1 ≡ x1 /\ x ≡ x1 ⋅ x2 -> ∃ x1 y y1, P (y) /\ ✓{n} (y ⋅? mz) /\ t y1 ≡ y1 /\ y ≡ y1 ⋅ x2. *)
+  (* Global Instance: Params (@cmra_updateP) 1 := {}. *)
+  (* Global Instance: Params (@cmra_updateP) 3 := {}. *)
+  (* Infix "~~>:{  t  }" := (cmra_updateP t) (at level 70). *)
+
   (* Lemma bupd_ownM_updateP x (Φ : M → Prop) : *)
   (*   x ~~>:{f} Φ → uPred_ownM x ⊢ |=/f=> ∃ y, ⌜Φ (f y)⌝ ∧ uPred_ownM (f y). *)
   (* Proof. *)
-  (*   unseal=> Hup; split=> n x2 ? [x3 Hx] k yf ??. *)
-  (*   destruct (Hup k (Some (f x3 ⋅ yf))) as (y&?&?); simpl in *. *)
+  (*   unseal=> Hup; split=> n x2 Hv1 [x3 Hx] k yf Hle Hv2. *)
+  (*   destruct (Hup k (Some (x3 ⋅ yf)) ) as (y&?&?); simpl in *. *)
   (*   { rewrite /= assoc -cmra_morphism_op -(dist_le _ _ _ _ Hx); auto. } *)
   (*   exists (y ⋅ x3); split; first by rewrite cmra_morphism_op -assoc. *)
   (*   exists y; split; eauto using cmra_morphism_op, cmra_includedN_l. *)
