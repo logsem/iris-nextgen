@@ -52,7 +52,7 @@ Section bnextgen_rules.
 
   Local Arguments uPred_holds {_} !_ _ _ /.
 
-  Ltac unseal := try uPred.unseal; rewrite !uPred_bnextgen_unseal !/uPred_holds /=.
+  Ltac unseal := try uPred.unseal; rewrite ?uPred_bnextgen_unseal !/uPred_holds /=.
 
   Lemma bnextgen_ownM (a : M) :
     uPred_ownM a ⊢ ⚡={f}=> uPred_ownM (f a).
@@ -171,16 +171,17 @@ Section bnextgen_rules.
       apply Hmono. apply cmra_includedN_r.
   Qed.
 
-  Lemma bnextgen_intro_plainly P :
-    ■ P ⊢ ⚡={f}=> ■ P.
+  Lemma bnextgen_plainly P :
+    ■ P ⊣⊢ ⚡={f}=> ■ P.
   Proof. unseal. split. done. Qed.
 
-  Lemma bnextgen_plainly P :
+  Lemma bnextgen_plainly_1 P :
+    ■ P ⊢ ⚡={f}=> ■ P.
+  Proof. rewrite -bnextgen_plainly. done. Qed.
+
+  Lemma bnextgen_plainly_elim P :
     (⚡={f}=> ■ P) ⊢ P.
-  Proof.
-    unseal. split. simpl. intros ????. simpl.
-    eauto using uPred_mono, ucmra_unit_leastN.
-  Qed.
+  Proof. rewrite -bnextgen_plainly plainly_elim. done. Qed.
 
   Lemma bnextgen_wand_plainly P Q :
     (⚡={f}=> (■ P -∗ Q)) ⊣⊢ (■ P -∗ ⚡={f}=> Q).
@@ -282,14 +283,11 @@ Section bnextgen_rules.
 
   Lemma bnextgen_intro_plain P `{!Plain P, !Absorbing P} :
     P ⊢ ⚡={f}=> P.
-  Proof.
-    rewrite -(plain_plainly P).
-    apply bnextgen_intro_plainly.
-  Qed.
+  Proof. rewrite -(plain_plainly P). apply bnextgen_plainly_1. Qed.
 
   Lemma bnextgen_plain P `{!Plain P} :
     (⚡={f}=> P) ⊢ P.
-  Proof. rewrite {1}(plain P). apply bnextgen_plainly. Qed.
+  Proof. rewrite {1}(plain P). apply bnextgen_plainly_elim. Qed.
 
   Global Instance into_later_bnextgen n P Q :
     IntoLaterN false n P Q →
@@ -522,7 +520,7 @@ End bnextgen_rules_cmra_morphism.
 Lemma bnextgen_plain_soundness {M : ucmra} f `{!GenTrans f} (P : uPred M) `{!Plain P} :
   (⊢ ⚡={f}=> P) → ⊢ P.
 Proof.
-  eapply bi_emp_valid_mono. etrans; last exact: bnextgen_plainly.
+  eapply bi_emp_valid_mono. etrans; last exact: bnextgen_plainly_elim.
   apply bnextgen_mono'. apply: plain.
 Qed.
 
