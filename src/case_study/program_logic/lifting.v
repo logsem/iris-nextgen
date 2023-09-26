@@ -5,6 +5,34 @@ From iris.proofmode Require Import proofmode.
 From nextgen.case_study.program_logic Require Export weakestpre.
 From iris.prelude Require Import options.
 
+Local Lemma transform_mono {Σ : gFunctors} {Ω : gTransformations Σ} (P : iProp Σ) :
+  (⚡={Ω}=> P) ⊢ ⚡={Ω}=> P.
+Proof.
+  apply nextgen_basic.bnextgen_mono.
+  iIntros "HP";done.
+Qed.
+
+Local Lemma transform_later {Σ : gFunctors} {Ω : gTransformations Σ} (P : iProp Σ) :
+  (▷ ⚡={Ω}=> P) ⊢ ⚡={Ω}=> ▷ P.
+Proof.
+  rewrite nextgen_basic.bnextgen_later.
+  auto.
+Qed.
+
+Local Lemma transform_plain {Σ : gFunctors} {Ω : gTransformations Σ} (P : iProp Σ) :
+  (■ P) ⊢ ⚡={Ω}=> ■ P.
+Proof.
+  iIntros "#HP".
+  iApply nextgen_basic.bnextgen_intro_plainly. eauto.
+Qed.
+
+#[local] Instance insert_mono_into_pnextgen {Σ : gFunctors} {Ω : gTransformations Σ} (P : iProp Σ)
+  : IntoPnextgen Ω _ _ := transform_mono P.
+#[local] Instance insert_later_into_pnextgen {Σ : gFunctors} {Ω : gTransformations Σ} (P : iProp Σ)
+  : IntoPnextgen Ω _ _ := transform_later P.
+#[local] Instance insert_plain_into_pnextgen {Σ : gFunctors} {Ω : gTransformations Σ} (P : iProp Σ)
+  : IntoPnextgen Ω _ _ := transform_plain P.
+
 Section lifting.
 Context `{!irisGS_gen hlc Λ Σ Ω T}.
 Implicit Types s : (stuckness).
@@ -89,7 +117,7 @@ Proof.
   destruct (Hstep κ σ1 e2 σ2 efs) as (-> & <- & ->); auto.
   iMod "Hclose" as "_". iMod "H". iModIntro.
   iDestruct ("H" with "[//] Hcred Hσ") as "[Hσ $]".
-  iSplitL =>//. unfold bnextgen_option;destruct (next_choose e1);[iModIntro|]; simpl.
+  iSplitL =>//. unfold bnextgen_option;destruct (next_choose e1);[iModIntro;iModIntro|]; simpl.
   all: by iApply state_interp_mono.
 Qed.
 
@@ -125,7 +153,7 @@ Proof.
   iMod "Hclose" as "_". iMod "H" as "($ & HQ & $)".
   destruct (to_val e2) eqn:?; last by iExFalso.
   simpl. iModIntro.
-  unfold bnextgen_option. destruct (next_choose e1);[iModIntro|];
+  unfold bnextgen_option. destruct (next_choose e1);[iModIntro;iModIntro|];
     iApply wp_value; [..|done| |done]; by apply of_to_val.
 Qed.
 

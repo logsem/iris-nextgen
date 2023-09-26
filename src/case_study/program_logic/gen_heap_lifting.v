@@ -19,11 +19,11 @@ Arguments ghost_mapNoG Σ Ω (K V)%type_scope {_ _}.
 Arguments GhostMapNoG Σ Ω (K V)%type_scope {_ _ _}.
 
 Class gen_heapNoGpreS (L V : Type) (Σ : gFunctors) (Ω : gTransformations Σ) (eqdec: EqDecision L) (count: Countable L) : Set := Build_gen_heapNoGpreS
-  { gen_heapNoGpreS_heap : ghost_mapNoG Σ Ω L V;
+  { (* gen_heapNoGpreS_heap : ghost_mapNoG Σ Ω L V; *)
     gen_heapNoGpreS_meta : ghost_mapIndG Σ Ω L gname;
     gen_heapNoGpreS_meta_data : genIndInG Σ Ω (reservation_map.reservation_mapR (agreeR positiveO)) }.
 Arguments gen_heapNoGpreS (L V)%type_scope Σ Ω {_ _}.
-Arguments Build_gen_heapNoGpreS (L V)%type_scope Σ Ω {_ _ _ _ _}.
+Arguments Build_gen_heapNoGpreS (L V)%type_scope Σ Ω {_ _ _ _}.
 
 Class gen_heapIndGpreS (L V : Type) (Σ : gFunctors) (Ω : gTransformations Σ) (eqdec: EqDecision L) (count: Countable L) : Set := Build_gen_heapIndGpreS
   { gen_heapIndGpreS_heap : ghost_mapIndG Σ Ω L V;
@@ -58,19 +58,21 @@ Arguments GenHeapNoMetaGS (L V)%type_scope Σ Ω {_ _ _} no_meta_gen_heap_name.
 #[global] Instance into_gen_heap_pre_from_ind {L V Σ Ω} `{eqK: EqDecision L} `{countK: @Countable L eqK} (Hwsat: gen_heapIndGpreS L V Σ Ω) : gen_heapGpreS L V Σ :=
   Build_gen_heapGpreS L V Σ eqK countK (into_ghost_map_from_ind gen_heapIndGpreS_heap) (into_ghost_map_from_ind gen_heapIndGpreS_meta) gen_heapIndGpreS_meta_data.(genInG_inG).
 
-#[global] Instance into_gen_heap_pre_from_no {L V Σ Ω} `{eqK: EqDecision L} `{countK: @Countable L eqK} (Hwsat: gen_heapNoGpreS L V Σ Ω) : gen_heapGpreS L V Σ :=
-  Build_gen_heapGpreS L V Σ eqK countK (into_ghost_map_from_no gen_heapNoGpreS_heap) (into_ghost_map_from_ind gen_heapNoGpreS_meta) gen_heapNoGpreS_meta_data.(genInG_inG).
+#[global] Instance into_gen_heap_pre_from_no_with_wsat {L V Σ Ω} `{eqK: EqDecision L} `{countK: @Countable L eqK} `{ghostmap: @ghost_mapNoG Σ Ω L V eqK countK}
+  (Hwsat: gen_heapNoGpreS L V Σ Ω) : gen_heapGpreS L V Σ :=
+  Build_gen_heapGpreS L V Σ eqK countK (into_ghost_map_from_no ghostmap) (into_ghost_map_from_ind gen_heapNoGpreS_meta) gen_heapNoGpreS_meta_data.(genInG_inG).
 
 #[global] Instance into_gen_heap_from_ind {L V Σ Ω} `{eqK: EqDecision L} `{countK: @Countable L eqK} (Hwsat: gen_heapIndGS L V Σ Ω) : gen_heapGS L V Σ :=
   @GenHeapGS L V Σ eqK countK (into_gen_heap_pre_from_ind gen_heap_inIndG) ind_gen_heap_name ind_gen_meta_name.
 
-#[global] Instance into_gen_heap_from_no {L V Σ Ω} `{eqK: EqDecision L} `{countK: @Countable L eqK} (Hwsat: gen_heapNoGS L V Σ Ω) : gen_heapGS L V Σ :=
-  @GenHeapGS L V Σ eqK countK (into_gen_heap_pre_from_no gen_heap_inNoG) no_gen_heap_name no_gen_meta_name.
+#[global] Instance into_gen_heap_from_no {L V Σ Ω} `{eqK: EqDecision L} `{countK: @Countable L eqK} `{ghostmap: @ghost_mapNoG Σ Ω L V eqK countK}
+  (Hwsat: gen_heapNoGS L V Σ Ω) : gen_heapGS L V Σ :=
+  @GenHeapGS L V Σ eqK countK (into_gen_heap_pre_from_no_with_wsat gen_heap_inNoG) no_gen_heap_name no_gen_meta_name.
 
 
 (** variants of gen_heap_init that take Ω into account *)
 
-Lemma gen_heap_init_no_names `{Countable L, !gen_heapNoGpreS L V Σ Ω} σ :
+Lemma gen_heap_init_no_names `{Countable L, !ghost_mapNoG Σ Ω L V, !gen_heapNoGpreS L V Σ Ω} σ :
   ⊢ |==> ∃ γh γm : gname,
     let hG := GenHeapNoGS L V Σ Ω γh γm in
     gen_heap_interp σ ∗ ([∗ map] l ↦ v ∈ σ, mapsto l (DfracOwn 1) v) ∗ ([∗ map] l ↦ _ ∈ σ, meta_token l ⊤).
@@ -85,7 +87,7 @@ Proof.
   rewrite right_id_L. done.
 Qed.
 
-Lemma gen_heap_init_no `{Countable L, !gen_heapNoGpreS L V Σ Ω} σ :
+Lemma gen_heap_init_no `{Countable L, ghost_mapNoG Σ Ω L V, !gen_heapNoGpreS L V Σ Ω} σ :
   ⊢ |==> ∃ _ : gen_heapNoGS L V Σ Ω,
     gen_heap_interp σ ∗ ([∗ map] l ↦ v ∈ σ, mapsto l (DfracOwn 1) v) ∗ ([∗ map] l ↦ _ ∈ σ, meta_token l ⊤).
 Proof.

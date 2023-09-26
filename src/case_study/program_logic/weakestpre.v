@@ -10,8 +10,8 @@ Import uPred.
 From nextgen Require Export utils nextgen_soundness nextgen_persistently nextgen_basic nextgen_pointwise.
 
 Class irisGS_gen (hlc : has_lc) (Λ : language) (Σ : gFunctors) (Ω : gTransformations Σ) (A : cmra) := IrisG {
-  iris_invGS :> invGIndS_gen hlc Σ Ω;
-  iris_notrans :> noTransInG Σ Ω A;
+  iris_pick :> pick_transform_preorder A;
+  iris_invGS :> invGIndS_gen hlc Σ Ω A iris_pick;
                                                                                                
   (** The state interpretation is an invariant that should hold in
   between each step of reduction. Here [Λstate] is the global state,
@@ -27,10 +27,10 @@ Class irisGS_gen (hlc : has_lc) (Λ : language) (Σ : gFunctors) (Ω : gTransfor
   keep track of resources precisely, as in e.g. Iron. *)
   fork_post : val Λ → iProp Σ;
 
-  B : Type; (* a_inhabited : Inhabited A; *)
-  next_state : B -> A -> A;
-  next_choose : expr Λ -> option B;
-  next_state_GenTrans :> forall e, (CmraMorphism (next_state e));
+  (* B : Type; (* a_inhabited : Inhabited A; *) *)
+  (* next_state : B -> A -> A; *)
+  next_choose : expr Λ -> option C;
+  (* next_state_GenTrans :> forall e, (CmraMorphism (next_state e)); *)
   (* next_state_contractive : forall (a : A) (x : iResUR Σ) (n : nat), next_state a x ≼{n} x; *)
   (* next_state_compose : ∀ a b : A, ∃ c : A, next_state a ∘ next_state b = next_state c;           *)
   (* next_state_idemp : forall (a : A) (x : iResUR Σ) (n : nat), next_state a x = (next_state a (next_state a x)); *)
@@ -64,10 +64,38 @@ Global Arguments IrisG {hlc Λ Σ}.
 
 Notation irisGS := (irisGS_gen HasNoLc).
 
+Local Lemma transform_mono {Σ : gFunctors} {Ω : gTransformations Σ} (P : iProp Σ) :
+  (⚡={Ω}=> P) ⊢ ⚡={Ω}=> P.
+Proof.
+  apply nextgen_basic.bnextgen_mono.
+  iIntros "HP";done.
+Qed.
+
+Local Lemma transform_later {Σ : gFunctors} {Ω : gTransformations Σ} (P : iProp Σ) :
+  (▷ ⚡={Ω}=> P) ⊢ ⚡={Ω}=> ▷ P.
+Proof.
+  rewrite nextgen_basic.bnextgen_later.
+  auto.
+Qed.
+
+Local Lemma transform_plain {Σ : gFunctors} {Ω : gTransformations Σ} (P : iProp Σ) :
+  (■ P) ⊢ ⚡={Ω}=> ■ P.
+Proof.
+  iIntros "#HP".
+  iApply nextgen_basic.bnextgen_intro_plainly. eauto.
+Qed.
+
+#[local] Instance insert_mono_into_pnextgen {Σ : gFunctors} {Ω : gTransformations Σ} (P : iProp Σ)
+  : IntoPnextgen Ω _ _ := transform_mono P.
+#[local] Instance insert_later_into_pnextgen {Σ : gFunctors} {Ω : gTransformations Σ} (P : iProp Σ)
+  : IntoPnextgen Ω _ _ := transform_later P.
+#[local] Instance insert_plain_into_pnextgen {Σ : gFunctors} {Ω : gTransformations Σ} (P : iProp Σ)
+  : IntoPnextgen Ω _ _ := transform_plain P.
+
 Class SameGeneration `{irisgen : irisGS_gen hlc Λ Σ Ω A} (e : expr Λ) : Prop :=
   same_generation : next_choose e = None.
 
-Notation "?={ Ω <- e }=> P" := (@bnextgen_option _ Ω _ _ _ _ next_choose next_state _ e P)
+Notation "?={ Ω <- e }=> P" := (@bnextgen_option _ Ω _ _ _ _ _ next_choose e P)
                             (at level 99, Ω at level 50, e at level 50, P at level 200, format "?={ Ω  <-  e }=>  P") : bi_scope.
 
   
@@ -145,7 +173,7 @@ Proof.
      proper instance for step_fupdN. *)
   induction num_laters_per_step as [|k IHk]; simpl; last by rewrite IHk.
   unfold bnextgen_option. case_match;
-    [do 4 (apply nextgen_basic.bnextgen_ne || f_contractive || f_equiv)
+    [do 4 ((do 2 apply nextgen_basic.bnextgen_ne) || f_contractive || f_equiv)
     | do 3 (f_contractive || f_equiv)].
   all: rewrite IH; [done|lia|]; intros v'; eapply dist_le; [apply HΦ|lia].
 Qed.
@@ -164,7 +192,7 @@ Proof.
      proper instance for step_fupdN. *)
   induction num_laters_per_step as [|k IHk]; simpl; last by rewrite IHk.
   do 3 f_equiv. unfold bnextgen_option.
-  case_match;[apply bnextgen_ne|]; do 2 f_equiv;auto.
+  case_match;[do 2 apply bnextgen_ne|]; do 2 f_equiv;auto.
 Qed.
 
 Lemma wp_value_fupd' s E Φ v : WP of_val v @ s; E {{ Φ }} ⊣⊢ |={E}=> Φ v.
@@ -188,7 +216,7 @@ Proof.
   iMod ("H" with "[//] Hcred") as "H". iIntros "!> !>".  iMod "H". iModIntro.
   iApply (step_fupdN_wand with "[H]"); first by iApply "H".
   iIntros ">($ & H & Hefs)". iMod "Hclose" as "_". iModIntro. iSplitR "Hefs".
-  - unfold bnextgen_option. destruct (next_choose e);[iModIntro|];
+  - unfold bnextgen_option. destruct (next_choose e);[iModIntro;iModIntro|];
     iApply ("IH" $! e2 with "[//] H"); auto.
   - iApply (big_sepL_impl with "Hefs"); iIntros "!>" (k ef _).
     iIntros "H". (* iModIntro.  *) iApply ("IH" with "[] H"); auto.
@@ -292,7 +320,7 @@ Proof.
   { etrans; last apply Htri. lia. }
   iApply (step_fupdN_wand with "Hwp"). iIntros ">(SI & Hwp & $)".
   iMod ("Hpost" with "Hk SI") as "[$ #HP]". iModIntro.
-  unfold bnextgen_option;case_match;[iModIntro|].
+  unfold bnextgen_option;case_match;[iModIntro;iModIntro|].
   all: iApply (wp_strong_mono with "Hwp"); [by auto..|].
   all: iModIntro.
   all: iIntros (v) "HΦ"; iApply ("HΦ" with "HP").
@@ -335,7 +363,7 @@ Proof.
   iInduction n as [|n] "IH" forall (n0 Hn).
   - iApply (step_fupdN_wand with "H"). iIntros ">($ & Hwp & $)". iMod "HP".
     iModIntro.
-    unfold bnextgen_option;case_match;[iModIntro|].
+    unfold bnextgen_option;case_match;[iModIntro;iModIntro|].
     all: iApply (wp_strong_mono with "Hwp");auto; iDestruct "HP" as "#HP"; iModIntro.
     all: iIntros (v) "HΦ".
     all: iApply ("HΦ" with "HP").
@@ -365,7 +393,7 @@ Proof.
   iMod "H". iModIntro. iApply (step_fupdN_wand with "H"). iIntros "H".
   iMod "H" as "(HH & H & Htp)". iModIntro.
   unfold bnextgen_option. rewrite next_state_ctx//.
-  iFrame. destruct (next_choose e);[iModIntro|];by iApply "IH".
+  iFrame. destruct (next_choose e);[iModIntro;iModIntro|];by iApply "IH".
 Qed.
 
 Lemma wp_bind_inv K `{!LanguageCtx K} s E e Φ :
@@ -387,7 +415,7 @@ Proof.
   iIntros "!> !>". iMod "H". iModIntro. iApply (step_fupdN_wand with "H").
   iIntros "H". iMod "H" as "(HH & H & Htp)". iModIntro.
   unfold bnextgen_option. rewrite next_state_ctx//.
-  iFrame. destruct (next_choose e);[iModIntro|];by iApply "IH".
+  iFrame. destruct (next_choose e);[iModIntro;iModIntro|];by iApply "IH".
 Qed.
 
 (** * Derived rules *)

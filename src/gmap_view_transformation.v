@@ -756,5 +756,18 @@ Section map_entry.
     rewrite agree_map_to_agree. done.
   Qed.
 
+  Lemma map_entry_lift_gmap_view_frag k dq v map_entry :
+    map_entry_lift_gmap_view map_entry (gmap_view_frag k dq v) =
+    from_option (λ v', gmap_view_frag k dq v') (◯V ∅) (map_entry k v).
+  Proof.
+    unfold map_entry_lift_gmap_view, fmap_view, fmap_pair. simpl.
+    unfold from_option. rewrite /gMapTrans_frag_lift.
+    rewrite -insert_empty. destruct (map_entry k v) eqn:Hsome.
+    - erewrite map_imap_insert_Some;auto.
+      simpl. rewrite agree_option_map_to_agree Hsome /= //.
+    - rewrite map_imap_insert_None;auto.
+      simpl. rewrite agree_option_map_to_agree Hsome /= //.
+  Qed.
+
 End map_entry.
 

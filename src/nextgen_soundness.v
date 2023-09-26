@@ -22,7 +22,7 @@ Proof.
   iModIntro. iExists C. iFrame.
 Qed.
 
-Local Lemma fupd_unfold_implies `{!invGIndS_gen HasNoLc Σ Ω} `{!noTransInG Σ Ω T} ω :
+Local Lemma fupd_unfold_implies `{!invGIndS_gen HasNoLc Σ Ω T pick} ω :
   ■ (∀ (E1 E2 : coPset) (P : iPropI Σ), (|={E1,E2}=> P) -∗ ω E1 ==∗ ◇ (ω E2 ∗ P)) ⊢
   ■ (∀ E1 E2 P n, (|={E1}[E2]▷=>^n P) -∗ ω E1 -∗ Nat.iter n (λ P, |==> ▷ |==> ▷ P) (ω E1 ∗ P)).
 Proof.
@@ -42,19 +42,46 @@ Proof.
     iMod ("H" with "HP Hω") as ">[Hω HP]".
     iModIntro. iNext. iApply ("IH" with "HP Hω").
 Qed.
-    
+
+Local Lemma transform_mono {Σ : gFunctors} {Ω : gTransformations Σ} (P : iProp Σ) :
+  (⚡={Ω}=> P) ⊢ ⚡={Ω}=> P.
+Proof.
+  apply nextgen_basic.bnextgen_mono.
+  iIntros "HP";done.
+Qed.
+
+Local Lemma transform_later {Σ : gFunctors} {Ω : gTransformations Σ} (P : iProp Σ) :
+  (▷ ⚡={Ω}=> P) ⊢ ⚡={Ω}=> ▷ P.
+Proof.
+  rewrite nextgen_basic.bnextgen_later.
+  auto.
+Qed.
+
+Local Lemma transform_plain {Σ : gFunctors} {Ω : gTransformations Σ} (P : iProp Σ) :
+  (■ P) ⊢ ⚡={Ω}=> ■ P.
+Proof.
+  iIntros "#HP".
+  iApply nextgen_basic.bnextgen_intro_plainly. eauto.
+Qed.
+
+#[local] Instance insert_mono_into_pnextgen {Σ : gFunctors} {Ω : gTransformations Σ} (P : iProp Σ)
+  : IntoPnextgen Ω _ _ := transform_mono P.
+#[local] Instance insert_later_into_pnextgen {Σ : gFunctors} {Ω : gTransformations Σ} (P : iProp Σ)
+  : IntoPnextgen Ω _ _ := transform_later P.
+#[local] Instance insert_plain_into_pnextgen {Σ : gFunctors} {Ω : gTransformations Σ} (P : iProp Σ)
+  : IntoPnextgen Ω _ _ := transform_plain P.
    
-Local Lemma fupd_soundness_no_lc_unfold_alt `{!invGIndpreS Σ Ω} `{!noTransInG Σ Ω T} m E :
-  ⊢ |==> ∃ `(Hws: invGIndS_gen HasNoLc Σ Ω) (ω : coPset -> iProp Σ),
+Local Lemma fupd_soundness_no_lc_unfold_alt `{!invGIndpreS Σ Ω T pick} m E :
+  ⊢ |==> ∃ `(Hws: !invGIndS_gen HasNoLc Σ Ω T pick) (ω : coPset -> iProp Σ),
       £ m ∗ ω E
         ∗ ■ (∀ (E1 E2 : coPset) (P : iPropI Σ), (|={E1,E2}=> P) -∗ ω E1 ==∗ ◇ (ω E2 ∗ P))
-        ∗ ■ (∀ E (t : T → T) `{!CmraMorphism t}, ω E -∗ ⚡={transmap_insert_inG t Ω}=> ω E).
+        ∗ ■ (∀ E (c : C), ω E -∗ ⚡={transmap_insert_inG (inv_pick_transform c) Ω}=> ⚡={transmap_insert_inG (C_pick c) Ω}=>  ω E).
 Proof.
   destruct invGIndpreS0.
   iMod wsat_alloc as (Hw) "[Hw HE]".
   (* We don't actually want any credits, but we need the [lcGS]. *)
   iMod (lc_alloc m) as (Hc) "[Hsupply Hm]".
-  set (Hi := InvIndG HasNoLc _ Ω Hw Hc).
+  set (Hi := InvIndG HasNoLc _ Ω _ _ Hw Hc).
   iExists Hi, (λ E, wsat ∗ ownE E)%I.
   rewrite (union_difference_L E ⊤); [|set_solver].
   rewrite wsat.ownE_op; [|set_solver]. iFrame.
@@ -64,14 +91,16 @@ Proof.
     rewrite fancy_updates.uPred_fupd_unseal
           /fancy_updates.uPred_fupd_def -assoc /=.
     iMod ("HP" with "[$Hw $HE]") as ">(Hw & HE & HP)". by iFrame. }
-  { iModIntro. iIntros (E1 t ?) "[Hw HE]".
-    iDestruct (wsat_ind_insert_intro with "Hw") as "Hw".
-    iDestruct (ownE_ind_insert_intro with "HE") as "HE".
+  { iModIntro. iIntros (E1 c) "[Hw HE]".
+    iDestruct (wsat_ind_insert_intro c with "Hw") as "Hw".
+    iDestruct (ownE_ind_insert_intro _ (inv_pick_transform c) with "HE") as "HE".
+    iModIntro.
+    iDestruct (ownE_ind_insert_intro _ (C_pick c) with "HE") as "HE".
     iModIntro. iFrame. }
 Qed.
 
-Local Lemma fupd_soundness_no_lc_unfold `{!invGIndpreS Σ Ω} `{!noTransInG Σ Ω T} m E :
-  ⊢ |==> ∃ `(Hws: invGIndS_gen HasNoLc Σ Ω) (ω : coPset → iProp Σ),
+Local Lemma fupd_soundness_no_lc_unfold `{!invGIndpreS Σ Ω T pick} m E :
+  ⊢ |==> ∃ `(Hws: !invGIndS_gen HasNoLc Σ Ω T pick) (ω : coPset → iProp Σ),
     £ m ∗ ω E ∗ □ (∀ E1 E2 P, (|={E1, E2}=> P) -∗ ω E1 ==∗ ◇ (ω E2 ∗ P)).
 Proof.
   iMod fupd_soundness_no_lc_unfold_alt as (Hws ω) "(?&?&?&?)".
@@ -97,8 +126,8 @@ Qed.
 Local Notation "⚡={ f }=> P" := (uPred_bnextgen f P)
                             (at level 99, f at level 50, P at level 200, format "⚡={ f }=>  P") : bi_scope.
 
-Lemma bnextgen_fupd_soundness_no_lc `{!invGIndpreS Σ Ω} `{!noTransInG Σ Ω T} E1 E2 (P : iProp Σ) `{!Plain P} m (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f}:
-  (∀ `{Hinv: !invGIndS_gen HasNoLc Σ Ω}, £ m ={E1,E2}=∗ ⚡={f}=> P) → ⊢ P.
+Lemma bnextgen_fupd_soundness_no_lc `{!invGIndpreS Σ Ω T pick} E1 E2 (P : iProp Σ) `{!Plain P} m (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f}:
+  (∀ `{Hinv: !invGIndS_gen HasNoLc Σ Ω T pick}, £ m ={E1,E2}=∗ ⚡={f}=> P) → ⊢ P.
 Proof.
   intros Hfupd. apply later_soundness.
   eapply (bnextgen_plain_soundness); [by apply later_plain|].
@@ -110,15 +139,15 @@ Proof.
   iDestruct "H2" as ">H2". iModIntro. iNext. iFrame.
 Qed.
 
-Lemma bnextgen_fupd_soundness_lc `{!invGIndpreS Σ Ω} `{!noTransInG Σ Ω T} n E1 E2 (P : iProp Σ) `{!Plain P} (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
-  (∀ `{Hinv: !invGIndS_gen HasLc Σ Ω}, £ n ={E1,E2}=∗ ⚡={f}=> P) → ⊢ P.
+Lemma bnextgen_fupd_soundness_lc `{!invGIndpreS Σ Ω T pick} n E1 E2 (P : iProp Σ) `{!Plain P} (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
+  (∀ `{Hinv: !invGIndS_gen HasLc Σ Ω T pick}, £ n ={E1,E2}=∗ ⚡={f}=> P) → ⊢ P.
 Proof.
   destruct invGIndpreS0.
   intros Hfupd. eapply (lc_soundness (S n)); first done.
   intros Hc. rewrite lc_succ.
   iIntros "[Hone Hn]". rewrite -le_upd.le_upd_trans. iApply le_upd.bupd_le_upd.
   iMod wsat_alloc as (Hw) "[Hw HE]".
-  set (Hi := InvIndG HasLc _ _ Hw Hc).
+  set (Hi := InvIndG HasLc _ _ _ _ Hw Hc).
   iAssert (|={⊤,E2}=> ⚡={f}=> P)%I with "[Hn]" as "H".
   { iMod (fupd_mask_subseteq E1) as "_"; first done. by iApply (Hfupd Hi). }
   rewrite fancy_updates.uPred_fupd_unseal /fancy_updates.uPred_fupd_def.
@@ -128,8 +157,8 @@ Proof.
   iApply bnextgen_plain. iDestruct "H" as "(_ & _ & $)".
 Qed.
 
-Lemma bnextgen_fupd_soundness_gen `{!invGIndpreS Σ Ω} `{!noTransInG Σ Ω T} n hlc E1 E2 (P : iProp Σ) `{!Plain P} (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
-  (∀ `{Hinv: !invGIndS_gen hlc Σ Ω}, £ n ={E1,E2}=∗ ⚡={f}=> P) → ⊢ P.
+Lemma bnextgen_fupd_soundness_gen `{!invGIndpreS Σ Ω T pick} n hlc E1 E2 (P : iProp Σ) `{!Plain P} (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
+  (∀ `{Hinv: !invGIndS_gen hlc Σ Ω T pick}, £ n ={E1,E2}=∗ ⚡={f}=> P) → ⊢ P.
 Proof.
   inversion invGIndpreS0.
   destruct hlc.
@@ -137,8 +166,8 @@ Proof.
   - by apply bnextgen_fupd_soundness_no_lc.
 Qed.
 
-Local Lemma fupd_soundness_no_lc `{!invGIndpreS Σ Ω} `{!noTransInG Σ Ω T} E1 E2 (P : iProp Σ) `{!Plain P} m :
-  (∀ `{Hinv: !invGIndS_gen HasNoLc Σ Ω}, £ m ={E1,E2}=∗ P) → ⊢ P.
+Local Lemma fupd_soundness_no_lc `{!invGIndpreS Σ Ω T pick} E1 E2 (P : iProp Σ) `{!Plain P} m :
+  (∀ `{Hinv: !invGIndS_gen HasNoLc Σ Ω T pick}, £ m ={E1,E2}=∗ P) → ⊢ P.
 Proof.
   intros Hfupd. apply later_soundness, bupd_soundness; [by apply later_plain|].
   iMod fupd_soundness_no_lc_unfold as (hws ω) "(Hlc & Hω & #H)".
@@ -147,8 +176,8 @@ Proof.
   iDestruct "H'" as "[>H1 >H2]". by iFrame.
 Qed.
 
-Lemma bnextgen_step_fupdN_soundness_no_lc `{!invGIndpreS Σ Ω} `{!noTransInG Σ Ω T} (P : iProp Σ) `{!Plain P} n m (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
-  (∀ `{Hinv: !invGIndS_gen HasNoLc Σ Ω}, £ m ={⊤,∅}=∗ |={∅}▷=>^n ⚡={f}=> P) →
+Lemma bnextgen_step_fupdN_soundness_no_lc `{!invGIndpreS Σ Ω T pick} (P : iProp Σ) `{!Plain P} n m (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
+  (∀ `{Hinv: !invGIndS_gen HasNoLc Σ Ω T pick}, £ m ={⊤,∅}=∗ |={∅}▷=>^n ⚡={f}=> P) →
   ⊢ P.
 Proof.
   intros Hiter.
@@ -163,8 +192,8 @@ Proof.
   iDestruct (plain with "H") as "H". iFrame.
 Qed.
 
-Lemma bnextgen_step_fupdN_soundness_no_lc' `{!invGIndpreS Σ Ω} `{!noTransInG Σ Ω T} (P : iProp Σ) `{!Plain P} n m (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
-  (∀ `{Hinv: !invGIndS_gen HasNoLc Σ Ω}, £ m ={⊤}[∅]▷=∗^n ⚡={f}=> P) →
+Lemma bnextgen_step_fupdN_soundness_no_lc' `{!invGIndpreS Σ Ω T pick} (P : iProp Σ) `{!Plain P} n m (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
+  (∀ `{Hinv: !invGIndS_gen HasNoLc Σ Ω T pick}, £ m ={⊤}[∅]▷=∗^n ⚡={f}=> P) →
   ⊢ P.
 Proof.
   intros Hiter. eapply (bnextgen_step_fupdN_soundness_no_lc _ n m)=>Hinv.
@@ -176,8 +205,8 @@ Proof.
 Qed.
 
 
-Lemma bnextgen_step_fupdN_soundness_lc `{!invGIndpreS Σ Ω} `{!noTransInG Σ Ω T} (P : iProp Σ) `{!Plain P} n m (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
-  (∀ `{Hinv: !invGIndS_gen HasLc Σ Ω}, £ m ={⊤,∅}=∗ |={∅}▷=>^n ⚡={f}=> P) →
+Lemma bnextgen_step_fupdN_soundness_lc `{!invGIndpreS Σ Ω T pick} (P : iProp Σ) `{!Plain P} n m (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
+  (∀ `{Hinv: !invGIndS_gen HasLc Σ Ω T pick}, £ m ={⊤,∅}=∗ |={∅}▷=>^n ⚡={f}=> P) →
   ⊢ P.
 Proof.
   inversion invGIndpreS0.
@@ -193,8 +222,8 @@ Proof.
     by iApply ("IH" with "Hn Hupd").
 Qed.
 
-Lemma bnextgen_step_fupdN_soundness_lc' `{!invGIndpreS Σ Ω} `{!noTransInG Σ Ω T} (P : iProp Σ) `{!Plain P} n m (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
-  (∀ `{Hinv: !invGIndS_gen hlc Σ Ω}, £ m ={⊤}[∅]▷=∗^n ⚡={f}=> P) →
+Lemma bnextgen_step_fupdN_soundness_lc' `{!invGIndpreS Σ Ω T pick} (P : iProp Σ) `{!Plain P} n m (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
+  (∀ `{Hinv: !invGIndS_gen hlc Σ Ω T pick}, £ m ={⊤}[∅]▷=∗^n ⚡={f}=> P) →
   ⊢ P.
 Proof.
   inversion invGIndpreS0.
@@ -213,9 +242,9 @@ Qed.
 
 (** Generic soundness lemma for the fancy update, parameterized by [use_credits]
   on whether to use credits or not. *)
-Lemma bnextgen_step_fupdN_soundness_gen `{!invGIndpreS Σ Ω} `{!noTransInG Σ Ω T} (P : iProp Σ) `{!Plain P}
+Lemma bnextgen_step_fupdN_soundness_gen `{!invGIndpreS Σ Ω T pick} (P : iProp Σ) `{!Plain P}
   (hlc : has_lc) (n m : nat) (f : iResUR Σ -> iResUR Σ) `{GenTrans (iResUR Σ) f} :
-  (∀ `{Hinv : invGIndS_gen hlc Σ Ω},
+  (∀ `{Hinv : !invGIndS_gen hlc Σ Ω T pick},
     £ m ={⊤,∅}=∗ |={∅}▷=>^n ⚡={f}=> P) →
   ⊢ P.
 Proof.
@@ -256,13 +285,13 @@ Local Notation "⚡={ M }=> P" := (nextgen_omega M P)
   (at level 99, M at level 50, P at level 200, format "⚡={ M }=>  P") : bi_scope.
 
 Section bnextgen_pred_imod.
-  Context {Σ : gFunctors} {Ω : gTransformations Σ} {A : Type} `{!noTransInG Σ Ω C}
-    {B : Type} (f : A -> option B) (g : B -> (C → C)) `{!forall a, CmraMorphism (g a)} {num_laters_per_step : nat -> nat}
-    `{!invGIndS_gen hlc Σ Ω}.
+  Context {Σ : gFunctors} {Ω : gTransformations Σ} (* {A : Type} `{!noTransInG Σ Ω C} *)
+    (* {B : Type} (f : A -> option B) (g : B -> (C → C)) `{!forall a, CmraMorphism (g a)} *) {num_laters_per_step : nat -> nat}
+    `{!invGIndS_gen hlc Σ Ω B pick} {A : Type} (f : A -> option C).
 
   Definition bnextgen_option (a : A) (P : iProp Σ) : iProp Σ :=
     match f a with
-    | Some b => ⚡={transmap_insert_inG (g b) Ω}=> P
+    | Some c => ⚡={transmap_insert_inG (inv_pick_transform c) Ω}=> ⚡={transmap_insert_inG (C_pick c) Ω}=> P
     | None => P
     end.
 
@@ -310,8 +339,8 @@ Section bnextgen_pred_imod.
     iMod "H". iModIntro.
     iApply (step_fupdN_mono with "H"). iIntros "H".
     iMod "H". iModIntro.
-    unfold bnextgen_option. case_match;
-      [iApply (bnextgen_mono with "H")|]; by iApply IHl.
+    unfold bnextgen_option.
+    case_match;[iModIntro;iModIntro|];by iApply IHl.
   Qed.
 
   Lemma bnextgen_n_open_mono P Q l n :
@@ -321,8 +350,8 @@ Section bnextgen_pred_imod.
     iIntros "H". simpl.
     iMod "H". iModIntro.
     iApply (step_fupdN_mono with "H"). iIntros "H".
-    unfold bnextgen_option. case_match;
-      [iApply (bnextgen_mono with "H")|]; by iApply IHl.
+    unfold bnextgen_option.
+    case_match;[iModIntro;iModIntro|];by iApply IHl.
   Qed.
 
   Global Instance bnextgen_n_mono' l n :
@@ -341,7 +370,7 @@ Section bnextgen_pred_imod.
     apply fupd_ne,later_ne, fupd_ne.
     apply step_fupdN_ne. apply fupd_ne.
     unfold bnextgen_option. case_match.
-    - apply bnextgen_ne. apply IHl. auto.
+    - apply bnextgen_ne. apply bnextgen_ne. apply IHl. auto.
     - apply IHl. auto.
   Qed.
 
@@ -357,10 +386,10 @@ Section bnextgen_pred_imod.
       all: iModIntro.
       all: iApply (step_fupdN_mono with "H"); iIntros "H".
       + rewrite {1}/bnextgen_option {1}/bnextgen_option;case_match.
-        1: iApply (bnextgen_mono with "H"); iIntros "H".
+        1: iModIntro; iApply (bnextgen_mono with "H"); iIntros "H".
         all: rewrite -PeanoNat.Nat.add_succ_comm; iApply IHl; iFrame.
       + rewrite {1}/bnextgen_option {3}/bnextgen_option;case_match.
-        1: iApply (bnextgen_mono with "H"); iIntros "H".
+        1: iModIntro; iApply (bnextgen_mono with "H"); iIntros "H".
         all: rewrite -PeanoNat.Nat.add_succ_comm; iApply IHl; iFrame.
   Qed.
 
@@ -373,10 +402,10 @@ Section bnextgen_pred_imod.
       all: iModIntro.
       all: iApply (step_fupdN_mono with "H"); iIntros "H".
       + rewrite {1}/bnextgen_option {1}/bnextgen_option;case_match.
-        1: iApply (bnextgen_mono with "H"); iIntros "H".
+        1: iApply (bnextgen_mono with "H"); iIntros "H";iModIntro.
         all: rewrite -PeanoNat.Nat.add_succ_comm; iApply IHl; iFrame.
       + rewrite {1}/bnextgen_option {3}/bnextgen_option;case_match.
-        1: iApply (bnextgen_mono with "H"); iIntros "H".
+        1: iApply (bnextgen_mono with "H"); iIntros "H";iModIntro.
         all: rewrite -PeanoNat.Nat.add_succ_comm; iApply IHl; iFrame.
   Qed.
   
@@ -393,7 +422,7 @@ Section bnextgen_pred_imod.
       iIntros "[H1 H2]".
       iMod "H1". iModIntro.
       unfold bnextgen_option;case_match.
-      1: iModIntro. all: iApply IHl;iFrame.
+      1: iModIntro;iModIntro. all: iApply IHl;iFrame.
   Qed.
 
   Lemma bnextgen_n_sep_nextgen l n P Q :
@@ -407,7 +436,7 @@ Section bnextgen_pred_imod.
       iNext. iIntros "H2".
       iMod "H2". iModIntro.
       unfold bnextgen_option;case_match.
-      1: iModIntro. all: iApply IHl;iFrame.
+      1: iModIntro;iModIntro. all: iApply IHl;iFrame.
   Qed.
 
   Lemma bnextgen_n_open_emp_intro P l n :
@@ -417,7 +446,7 @@ Section bnextgen_pred_imod.
     revert n; induction l =>n;simpl;auto.
     iApply step_fupdN_intro;auto.
     iModIntro. iNext. iModIntro.
-    iNext. unfold bnextgen_option;case_match;[iModIntro|].
+    iNext. unfold bnextgen_option;case_match;[iModIntro;iModIntro|].
     all: iStopProof;eauto.
     all: apply IHl.
   Qed.
@@ -430,8 +459,8 @@ Section bnextgen_pred_imod.
     iApply step_fupdN_intro;auto.
     iApply fupd_mask_intro;auto. iIntros "Hcls".
     iModIntro. iNext. iModIntro.
-    iNext. iMod "Hcls". iModIntro.
-    unfold bnextgen_option;case_match;[iModIntro|].
+    iNext. iMod "Hcls". iModIntro. iClear "Hcls".
+    unfold bnextgen_option;case_match;[iModIntro;iModIntro|].
     all: iStopProof;eauto.
     all: apply IHl.
   Qed.
@@ -441,7 +470,7 @@ Section bnextgen_pred_imod.
   Proof.
     intros HP.
     induction l;simpl;auto.
-    unfold bnextgen_option;case_match;[iModIntro|].
+    unfold bnextgen_option;case_match;[iModIntro;iModIntro|].
     all: auto.
   Qed.
     
@@ -479,21 +508,21 @@ Fixpoint steps_sum (num_laters_per_step : nat → nat) (start ns : nat) : nat :=
   end.
 
 Section bnextgen_n_open_soundness.
-  Context {A : Type} {Σ : gFunctors} {Ω : gTransformations Σ} `{!noTransInG Σ Ω C} {B : Type} (f : A -> option B) (g : B -> C → C) `{!forall (a : B), CmraMorphism (g a)}
+  Context {A : Type} {Σ : gFunctors} {Ω : gTransformations Σ} {B : cmra} {pick: pick_transform_preorder B} (f : A -> option C)
     {num_laters_per_step : nat -> nat}.
-  
-  Notation "?={ e }=> P" := (@bnextgen_option _ _ _ _ _ _ f g _ e P)
+
+  Notation "?={ e }=> P" := (@bnextgen_option _ _ _ _ _ _ _ f e P)
                               (at level 99, e at level 50, P at level 200, format "?={ e }=>  P") : bi_scope.
   
-  Notation "⚡={[ l ]}▷=>^ ( n ) P" := (@bnextgen_n _ _ _ _ _ _ f g _ num_laters_per_step _ _ l n P)
+  Notation "⚡={[ l ]}▷=>^ ( n ) P" := (@bnextgen_n _ _ num_laters_per_step _ _ _ _ _ f l n P)
          (at level 99, l at level 50, n at level 50, P at level 200, format "⚡={[ l ]}▷=>^ ( n )  P") : bi_scope.
 
-  Notation "⚡={[ l ]}▷=>>^ ( n ) P" := (@bnextgen_n_open _ _ _ _ _ _ f g _ num_laters_per_step _ _ l n P)
+  Notation "⚡={[ l ]}▷=>>^ ( n ) P" := (@bnextgen_n_open _ _ num_laters_per_step _ _ _ _ _ f l n P)
          (at level 99, l at level 50, n at level 50, P at level 200, format "⚡={[ l ]}▷=>>^ ( n )  P") : bi_scope.
 
   Lemma step_fupdN_nextgen_open_soundness_no_lc (l : list A) :
-    invGIndpreS Σ Ω → ∀ P : iProp Σ,
-        Plain P → ∀ (n m : nat), (∀ (Hinv : invGIndS_gen HasNoLc Σ Ω), £ m -∗ ⚡={[l]}▷=>>^(n) P) → (⊢ P)%stdpp.
+    invGIndpreS Σ Ω B pick → ∀ P : iProp Σ,
+        Plain P → ∀ (n m : nat), (∀ (Hinv : invGIndS_gen HasNoLc Σ Ω B pick), £ m -∗ ⚡={[l]}▷=>>^(n) P) → (⊢ P)%stdpp.
   Proof.
     intros until P. intros HPlain n m  Hiter.
     apply (laterN_soundness _ (steps_sum num_laters_per_step (n) (S (length l)) + steps_sum num_laters_per_step (n) (S (length l)))).
@@ -505,7 +534,7 @@ Section bnextgen_n_open_soundness.
     - simpl. auto.
     - simpl. rewrite /= -Nat.add_succ_r.
       iDestruct "Hn" as "[Hone [Hm Hn]]".
-      iDestruct (@fupd_unfold_implies Σ Ω Hws C noTransInG0 ω with "H") as "#H'".
+      iDestruct (@fupd_unfold_implies Σ Ω _ _ Hws ω with "H") as "#H'".
       iAssert (|={∅}▷=>^(S $ num_laters_per_step n) ?={a}=> ⚡={[l]}▷=>>^(S n) P)%I with "HH" as "HH".
       iDestruct ("H'" with "HH Hω") as "HH".
       set (num:=S (num_laters_per_step (S n) + steps_sum num_laters_per_step (S (S n)) (length l))).
@@ -520,9 +549,14 @@ Section bnextgen_n_open_soundness.
         iMod "H". iIntros "!>!>". iApply "J". iFrame. }
       iIntros "[Hω HP]".
       unfold bnextgen_option. destruct (f a).
-      + iApply (transmap_plain (transmap_insert_inG (g b) Ω)).
-        iAssert (⚡={transmap_insert_inG (g b) Ω}=> ω ∅)%I with "[Hω]" as "HA1".
+      + iApply (transmap_plain (transmap_insert_inG (inv_pick_transform c) Ω)).
+        iAssert (⚡={transmap_insert_inG (inv_pick_transform c) Ω}=> ⚡={transmap_insert_inG (C_pick c) Ω}=> ω ∅)%I with "[Hω]" as "HA1".
         { iApply "Hintro". iFrame. }
+        iClear "Hone Hm".
+        iDestruct (lc_ind_insert_intro _ (inv_pick_transform c) with "Hn") as "Hn".
+        iModIntro.
+        iApply (transmap_plain (transmap_insert_inG (C_pick c) Ω)).
+        iDestruct (lc_ind_insert_intro _ (C_pick c) with "Hn") as "Hn".
         iModIntro.
         iDestruct (IHl with "[$H $HA1 $Hn $HP $Hintro]") as "HH".
         rewrite /num. simpl. iNext. iApply (laterN_mono with "HH"). auto.
@@ -532,10 +566,10 @@ Section bnextgen_n_open_soundness.
 
 
   Lemma step_fupdN_nextgen_soundness_no_lc (l : list A) :
-    invGIndpreS Σ Ω → ∀ P : iProp Σ,
-        Plain P → ∀ (n m : nat), (∀ (Hinv : invGIndS_gen HasNoLc Σ Ω), £ m ={⊤}=∗ ⚡={[l]}▷=>^(n) |={⊤,∅}=> P) → (⊢ P)%stdpp.
+    invGIndpreS Σ Ω B pick → ∀ P : iProp Σ,
+        Plain P → ∀ (n m : nat), (∀ (Hinv : invGIndS_gen HasNoLc Σ Ω B pick), £ m ={⊤}=∗ ⚡={[l]}▷=>^(n) |={⊤,∅}=> P) → (⊢ P)%stdpp.
   Proof.
-    intros until P. inversion H0. intros HPlain n m  Hiter.
+    intros until P. inversion H. intros HPlain n m  Hiter.
     apply (laterN_soundness _ (steps_sum num_laters_per_step (n) (S (length l)) + steps_sum num_laters_per_step (n) (S (length l)))).
     iMod (fupd_soundness_no_lc_unfold_alt (m + (steps_sum num_laters_per_step (n) (length l))) ⊤) as (Hws ω) "[Hm [Hω [#H #H']]]".
     specialize (Hiter Hws).
@@ -544,7 +578,7 @@ Section bnextgen_n_open_soundness.
     iStopProof. revert n. induction l;intros n;iIntros "[#[H Hintro] (Hn & Hω & HH)]".
     - simpl. rewrite fupd_trans.
       iMod ("H" with "HH Hω") as "[>Hω >HH]". auto.
-    - iDestruct (@fupd_unfold_implies Σ Ω Hws C noTransInG0 ω with "H") as "#H'".
+    - iDestruct (@fupd_unfold_implies Σ Ω _ _ Hws ω with "H") as "#H'".
       simpl. rewrite /= -Nat.add_succ_r.
       iDestruct "Hn" as "[Hone [Hm Hn]]".
       rewrite (fupd_trans ⊤ ⊤).
@@ -568,15 +602,19 @@ Section bnextgen_n_open_soundness.
       iMod ("H" with "HP Hω") as "[>Hω >HP]".
       iModIntro.
       unfold bnextgen_option. destruct (f a).
-      + iApply (transmap_plain (transmap_insert_inG (g b) Ω)).
-        iAssert (⚡={transmap_insert_inG (g b) Ω}=> ω ⊤)%I with "[Hω]" as "HA1".
+      + iApply (transmap_plain (transmap_insert_inG (inv_pick_transform c) Ω)).
+        iAssert (⚡={transmap_insert_inG (inv_pick_transform c) Ω}=> ⚡={transmap_insert_inG (C_pick c) Ω}=> ω ⊤)%I with "[Hω]" as "HA1".
         { iApply "Hintro". iFrame. }
+        iDestruct (lc_ind_insert_intro _ (inv_pick_transform c) with "Hn") as "Hn".
+        iClear "Hone Hm". iModIntro.
+        iDestruct (lc_ind_insert_intro _ (C_pick c) with "Hn") as "Hn".
+        iApply (transmap_plain (transmap_insert_inG (C_pick c) Ω)).
         iModIntro.
         iDestruct (IHl with "[$H $HA1 $Hn $HP $Hintro]") as "HH";auto.
       + iDestruct (IHl with "[$H $Hω $Hn $HP $Hintro]") as "HH";auto.
   Qed.
 
-  Lemma fupdN_lc_elim `{!invGIndS_gen HasLc Σ Ω} E1 P n :
+  Lemma fupdN_lc_elim `{!invGIndS_gen HasLc Σ Ω B pick} E1 P n :
     (wsat ∗ ownE E1 ∗ £ (3 * n) ∗ |={E1}▷=>^n P) ⊢ le_upd.le_upd (wsat ∗ ownE E1 ∗ P).
   Proof.
     induction n.
@@ -599,7 +637,7 @@ Section bnextgen_n_open_soundness.
       iApply IHn. iFrame.
   Qed.
 
-  Lemma fupd_lc_elim `{!invGIndS_gen HasLc Σ Ω} E1 E2 P :
+  Lemma fupd_lc_elim `{!invGIndS_gen HasLc Σ Ω B pick} E1 E2 P :
     (wsat ∗ ownE E1 ∗ £ 1 ∗ |={E1,E2}=> P) ⊢ le_upd.le_upd (wsat ∗ ownE E2 ∗ P).
   Proof.
     iIntros "[Hwsat [HE [Hone HP]]]".
@@ -612,16 +650,16 @@ Section bnextgen_n_open_soundness.
 
   
   Lemma step_fupdN_nextgen_soundness_lc (l : list A) :
-    invGIndpreS Σ Ω → ∀ P : iProp Σ,
-        Plain P → ∀ (n m : nat), (∀ (Hinv : invGIndS_gen HasLc Σ Ω), £ m ={⊤}=∗ ⚡={[l]}▷=>^(n) |={⊤,∅}=> P) → (⊢ P)%stdpp.
+    invGIndpreS Σ Ω B pick → ∀ P : iProp Σ,
+        Plain P → ∀ (n m : nat), (∀ (Hinv : invGIndS_gen HasLc Σ Ω B pick), £ m ={⊤}=∗ ⚡={[l]}▷=>^(n) |={⊤,∅}=> P) → (⊢ P)%stdpp.
   Proof.
-    intros until P. inversion H0. intros HPlain n m Hiter.
+    intros until P. inversion H. intros HPlain n m Hiter.
     (* apply (lc_soundness (m + 2 + steps_sum (λ n, 4 + 3 * num_laters_per_step n) n (length l)));[auto|]. *)
     (* intros Hc. iIntros "Hlc". *)
     apply (laterN_soundness _ ((m + 3 + steps_sum (λ n0 : nat, 4 + 3 * num_laters_per_step n0) n (length l)) * S (S (length l)))).
     iMod wsat_alloc as (Hw) "[Hw HE]".
     iMod (lc_alloc (m + 2 + steps_sum (λ n, 4 + 3 * num_laters_per_step n) n (length l))) as (Hc) "[Hsuppl Hlc]".
-    set (Hinv := InvIndG HasLc _ Ω Hw Hc).
+    set (Hinv := InvIndG HasLc _ Ω _ _ Hw Hc).
     specialize (Hiter Hinv).
     rewrite !lc_split. iDestruct "Hlc" as "[[Hm Hone] Hms]".
     iDestruct (Hiter with "Hm") as "HH". clear Hiter.

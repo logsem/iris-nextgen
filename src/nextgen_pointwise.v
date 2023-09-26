@@ -276,7 +276,21 @@ Notation genIndInG Σ Ω A := (transInG Σ Ω A id).
 Class noTransInG Σ (Ω : gTransformations Σ) (A : cmra) := {
   noTransInG_inG :> inG Σ A;
   noTransInG_trans_lookup : Ω.(gT_map) noTransInG_inG.(inG_id) = None
+  }.
+
+(* Knowledge about the camera [A] and [B], the fact that there is no
+associated transformations, and that their gid's are different *)
+Class noTwoTransInG Σ (Ω : gTransformations Σ) (A : cmra) (B : cmra) := {
+    noTransInG_A_inG :> noTransInG Σ Ω A;
+    noTransInG_B_inG :> noTransInG Σ Ω B;
+    noTransInG_diff : (noTransInG_A_inG.(noTransInG_inG)).(inG_id) ≠ (noTransInG_B_inG.(noTransInG_inG)).(inG_id)
 }.
+
+(* #[global] Instance noTransInG_inl `{no_trans : noTwoTransInG Σ Ω A B} : noTransInG Σ Ω A.  *)
+(*   {| noTransInG_inG := no_trans.(noTransInG_A_inG) ; noTransInG_trans_lookup := no_trans.(noTransInG_trans_A_lookup) |}. *)
+
+(* #[global] Instance noTransInG_inr `{no_trans : noTwoTransInG Σ Ω A B} : noTransInG Σ Ω B := *)
+(*   {| noTransInG_inG := no_trans.(noTransInG_B_inG) ; noTransInG_trans_lookup := no_trans.(noTransInG_trans_B_lookup) |}. *)
 
 Section nextgen_instances.
 
@@ -379,6 +393,87 @@ Section nextgen_instances.
       `{i : noTransInG Σ Ω A} (t : A → A) `{!CmraMorphism t} γ (a : A) :
       IntoPnextgen _ _ _ :=
     transmap_own_insert t γ a.
+
+   Lemma transmap_own_insert_other_left {A1 A2}
+    `{i : noTwoTransInG Σ Ω A1 A2} (t1 : A2 → A2) `{!CmraMorphism t1} γ (a : A1) :
+    own γ a ⊢ ⚡={transmap_insert_inG t1 Ω}=> own γ a.
+  Proof.
+    iIntros "O".
+    iApply transmap_own_lookup_None; last done.
+    unfold transmap_insert_inG. simpl.
+    rewrite transmap_insert_lookup_ne; cycle 1.
+    { by specialize  noTransInG_diff as Hdiff. }
+    apply noTransInG_trans_lookup.
+  Qed.
+
+  Lemma transmap_own_insert_other_right {A1 A2}
+    `{i : noTwoTransInG Σ Ω A1 A2} (t1 : A1 → A1) `{!CmraMorphism t1} γ (a : A2) :
+    own γ a ⊢ ⚡={transmap_insert_inG t1 Ω}=> own γ a.
+  Proof.
+    iIntros "O".
+    iApply transmap_own_lookup_None; last done.
+    unfold transmap_insert_inG. simpl.
+    rewrite transmap_insert_lookup_ne; cycle 1.
+    { by specialize  noTransInG_diff as Hdiff. }
+    apply noTransInG_trans_lookup.
+  Qed.
+
+  Lemma transmap_own_insert_left {A1 A2}
+    `{i : noTwoTransInG Σ Ω A1 A2} (t1 : A1 → A1) `{!CmraMorphism t1} γ (a : A1) :
+    own γ a ⊢ ⚡={transmap_insert_inG t1 Ω}=> own γ (t1 a).
+  Proof.
+    iIntros "O".
+    iApply transmap_own_lookup_Some; last done.
+    unfold transmap_insert_inG. simpl.
+    rewrite transmap_insert_lookup_eq//.
+  Qed.
+
+  Lemma transmap_own_insert_right {A1 A2}
+    `{i : noTwoTransInG Σ Ω A1 A2} (t2 : A2 → A2) `{!CmraMorphism t2} γ (a : A2) :
+    own γ a ⊢ ⚡={transmap_insert_inG t2 Ω}=> own γ (t2 a).
+  Proof.
+    iIntros "O".
+    iApply transmap_own_lookup_Some; last done.
+    unfold transmap_insert_inG. simpl.
+    rewrite transmap_insert_lookup_eq//.
+  Qed.
+
+  (* Lemma transmap_own_insert_other_other_left {A1 A2 A3} *)
+  (*   `{i : noTwoTransInG Σ Ω A1 A2} (t1 : A1 → A1) `{!CmraMorphism t1} *)
+  (*   `{!CmraMorphism t3} `{!transInG Σ Ω A3 t3} γ (a : A3) : *)
+  (*   own γ a ⊢ ⚡={transmap_insert_inG t1 Ω}=> own γ (t3 a). *)
+  (* Proof. *)
+  (*   iIntros "O". *)
+  (*   iDestruct (@transmap_own_insert_other _ _ _ _ _ t1 with "O") as "$". *)
+  (* Qed. *)
+     
+  #[global]
+  Instance into_pnextgen_insert_own_other_left {A1 A2}
+  `{i : noTwoTransInG Σ Ω A1 A2} (t1 : A2 → A2) `{!CmraMorphism t1}
+    γ (a : A1) :
+      IntoPnextgen _ _ _ | 2 :=
+    transmap_own_insert_other_left t1 γ a.
+
+  #[global]
+  Instance into_pnextgen_insert_own_other_right {A1 A2}
+  `{i : noTwoTransInG Σ Ω A1 A2} (t1 : A1 → A1) `{!CmraMorphism t1}
+    γ (a : A2) :
+      IntoPnextgen _ _ _ | 2 :=
+    transmap_own_insert_other_right t1 γ a.
+
+  #[global]
+  Instance into_pnextgen_insert_other_left_ind {A1 A2}
+    `{i : noTwoTransInG Σ Ω A1 A2} (t1 : A2 → A2) `{!CmraMorphism t1}
+    γ (a : A1) :
+      IntoPnextgen _ _ (own γ a) | 2 :=
+    transmap_own_insert_other_left t1 γ a.
+
+  #[global]
+  Instance into_pnextgen_insert_other_right_ind {A1 A2}
+    `{i : noTwoTransInG Σ Ω A1 A2} (t1 : A1 → A1) `{!CmraMorphism t1}
+    γ (a : A2) :
+      IntoPnextgen _ _ (own γ a) | 2 :=
+    transmap_own_insert_other_right t1 γ a.
 
 End nextgen_instances.
 

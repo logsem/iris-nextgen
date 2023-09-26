@@ -23,17 +23,17 @@ From nextgen Require Import nextgen_pointwise.
     We don't use that notation in this file to avoid confusion.
  *)
 
-Class invGIndpreS (Σ : gFunctors) (Ω : gTransformations Σ) : Set := InvGIndpreS {
-  invGIndpreS_wsat : wsatGIndpreS Σ Ω;
+Class invGIndpreS (Σ : gFunctors) (Ω : gTransformations Σ) (A : cmra) (pick: pick_transform_preorder A) : Set := InvGIndpreS {
+  invGIndpreS_wsat : wsatGIndpreS Σ Ω A pick;
   invGIndpreS_lc : lcGIndpreS Σ Ω;
 }.
 
-Class invGIndS_gen (hlc : fancy_updates.has_lc) (Σ : gFunctors) (Ω : gTransformations Σ) : Set := InvIndG {
-  invGS_wsat : wsatGIndS Σ Ω;
+Class invGIndS_gen (hlc : fancy_updates.has_lc) (Σ : gFunctors) (Ω : gTransformations Σ) (A : cmra) (pick: pick_transform_preorder A) : Set := InvIndG {
+  invGS_wsat : wsatGIndS Σ Ω A pick;
   invGS_lc : lcGIndS Σ Ω;
 }.
-Global Hint Mode invGIndS_gen - - - : typeclass_instances.
-Global Hint Mode invGIndpreS - - : typeclass_instances.
+Global Hint Mode invGIndS_gen - - - - - : typeclass_instances.
+Global Hint Mode invGIndpreS - - - - : typeclass_instances.
 
 Local Existing Instances invGIndpreS_wsat invGIndpreS_lc.
 (* [invGS_lc] needs to be global in order to enable the use of lemmas like [lc_split]
@@ -41,11 +41,11 @@ Local Existing Instances invGIndpreS_wsat invGIndpreS_lc.
    [invGS_wsat] also needs to be global as the lemmas in [invariants.v] require it. *)
 Global Existing Instances invGS_lc invGS_wsat.
 
-#[global] Instance into_invpres `{Hinv: invGIndpreS Σ Ω} : fancy_updates.invGpreS Σ :=
-  fancy_updates.InvGpreS Σ (@into_wsatpres Σ Ω invGIndpreS_wsat) (@into_lcpres Σ Ω invGIndpreS_lc).
+#[global] Instance into_invpres `{Hinv: !invGIndpreS Σ Ω A pick} : fancy_updates.invGpreS Σ :=
+  fancy_updates.InvGpreS Σ (@into_wsatpres A pick Σ Ω invGIndpreS_wsat) (@into_lcpres Σ Ω invGIndpreS_lc).
 
-#[global] Instance into_invs `{Hinv: invGIndS_gen hlc Σ Ω} : fancy_updates.invGS_gen hlc Σ :=
-  fancy_updates.InvG hlc Σ (@into_wsats Σ Ω invGS_wsat) (@into_lcs Σ Ω invGS_lc).
+#[global] Instance into_invs `{Hinv: !invGIndS_gen hlc Σ Ω A pick} : fancy_updates.invGS_gen hlc Σ :=
+  fancy_updates.InvG hlc Σ (@into_wsats A pick Σ Ω invGS_wsat) (@into_lcs Σ Ω invGS_lc).
 
 Notation has_lc := fancy_updates.has_lc.
 Notation HasLc := fancy_updates.HasLc.
@@ -55,15 +55,15 @@ Notation ownD := wsat.ownD.
 
 Notation invGIndS := (invGIndS_gen HasLc).
 
-Local Definition uPred_fupd_def `{!invGIndS_gen hlc Σ Ω} `{!noTransInG Σ Ω T} (E1 E2 : coPset) (P : iProp Σ) : iProp Σ :=
+Local Definition uPred_fupd_def `{!invGIndS_gen hlc Σ Ω T pick} (E1 E2 : coPset) (P : iProp Σ) : iProp Σ :=
   wsat ∗ ownE E1 -∗ le_upd_if (if hlc is fancy_updates.HasLc then true else false) (◇ (wsat ∗ ownE E2 ∗ P)).
 Local Definition uPred_fupd_aux : seal (@uPred_fupd_def). Proof. by eexists. Qed.
 Definition uPred_fupd := uPred_fupd_aux.(unseal).
 Global Arguments uPred_fupd {hlc Σ _ _ _ _}.
-Local Lemma uPred_fupd_unseal `{!invGIndS_gen hlc Σ Ω} `{!noTransInG Σ Ω T} : @fupd _ uPred_fupd = uPred_fupd_def.
+Local Lemma uPred_fupd_unseal `{!invGIndS_gen hlc Σ Ω A pick} : @fupd _ uPred_fupd = uPred_fupd_def.
 Proof. rewrite -uPred_fupd_aux.(seal_eq) //. Qed.
 
-Lemma uPred_fupd_mixin `{!invGIndS_gen hlc Σ Ω} `{!noTransInG Σ Ω T} : BiFUpdMixin (uPredI (iResUR Σ)) uPred_fupd.
+Lemma uPred_fupd_mixin `{!invGIndS_gen hlc Σ Ω A pick} : BiFUpdMixin (uPredI (iResUR Σ)) uPred_fupd.
 Proof.
   split.
   - rewrite uPred_fupd_unseal. solve_proper.
@@ -83,15 +83,15 @@ Proof.
     iIntros "!> !>". by iApply "HP".
   - rewrite uPred_fupd_unseal /uPred_fupd_def. by iIntros (????) "[HwP $]".
 Qed.
-Global Instance uPred_bi_fupd `{!invGIndS_gen hlc Σ Ω} `{!noTransInG Σ Ω T} : BiFUpd (uPredI (iResUR Σ)) | 1 :=
+Global Instance uPred_bi_fupd `{!invGIndS_gen hlc Σ Ω A pick} : BiFUpd (uPredI (iResUR Σ)) | 1 :=
   {| bi_fupd_mixin := uPred_fupd_mixin |}.
 
-Global Instance uPred_bi_bupd_fupd {Σ : gFunctors} `{!invGIndS_gen hlc Σ Ω} `{!noTransInG Σ Ω T} : BiBUpdFUpd (uPredI (iResUR Σ)) | 1.
+Global Instance uPred_bi_bupd_fupd {Σ : gFunctors} `{!invGIndS_gen hlc Σ Ω A pick} : BiBUpdFUpd (uPredI (iResUR Σ)) | 1.
 Proof. rewrite /BiBUpdFUpd. rewrite uPred_fupd_unseal. by iIntros (E P) ">? [$ $] !> !>". Qed.
 
 (** The interaction laws with the plainly modality are only supported when
   we opt out of the support for later credits. *)
-Global Instance uPred_bi_fupd_plainly_no_lc `{!invGIndS_gen fancy_updates.HasNoLc Σ Ω} `{!noTransInG Σ Ω T} :
+Global Instance uPred_bi_fupd_plainly_no_lc `{!invGIndS_gen fancy_updates.HasNoLc Σ Ω T pick} :
   BiFUpdPlainly (uPredI (iResUR Σ)) | 1.
 Proof.
   split; rewrite uPred_fupd_unseal /uPred_fupd_def.
@@ -119,7 +119,7 @@ Qed.
   This is typically used as [iMod (lc_fupd_elim_later with "Hcredit HP") as "HP".],
   where ["Hcredit"] is a credit available in the context and ["HP"] is the
   assumption from which a later should be stripped. *)
-Lemma lc_fupd_elim_later `{!invGIndS_gen HasLc Σ Ω} `{!noTransInG Σ Ω T} E P :
+Lemma lc_fupd_elim_later `{!invGIndS_gen HasLc Σ Ω T pick} E P :
    £ 1 -∗ (▷ P) -∗ |={E}=> P.
 Proof.
   iIntros "Hf Hupd".
@@ -132,7 +132,7 @@ Qed.
   in front of it in exchange for a later credit.
   This is typically used as [iApply (lc_fupd_add_later with "Hcredit")],
   where ["Hcredit"] is a credit available in the context. *)
-Lemma lc_fupd_add_later `{!invGIndS_gen HasLc Σ Ω} `{!noTransInG Σ Ω T} E1 E2 P :
+Lemma lc_fupd_add_later `{!invGIndS_gen HasLc Σ Ω T pick} E1 E2 P :
   £ 1 -∗ (▷ |={E1, E2}=> P) -∗ |={E1, E2}=> P.
 Proof.
   iIntros "Hf Hupd". iApply (fupd_trans E1 E1).

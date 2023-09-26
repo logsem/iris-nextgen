@@ -10,7 +10,7 @@ Class stacksizePreGS (Σ : gFunctors) (Ω : gTransformations Σ) := StackSizePre
                                                                    }.
 
 Class heapPreGS (Σ : gFunctors) (Ω : gTransformations Σ) := HeapPreGS {
-  heap_preG_invGS :: invGIndpreS Σ Ω;
+  heap_preG_invGS :: invGIndpreS Σ Ω (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) locality_lifetime_pick;
   heap_preG_heap  :: gen_heapIndGpreS loc val Σ Ω;
   heap_preG_stack :: gen_heapNoGpreS (nat * loc) val Σ Ω;
   heap_preG_size  :: stacksizePreGS Σ Ω
@@ -37,10 +37,11 @@ Proof.
   intros v2 σ2 Hsteps.
   cut (adequate_single_thread NotStuck ((0,example1) : stack_expr) (∅,[]) (λ v _, v.2 = NatV 42)).
   { intros Hadequate. inversion Hadequate. apply adequate_result in Hsteps. auto. }
-  eapply (@wp_adequacy_no_lc_single_thread Σ Ω _ (heap_preG_stack.(gen_heapNoGpreS_heap)).(ghost_map_inNoG)
-            lang heap_preG_invGS nat next_choose_f state_trans _ NotStuck).
+  eapply (@wp_adequacy_no_lc_single_thread Σ Ω _ _
+            locality_lifetime_pick heap_preG_invGS next_choose_f NotStuck).
   intros Hinv κs. simpl.
   iMod (gen_heap_init_ind (∅ : gmap loc val)) as (Hheap) "[Hh _]".
+  set (ghostnoG := @gmap_view_inG _ _ _ Hinv).
   iMod (gen_heap_init_no_names (∅ : gmap (nat * loc) val)) as (γs1 γs2) "[Hs _]".
   iMod (stacksize_init 0) as (Hsize) "[Hsize Hfrag]".
   set (Hstack := GenHeapNoGS _ _ Σ Ω γs1 γs2).
@@ -52,5 +53,6 @@ Proof.
                                                                                           (excl_auth_auth (length s)))%I).
   iExists (λ _, True%I).
   iDestruct "Hs" as (m Hdom) "[Hs _]". simpl.
-  iModIntro. iFrame. iApply (@example1_spec Σ Ω heapGΣ with "Hfrag []");auto.
+  iModIntro. iFrame. 
+  iApply (@example1_spec Σ Ω heapGΣ with "Hfrag []");auto.
 Qed.

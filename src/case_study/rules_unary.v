@@ -9,6 +9,8 @@ From nextgen Require Import nextgen_basic gen_trans gmap_view_transformation nex
 From nextgen Require Export nextgen_pointwise.
 Set Default Proof Using "Type".
 Import uPred.
+From nextgen.lib Require Import wsat fancy_updates.
+
 
 (** Basic rules for language operations. *)
 
@@ -19,9 +21,59 @@ Class stacksizeGS (Σ : gFunctors) (Ω : gTransformations Σ) := StackSizeGS {
 }.
 
 
+Inductive locality_lifetime : Type :=
+  | lifetime_stack : nat -> locality_lifetime
+  | lifetime_heap : locality_lifetime.
+
+Definition locality_lifetime_rel : relation locality_lifetime :=
+  λ l1 l2, match l1,l2 with
+           | lifetime_heap, _ => True
+           | lifetime_stack f1, lifetime_stack f2 => f1 <= f2
+           | _,_ => False
+           end.
+
+Definition state_trans (n : nat) := (map_entry_lift_gmap_view (stack_location_cut n)).
+
+Definition locality_pick (l : locality_lifetime) :=
+  match l with
+  | lifetime_heap => id
+  | lifetime_stack n => state_trans n
+  end.
+
+Lemma pick_state_trans_eq (Σ : gFunctors) (Ω : gTransformations Σ) `{!inG Σ (gmap_view.gmap_viewR (nat * loc) (leibnizO val))} (n : nat) :
+  transmap_insert_inG (state_trans n) Ω = transmap_insert_inG (locality_pick (lifetime_stack n)) Ω.
+Proof. auto. Qed.
+
+Global Instance locality_lifetime_rel_pre : PreOrder locality_lifetime_rel.
+Proof.
+  split.
+  - intros l. destruct l;simpl;auto.
+  - intros l1 l2 l3 Hl1 Hl2.
+    destruct l1,l2,l3;try by inversion Hl1;try by inversion Hl2.
+    simpl in *. lia.
+Qed.
+
+Global Instance locality_lifetime_cmra_morphism : ∀ l, CmraMorphism (locality_pick l) :=
+  λ l, match l with
+       | lifetime_heap => cmra_morphism_id
+       | lifetime_stack n => gMapTrans_lift_CmraMorphism (stack_location_cut n)
+       end.
+
+Global Instance locality_lifetime_rel_dec : ∀ l1 l2, Decision (locality_lifetime_rel l1 l2).
+Proof. intros l1 l2. destruct l1,l2;simpl;[apply _|right;auto|left;auto..]. Qed.
+
+Global Instance locality_lifetime_pick
+  : pick_transform_preorder (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) :=
+  { C := locality_lifetime;
+    CR := locality_lifetime_rel;
+    C_pick := locality_pick;
+  }.
+
+Notation inv_pick_transform := (@inv_pick_transform _ locality_lifetime_pick).
+
 (* CMRA for state interpretation *)
 Class heapGS (Σ : gFunctors) (Ω : gTransformations Σ) := HeapGS {
-  heapG_invGS : invGIndS_gen HasNoLc Σ Ω;
+  heapG_invGS : invGIndS_gen HasNoLc Σ Ω _ locality_lifetime_pick;
   (* heapG_no_trans :> noTransInG Σ Ω (gmap_view.gmap_viewR (nat * loc) (leibnizO val)); *)
   heapG_gen_heapGS :> gen_heapIndGS loc val Σ Ω;
   heapG_gen_stackGS :> gen_heapNoGS (nat * loc) val Σ Ω; (* gen_heapNoMetaGS (nat * loc) val Σ Ω ; *)
@@ -59,12 +111,26 @@ Section StackSize.
     
 End StackSize.
 
-#[global] Instance gmap_view_inG `{H:heapGS Σ Ω} : ghost_map.ghost_mapG Σ (nat * loc) (leibnizO val) :=
-  ghost_map.GhostMapG Σ (nat * loc) (leibnizO val) _ _ (((heapG_gen_stackGS.(gen_heap_inNoG)).(gen_heapNoGpreS_heap)).(ghost_map_inNoG)).(noTransInG_inG).
-#[global] Instance heapG_noTransInG `{H:heapGS Σ Ω} : noTransInG Σ Ω (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) :=
-  ((heapG_gen_stackGS.(gen_heap_inNoG)).(gen_heapNoGpreS_heap)).(ghost_map_inNoG).
+#[global] Instance heapG_inv_transform_inG `{H:heapGS Σ Ω} : inG Σ (gmap_view.gmap_viewR positive (optionO (leibnizO C))) :=
+  ((((heapG_invGS.(invGS_wsat)).(wsat_inG)).(wsatGpreS_func)).(noTransInG_A_inG)).(noTransInG_inG).
 
-Definition state_trans (n : nat) := (map_entry_lift_gmap_view (stack_location_cut n)).
+(* #[global] Instance gmap_view_inG `{H:heapGS Σ Ω} : ghost_mapNoG Σ Ω (nat * loc) (leibnizO val) := *)
+(*   @GhostMapNoG Σ Ω (nat * loc) (leibnizO val) _ _ *)
+(*     (((heapG_invGS.(invGS_wsat)).(wsat_inG)).(wsatGpreS_func)).(noTransInG_B_inG). *)
+
+#[global] Instance gmap_view_inG `{H:invGIndS_gen fancy_updates.HasNoLc Σ Ω (gmap_view.gmap_viewR (nat * loc) (leibnizO val))} : ghost_mapNoG Σ Ω (nat * loc) (leibnizO val) :=
+  @GhostMapNoG Σ Ω (nat * loc) (leibnizO val) _ _
+    ((invGS_wsat.(wsat_inG)).(wsatGpreS_func)).(noTransInG_B_inG).
+  (* @GhostMapNoG Σ Ω (nat * loc) (leibnizO val) _ _ *)
+  (*   (wsatGpreS_func).(noTransInG_B_inG). *)
+
+#[global] Instance heapG_wsatpre `{H:heapGS Σ Ω} : invGIndS_gen fancy_updates.HasNoLc Σ Ω (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) locality_lifetime_pick :=
+  heapG_invGS.
+
+#[global] Instance heapG_gen_heapGS_inG `{H:heapGS Σ Ω} : gen_heapGS (nat * loc) val Σ :=
+  @into_gen_heap_from_no (nat * loc) val Σ Ω _ _ _ heapG_gen_stackGS.
+
+
 (* Definition state_trans_aux : seal (@state_trans_def). *)
 (* Proof. by eexists. Qed. *)
 (* Definition state_trans := (state_trans_aux).(unseal). *)
@@ -74,8 +140,8 @@ Definition state_trans (n : nat) := (map_entry_lift_gmap_view (stack_location_cu
 Definition state_trans_state (σ : state) := state_trans (length σ.2).
 Definition stack_gname `{heapGS Σ} : gname := heapG_gen_stackGS.(no_gen_heap_name).
 
-Definition next_choose_f (e : stack_expr) : option nat :=
-  (find_i e.2) ≫= λ i, Some (e.1 - Z.abs_nat i).
+Definition next_choose_f (e : stack_expr) : option locality_lifetime :=
+  (find_i e.2) ≫= λ i, Some (lifetime_stack (e.1 - Z.abs_nat i)).
 
 (* Definition next_state_f_aux : seal (@next_state_f_def). *)
 (* Proof. by eexists. Qed. *)
@@ -108,10 +174,7 @@ Instance heapG_irisGS `{heapGS Σ Ω} : irisGS_gen _ lang Σ Ω (gmap_view.gmap_
       (gen_heap_interp h
          ∗ (* gen_heap_interp (list_to_gmap_stack s) *) gen_stack_interp s
          ∗ own heapG_stacksize_name (excl_auth_auth (length s)))%I;
-    B := nat;
     next_choose := next_choose_f;
-    next_state := state_trans;
-    next_state_GenTrans := _;
     num_laters_per_step _ := 0;
     fork_post _ := True%I;
     state_interp_mono _ _ _ _ := (entails_po).(PreOrder_Reflexive) _
@@ -121,31 +184,52 @@ Global Opaque iris_invGS.
 Definition id := (id : (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) -> (gmap_view.gmap_viewR (nat * loc) (leibnizO val))).
 
 #[global]
-Instance option_state_trans_cmra_morphism `{H : heapGS Σ Ω} (n : option nat) : CmraMorphism (from_option (λ n, state_trans n) id n) 
+Instance option_state_trans_cmra_morphism `{H : heapGS Σ Ω} (n : option locality_lifetime) : CmraMorphism (from_option (λ n, locality_pick n) id n) 
   := match n with
      | None => _
      | Some n => _
      end.
 
-Definition next_state_option_def {Σ} (Ω : gTransformations Σ) `{H : heapGS Σ Ω} (n: option nat) :=
-  transmap_insert_inG (from_option (λ n, state_trans n) id n) Ω.
-Definition next_state_option_aux : seal (@next_state_option_def).
+Definition next_state_def {Σ} (Ω : gTransformations Σ) `{H : heapGS Σ Ω} (n: locality_lifetime) :=
+  transmap_insert_inG (locality_pick n) Ω.
+Definition next_state_aux : seal (@next_state_def).
 Proof. by eexists. Qed.
-Definition next_state_option := (next_state_option_aux).(unseal).
-Local Definition next_state_option_unseal :
-  @next_state_option = @next_state_option_def := next_state_option_aux.(seal_eq).
-Global Arguments next_state_option {Σ} Ω {H} n.
+Definition next_state := (next_state_aux).(unseal).
+Local Definition next_state_unseal :
+  @next_state = @next_state_def := next_state_aux.(seal_eq).
+Global Arguments next_state {Σ} Ω {H} n.
 
-Lemma next_state_option_id_eq `{H : heapGS Σ Ω} :
-  next_state_option Ω None = transmap_insert_inG id Ω.
+Lemma next_state_eq `{H : heapGS Σ Ω} n :
+  next_state Ω n = transmap_insert_inG (locality_pick n) Ω.
 Proof.
-  rewrite next_state_option_unseal /next_state_option_def /= //.
+  rewrite next_state_unseal /next_state_def /= //.
 Qed.
 
-Lemma next_state_option_some_eq `{H : heapGS Σ Ω} n :
-  next_state_option Ω (Some n) = transmap_insert_inG (state_trans n) Ω.
+Lemma next_state_eq' `{H : heapGS Σ Ω} n :
+  next_state Ω (lifetime_stack n) = transmap_insert_inG (state_trans n) Ω.
 Proof.
-  rewrite next_state_option_unseal /next_state_option_def /= //.
+  rewrite next_state_unseal /next_state_def /= //. 
+Qed.
+
+Definition next_state_inv_def {Σ} (Ω : gTransformations Σ) `{H : heapGS Σ Ω} (n: locality_lifetime) :=
+  transmap_insert_inG (inv_pick_transform n) Ω.
+Definition next_state_inv_aux : seal (@next_state_inv_def).
+Proof. by eexists. Qed.
+Definition next_state_inv := (next_state_inv_aux).(unseal).
+Local Definition next_state_inv_unseal :
+  @next_state_inv = @next_state_inv_def := next_state_inv_aux.(seal_eq).
+Global Arguments next_state_inv {Σ} Ω {H} n.
+
+Lemma next_state_inv_eq `{H : heapGS Σ Ω} n :
+  next_state_inv Ω n = transmap_insert_inG (inv_pick_transform n) Ω.
+Proof.
+  rewrite next_state_inv_unseal /next_state_inv_def /= //.
+Qed.
+
+Lemma next_state_inv_eq' `{H : heapGS Σ Ω} n :
+  next_state_inv Ω n = transmap_insert_inG (inv_pick_transform n) Ω.
+Proof.
+  rewrite next_state_inv_unseal /next_state_inv_def /= //. 
 Qed.
   
 #[global]
@@ -182,12 +266,8 @@ Notation "i @@ l ↦{ q } -" := (∃ v, i @@ l ↦{q} v)%I
 (* Notation "i @@ l ↦ -" := (i @@ l ↦{DfracOwn 1} -)%I (at level 20) : bi_scope. *)
 Notation "[size] n" := (own heapG_stacksize_name (excl_auth_frag n)) (at level 20, format "[size]  n") : bi_scope.
 
-Notation "⚡={ Ω <- n }=> P" := (⚡={ next_state_option Ω (Some n) }=> P)%I
+Notation "⚡={ Ω <- n }=> P" := (⚡={ next_state_inv Ω n }=> ⚡={ next_state Ω n }=> P)%I
   (at level 99, Ω at level 50, n at level 50, P at level 200, format "⚡={ Ω  <-  n }=>  P") : bi_scope.
-
-Notation "⚡={ Ω <- 'id' }=> P" := (⚡={ next_state_option Ω None }=> P)%I
-  (at level 99, Ω at level 50, P at level 200, format "⚡={ Ω  <-  id }=>  P") : bi_scope.
-
 
 Section heapG_nextgen_updates.
   Context `{heapGS Σ Ω}.
@@ -213,7 +293,7 @@ Section heapG_nextgen_updates.
     rewrite (list_to_gmap_stack_insert _ s0)//.
     simpl. rewrite /insert /insert_state_Insert /=.
     rewrite PeanoNat.Nat.sub_0_r Hs0 insert_length. iFrame.
-    rewrite /mapsto seal_eq /gen_heap.mapsto_def /=. iFrame.
+    rewrite /mapsto seal_eq /gen_heap.mapsto_def /=. rewrite /stack_gname. simpl. iFrame. simpl. iFrame.
     done.
   Qed.
 
@@ -238,125 +318,149 @@ Section heapG_nextgen_updates.
     erewrite list_to_gmap_stack_insert =>//.
   Qed.
 
-
   Lemma gen_stack_interp_stack_pop s1 i
     (Hlen: length s1 ≥ i) :
     gen_stack_interp s1 ⊢
-    ⚡={next_state_option Ω (Some ((length s1) - i))}=> gen_stack_interp (popN_stack s1 i).
+    ⚡={next_state Ω (lifetime_stack ((length s1) - i))}=> gen_stack_interp (popN_stack s1 i).
   Proof.
     iIntros "Hs". rewrite /gen_stack_interp /=.
-    pose proof heapG_noTransInG.
     rewrite /ghost_map.ghost_map_auth seal_eq /ghost_map.ghost_map_auth_def /=.
-    rewrite next_state_option_unseal /next_state_option_def /=.
-    iModIntro.
+    rewrite next_state_unseal /next_state_def /=.
+    iDestruct (transmap_own_insert_right (state_trans (length s1 - i)) with "Hs") as "Hs".
+    iApply (bnextgen_mono with "Hs").
     rewrite /state_trans
       /map_entry_lift_gmap_view /= /cmra_morphism_extra.fmap_view /= /cmra_morphism_extra.fmap_pair /=.
     rewrite /gMapTrans_frag_lift map_imap_empty /=.
     rewrite /gmap_view.gmap_view_auth /view_auth.
     rewrite agree_map_to_agree.
-    rewrite stack_location_cut_popN_stack. iFrame.
+    rewrite stack_location_cut_popN_stack. iIntros "Hs". iFrame.
   Qed.
 
+  Lemma gen_stack_interp_stack_pop_inv s1 i
+    (Hlen: length s1 ≥ i) :
+    gen_stack_interp s1 ⊢
+    ⚡={next_state_inv Ω (lifetime_stack ((length s1) - i))}=> gen_stack_interp s1.
+  Proof.
+    iIntros "Hs".
+    rewrite /gen_stack_interp /=.
+    rewrite /ghost_map.ghost_map_auth seal_eq /ghost_map.ghost_map_auth_def /=.
+    rewrite next_state_inv_unseal /next_state_inv_def /=.
+    iDestruct (transmap_own_insert_other_right (inv_pick_transform (lifetime_stack (length s1 - i))) with "Hs") as "Hs".
+    iApply (bnextgen_mono with "Hs"). iIntros "Hs". iFrame.
+  Qed.
+
+  Lemma gen_stack_interp_heap_inv s1 i
+    (Hlen: length s1 ≥ i) :
+    gen_stack_interp s1 ⊢
+    ⚡={next_state_inv Ω lifetime_heap}=> gen_stack_interp s1.
+  Proof.
+    iIntros "Hs".
+    rewrite /gen_stack_interp /=.
+    rewrite /ghost_map.ghost_map_auth seal_eq /ghost_map.ghost_map_auth_def /=.
+    rewrite next_state_inv_unseal /next_state_inv_def /=.
+    iModIntro. iFrame.
+  Qed.
+  
   Lemma stack_size_auth_intro (s : nat) n :
     own heapG_stacksize_name (excl_auth_auth s) ⊢
-    ⚡={next_state_option Ω n}=> own heapG_stacksize_name (excl_auth_auth s).
+    ⚡={next_state Ω n}=> own heapG_stacksize_name (excl_auth_auth s).
   Proof.
-    iIntros "Hs". rewrite next_state_option_unseal /next_state_option_def.
+    iIntros "Hs". rewrite next_state_unseal /next_state_def.
+    iModIntro. iFrame.
+  Qed.
+
+  Lemma stack_size_auth_inv_intro (s : nat) n :
+    own heapG_stacksize_name (excl_auth_auth s) ⊢
+    ⚡={next_state_inv Ω n}=> own heapG_stacksize_name (excl_auth_auth s).
+  Proof.
+    iIntros "Hs". rewrite next_state_inv_unseal /next_state_inv_def.
     iModIntro. iFrame.
   Qed.
 
   Lemma stack_size_frag_intro (s : nat) n :
     [size] s ⊢
-    ⚡={next_state_option Ω n}=> [size] s.
+    ⚡={next_state Ω n}=> [size] s.
   Proof.
-    iIntros "Hs". rewrite next_state_option_unseal /next_state_option_def.
+    iIntros "Hs". rewrite next_state_unseal /next_state_def.
+    iModIntro. iFrame.
+  Qed.
+
+  Lemma stack_size_frag_inv_intro (s : nat) n :
+    [size] s ⊢
+    ⚡={next_state_inv Ω n}=> [size] s.
+  Proof.
+    iIntros "Hs". rewrite next_state_inv_unseal /next_state_inv_def.
     iModIntro. iFrame.
   Qed.
   
   Lemma heap_stack_intro (l : loc) (q : dfrac) (v : val) n :
-    l ↦{q} v ⊢ ⚡={next_state_option Ω n}=> l ↦{q} v.
+    l ↦{q} v ⊢ ⚡={next_state Ω n}=> l ↦{q} v.
   Proof.
     iIntros "Hl".
     rewrite /mapsto seal_eq /gen_heap.mapsto_def
       /ghost_map.ghost_map_elem seal_eq /ghost_map.ghost_map_elem_def
-      next_state_option_unseal /next_state_option_def.
+      next_state_unseal /next_state_def.
+    iModIntro. iFrame.
+  Qed.
+
+  Lemma heap_stack_inv_intro (l : loc) (q : dfrac) (v : val) n :
+    l ↦{q} v ⊢ ⚡={next_state_inv Ω n}=> l ↦{q} v.
+  Proof.
+    iIntros "Hl".
+    rewrite /mapsto seal_eq /gen_heap.mapsto_def
+      /ghost_map.ghost_map_elem seal_eq /ghost_map.ghost_map_elem_def
+      next_state_inv_unseal /next_state_inv_def.
     iModIntro. iFrame.
   Qed.
 
   Lemma gen_heap_interp_stack_pop (h1 : heap) n :
     gen_heap_interp h1 ⊢
-    ⚡={next_state_option Ω n}=> gen_heap_interp h1.
+    ⚡={next_state Ω n}=> gen_heap_interp h1.
   Proof.
-    iIntros "Hg". iDestruct "Hg" as (m Hdom) "Hg".
+    iIntros "Hg". iDestruct "Hg" as (m Hdom) "[Hg Hmeta]".
     rewrite /gen_heap_interp /ghost_map.ghost_map_auth !seal_eq /= /ghost_map.ghost_map_auth_def
-      next_state_option_unseal /next_state_option_def /=.
-    iModIntro; eauto.
-  Qed.
-  
-  Lemma gen_stack_interp_id_intro (s1 : stack) :
-    gen_stack_interp s1 ⊢
-    ⚡={next_state_option Ω None}=> gen_stack_interp s1.
-  Proof.
-    iIntros "H".
-    rewrite /gen_stack_interp /ghost_map.ghost_map_auth !seal_eq /ghost_map.ghost_map_auth_def
-      next_state_option_unseal /next_state_option_def /=.
-    iModIntro. auto.
+      next_state_unseal /next_state_def.
+    iModIntro. iExists _. iFrame. auto.
   Qed.
 
-  Lemma stack_id_intro i l q v :
-    i @@ l ↦{q} v ⊢ ⚡={next_state_option Ω None}=> i @@ l ↦{q} v.
+  Lemma gen_heap_interp_stack_pop_inv (h1 : heap) n :
+    gen_heap_interp h1 ⊢
+    ⚡={next_state_inv Ω n}=> gen_heap_interp h1.
   Proof.
-    iIntros "Hi".
-    rewrite /mapsto !seal_eq /gen_heap.mapsto_def /ghost_map.ghost_map_elem !seal_eq
-      next_state_option_unseal /next_state_option_def.
-    iModIntro. iFrame.
-  Qed.
-
-  Lemma state_interp_insert_id_intro σ ns κs nt :
-    state_interp σ ns κs nt ⊢
-    ⚡={next_state_option Ω None}=> state_interp σ ns κs nt.
-  Proof.
-    destruct σ as [h1 s1]. simpl snd in *;simpl.
-    iIntros "(Hh & Hstk & Hsize)".
-    iDestruct "Hh" as (m Hdom) "[Hh1 Hh2]".
-    rewrite /gen_stack_interp.
-    rewrite /ghost_map.ghost_map_auth !seal_eq /=
-      next_state_option_unseal /next_state_option.
-    rewrite /id.
-    iModIntro. iFrame. iExists _. iFrame "%".
-    rewrite /ghost_map.ghost_map_auth !seal_eq /=.
-    iFrame.
+    iIntros "Hg". iDestruct "Hg" as (m Hdom) "[Hg Hmeta]".
+    rewrite /gen_heap_interp /ghost_map.ghost_map_auth !seal_eq /= /ghost_map.ghost_map_auth_def
+      next_state_inv_unseal /next_state_inv_def.
+    iModIntro. iExists _. iFrame. auto.
   Qed.
 
   Lemma later_credits_intro m n :
-    £ m ⊢ ⚡={next_state_option Ω n}=> £ m.
+    £ m ⊢ ⚡={next_state Ω n}=> £ m.
   Proof.
     iIntros "Hm".
-    rewrite next_state_option_unseal /next_state_option_def.
-    iApply wsat.lc_ind_insert_intro. iFrame.
+    rewrite next_state_unseal /next_state_def.
+    iDestruct (wsat.lc_ind_insert_intro _ (locality_pick n) with "Hm") as "Hm".
+    iApply (bnextgen_mono with "Hm"). iIntros "$". 
   Qed.
 
-  (* The following two instances make typeclass resolution much faster *)
-  Lemma next_state_option_id n P :
-    ((⚡={next_state_option Ω n}=> P) ⊢ ⚡={next_state_option Ω n}=> P).
-  Proof. intros. auto. Qed.
-
-  Lemma next_state_option_pure_intro P n :
-    (■ P) ⊢ ⚡={next_state_option Ω n}=> ■ P.
+  Lemma later_credits_inv_intro m n :
+    £ m ⊢ ⚡={next_state_inv Ω n}=> £ m.
   Proof.
-    iIntros "Hp". iApply bnextgen_intro_plainly. eauto.
+    iIntros "Hm".
+    rewrite next_state_inv_unseal /next_state_inv_def.
+    iDestruct (wsat.lc_ind_insert_intro _ (inv_pick_transform n) with "Hm") as "Hm".
+    iApply (bnextgen_mono with "Hm"). iIntros "$". 
   Qed.
 
   Lemma stack_stack_pop_intro i l q v n
     (Hlt : i < n) :
-    i @@ l ↦{q} v ⊢ ⚡={next_state_option Ω (Some n)}=> i @@ l ↦{q} v.
+    i @@ l ↦{q} v ⊢ ⚡={next_state Ω (lifetime_stack n)}=> i @@ l ↦{q} v.
   Proof.
     iIntros "Hl".
     rewrite /mapsto seal_eq /gen_heap.mapsto_def
       /ghost_map.ghost_map_elem seal_eq /ghost_map.ghost_map_elem_def
-      next_state_option_unseal /next_state_option_def.
+      next_state_unseal /next_state_def.
     rewrite -/stack_gname.
-    iModIntro.
+    iModIntro. simpl.
     rewrite /state_trans /map_entry_lift_gmap_view /gmap_view.gmap_view_frag /=.
     rewrite /cmra_morphism_extra.fmap_view /=.
     rewrite /gMapTrans_frag_lift /=.
@@ -364,31 +468,79 @@ Section heapG_nextgen_updates.
     rewrite /stack_location_cut bool_decide_true // /=.
   Qed.
 
+  Lemma stack_stack_pop_inv_intro i l q v n :
+    i @@ l ↦{q} v ⊢ ⚡={next_state_inv Ω n}=> i @@ l ↦{q} v.
+  Proof.
+    iIntros "Hl".
+    rewrite /mapsto seal_eq /gen_heap.mapsto_def
+      /ghost_map.ghost_map_elem seal_eq /ghost_map.ghost_map_elem_def
+      next_state_inv_unseal /next_state_inv_def.
+    rewrite -/stack_gname.
+    iModIntro. iFrame.
+  Qed.
+
+  Lemma stack_heap_intro i l q v :
+    i @@ l ↦{q} v ⊢ ⚡={next_state Ω lifetime_heap}=> i @@ l ↦{q} v.
+  Proof.
+    iIntros "Hl".
+    rewrite /mapsto seal_eq /gen_heap.mapsto_def
+      /ghost_map.ghost_map_elem seal_eq /ghost_map.ghost_map_elem_def
+      next_state_unseal /next_state_def.
+    iModIntro. iFrame.
+  Qed.
+
+  (* The following two instances make typeclass resolution much faster *)
+  Lemma next_state_id n P :
+    ((⚡={next_state Ω n}=> P) ⊢ ⚡={next_state Ω n}=> P).
+  Proof. intros. auto. Qed.
+  Lemma next_state_inv_id n P :
+    ((⚡={next_state_inv Ω n}=> P) ⊢ ⚡={next_state_inv Ω n}=> P).
+  Proof. intros. auto. Qed.
+  
+  Lemma next_state_pure_intro P n :
+    (■ P) ⊢ ⚡={next_state Ω n}=> ■ P.
+  Proof.
+    iIntros "Hp". iApply bnextgen_intro_plainly. eauto.
+  Qed.
+  Lemma next_state_pure_inv_intro P n :
+    (■ P) ⊢ ⚡={next_state_inv Ω n}=> ■ P.
+  Proof.
+    iIntros "Hp". iApply bnextgen_intro_plainly. eauto.
+  Qed.
+
   (* #[global] Instance gen_stack_interp_stack_pop' s1 i (Hlen: length s1 >= i) *)
   (*   : IntoPnextgen _ _ _ := gen_stack_interp_stack_pop s1 i Hlen. *)
-  #[global] Instance stack_size_auth_intro' s n
-    : IntoPnextgen _ _ _ := stack_size_auth_intro s n.
+  (* #[global] Instance stack_size_auth_intro' s n *)
+  (*   : IntoPnextgen _ _ _ := stack_size_auth_intro s n. *)
   #[global] Instance stack_size_frag_intro' s n
     : IntoPnextgen _ _ _ := stack_size_frag_intro s n.
+  #[global] Instance stack_size_frag_inv_intro' s n
+    : IntoPnextgen _ _ _ := stack_size_frag_inv_intro s n.
   #[global] Instance heap_stack_intro' (l : loc) (q : dfrac) (v : val) n
     : IntoPnextgen _ _ _ := heap_stack_intro l q v n.
-  #[global] Instance gen_heap_interp_stack_pop' (h1 : heap) n
-    : IntoPnextgen _ _ _ := gen_heap_interp_stack_pop h1 n.
+  #[global] Instance heap_stack_inv_intro' (l : loc) (q : dfrac) (v : val) n
+    : IntoPnextgen _ _ _ := heap_stack_inv_intro l q v n.
+  #[global] Instance stack_stack_pop_inv_intro' i l q v n 
+    : IntoPnextgen _ _ _ := stack_stack_pop_inv_intro i l q v n.
+  #[global] Instance stack_heap_intro' i l q v
+    : IntoPnextgen _ _ _ := stack_heap_intro i l q v.
+  (* #[global] Instance gen_heap_interp_stack_pop' (h1 : heap) n *)
+  (*   : IntoPnextgen _ _ _ := gen_heap_interp_stack_pop h1 n. *)
   (* #[global] Instance stack_stack_pop_intro' i l q v n Hlt *)
   (*   : IntoPnextgen _ _ _ := stack_stack_pop_intro i l q v n Hlt. *)
-  #[global] Instance gen_stack_interp_id_intro' s
-    : IntoPnextgen _ _ _ := gen_stack_interp_id_intro s.
-  #[global] Instance stack_id_intro' i l q v
-    : IntoPnextgen _ _ _ := stack_id_intro i l q v.
-  #[global] Instance state_interp_insert_id_intro' σ ns κs nt
-    : IntoPnextgen _ _ _ := state_interp_insert_id_intro σ ns κs nt.
   #[global] Instance later_credits_intro' m n
     : IntoPnextgen _ _ _ := later_credits_intro m n.
-  #[global] Instance next_state_option_id' n P
-    : IntoPnextgen _ _ _ := next_state_option_id n P.
-  #[global] Instance next_state_option_pure_intro' P n
-    : IntoPnextgen _ _ _ := next_state_option_pure_intro P n.
+  #[global] Instance later_credits_inv_intro' m n
+    : IntoPnextgen _ _ _ := later_credits_inv_intro m n.
 
+  #[global] Instance next_state_id' n P
+    : IntoPnextgen _ _ _ := next_state_id n P.
+  #[global] Instance next_state_pure_intro' P n
+    : IntoPnextgen _ _ _ := next_state_pure_intro P n.
+  #[global] Instance next_state_inv_id' n P
+    : IntoPnextgen _ _ _ := next_state_inv_id n P.
+  #[global] Instance next_state_pure_inv_intro' P n
+    : IntoPnextgen _ _ _ := next_state_pure_inv_intro P n.
   
 End heapG_nextgen_updates.
 
@@ -765,7 +917,7 @@ Section lifting.
     (i <= 0)%Z ->
     Z.abs_nat i <= n ->
     ▷ ([size] (n - (Z.abs_nat i)) -∗
-         ⚡={next_state_option Ω (Some (n - (Z.abs_nat i)))}=>
+         ⚡={next_state_inv Ω (lifetime_stack (n - (Z.abs_nat i)))}=> ⚡={next_state Ω (lifetime_stack (n - (Z.abs_nat i)))}=>
          WP fill K' (n - (Z.abs_nat i),shift_expr e i) @ E {{ Φ }})
       ∗ ▷ [size] n
       ⊢ WP fill K (n,Return (Cont i K') e) @ E {{ Φ }}.
@@ -780,18 +932,23 @@ Section lifting.
     iNext. iIntros (r0 σ2 efs Hstep) "Hp".
     resolve_next_state. iMod "Hcls". rewrite H1.
     iDestruct "Hstate" as "(Hh & Hs & Hsize)".
-    iDestruct (gen_stack_interp_stack_pop with "Hs") as "Hs";[eauto|].
-    iDestruct (gen_heap_interp_stack_pop _ (Some (length s1 - Z.abs_nat i)) with "Hh") as "Hh".
+    iDestruct (gen_stack_interp_stack_pop_inv with "Hs") as "Hs";[eauto|].
+    iDestruct (gen_heap_interp_stack_pop_inv _ (lifetime_stack (length s1 - Z.abs_nat i)) with "Hh") as "Hh".
     iMod (stacksize_own_update (length s1 - Z.abs_nat i) with "[$Hsize $Hn]") as "[Hsize Hn]".
-    iDestruct (stack_size_auth_intro _ (Some (length s1 - Z.abs_nat i)) with "Hsize") as "Hsize".
-    iModIntro.
+    iDestruct (stack_size_auth_inv_intro _ (lifetime_stack (length s1 - Z.abs_nat i)) with "Hsize") as "Hsize".
+    iModIntro. iClear "Hp".
     iDestruct ("HΦ" with "Hn") as "Hwp". iFrame.
     iSplitR "Hwp".
-    - erewrite <- next_state_option_some_eq.
-      rewrite popN_stack_length.
-      iModIntro. iFrame.
-    - erewrite <- next_state_option_some_eq.
-      iModIntro. rewrite /CC_ectxi_language.fill /= fill_proj_eq.
+    - rewrite <- (@next_state_inv_eq Σ Ω H).
+      iModIntro.
+      iDestruct (gen_stack_interp_stack_pop with "Hs") as "Hs";[eauto|].
+      iDestruct (gen_heap_interp_stack_pop _ (lifetime_stack (length s1 - Z.abs_nat i)) with "Hh") as "Hh".
+      iDestruct (stack_size_auth_intro _ (lifetime_stack (length s1 - Z.abs_nat i)) with "Hsize") as "Hsize".
+      rewrite <- (@next_state_eq' Σ Ω H).
+      iModIntro. iFrame. rewrite popN_stack_length. iFrame.
+    - rewrite <- (@next_state_inv_eq Σ Ω H).
+      rewrite <- (@next_state_eq' Σ Ω H).
+      iModIntro. iModIntro. rewrite /CC_ectxi_language.fill /= fill_proj_eq.
       iFrame.
   Qed.
 

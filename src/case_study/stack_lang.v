@@ -6,12 +6,6 @@ From stdpp Require Import binders strings gmap.
 
 Definition loc := positive.
 
-Global Instance loc_dec_eq : EqDecision loc.
-Proof. solve_decision. Defined.
-
-Global Instance loc_countable : Countable loc.
-Proof. apply pos_countable. Qed.
-
 Inductive binop := Add | Sub | Eq | Le | Lt.
 
 Global Instance binop_dec_eq : EqDecision binop.
