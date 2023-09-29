@@ -9,7 +9,7 @@ From nextgen Require Import nextgen_basic gen_trans gmap_view_transformation nex
 From nextgen Require Export nextgen_pointwise.
 Set Default Proof Using "Type".
 Import uPred.
-From nextgen.lib Require Import wsat fancy_updates.
+From nextgen.lib Require Import wsat fancy_updates invariants.
 
 
 (** Basic rules for language operations. *)
@@ -25,12 +25,9 @@ Inductive locality_lifetime : Type :=
   | lifetime_stack : nat -> locality_lifetime
   | lifetime_heap : locality_lifetime.
 
-Definition locality_lifetime_rel : relation locality_lifetime :=
-  λ l1 l2, match l1,l2 with
-           | lifetime_heap, _ => True
-           | lifetime_stack f1, lifetime_stack f2 => f1 <= f2
-           | _,_ => False
-           end.
+Inductive locality_lifetime_rel : relation locality_lifetime :=
+| rel_heap c : locality_lifetime_rel c lifetime_heap
+| rel_stack f1 f2 : f2 <= f1 -> locality_lifetime_rel (lifetime_stack f1) (lifetime_stack f2).
 
 Definition state_trans (n : nat) := (map_entry_lift_gmap_view (stack_location_cut n)).
 
@@ -47,10 +44,11 @@ Proof. auto. Qed.
 Global Instance locality_lifetime_rel_pre : PreOrder locality_lifetime_rel.
 Proof.
   split.
-  - intros l. destruct l;simpl;auto.
+  - intros l. destruct l;simpl;constructor. auto.
   - intros l1 l2 l3 Hl1 Hl2.
     destruct l1,l2,l3;try by inversion Hl1;try by inversion Hl2.
-    simpl in *. lia.
+    + constructor. inversion Hl2;subst. inversion Hl1;subst. lia.
+    + constructor.
 Qed.
 
 Global Instance locality_lifetime_cmra_morphism : ∀ l, CmraMorphism (locality_pick l) :=
@@ -60,7 +58,13 @@ Global Instance locality_lifetime_cmra_morphism : ∀ l, CmraMorphism (locality_
        end.
 
 Global Instance locality_lifetime_rel_dec : ∀ l1 l2, Decision (locality_lifetime_rel l1 l2).
-Proof. intros l1 l2. destruct l1,l2;simpl;[apply _|right;auto|left;auto..]. Qed.
+Proof.
+  intros l1 l2. destruct l1,l2;simpl;[|left;constructor|
+                                       right;intros Hcontr;inversion Hcontr|
+                                       left;constructor].
+  destruct (decide (n0 <= n));[left;by constructor|right].
+  intros Hcontr. inversion Hcontr;subst. inversion Hcontr;subst. lia.
+Qed.
 
 Global Instance locality_lifetime_pick
   : pick_transform_preorder (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) :=
@@ -394,7 +398,27 @@ Section heapG_nextgen_updates.
     iModIntro. iFrame.
   Qed.
 
-  (* The following two instances make typeclass resolution much faster *)
+  Lemma next_state_heap_inv_intro N c P :
+    inv N c P ⊢ ⚡={next_state Ω lifetime_heap}=> inv N c P.
+  Proof.
+    rewrite next_state_unseal /next_state_def.
+    iIntros "#Hinv".
+    iApply inv_mod_intro;auto.
+    simpl. constructor.
+  Qed.
+
+  Lemma next_state_stack_inv_intro N n1 n2 P :
+    n2 <= n1 ->
+    inv N (lifetime_stack n1) P ⊢ ⚡={next_state Ω (lifetime_stack n2)}=> inv N (lifetime_stack n1) P.
+  Proof.
+    intros Hle.
+    rewrite next_state_unseal /next_state_def.
+    iIntros "#Hinv".
+    iApply inv_mod_intro;auto.
+    simpl. by constructor.
+  Qed.
+
+  (* Repeating the following two instances here make typeclass resolution much faster *)
   Lemma next_state_id n P :
     ((⚡={next_state Ω n}=> P) ⊢ ⚡={next_state Ω n}=> P).
   Proof. intros. auto. Qed.
