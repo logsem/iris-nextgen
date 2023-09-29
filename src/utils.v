@@ -56,6 +56,10 @@ Section cmra_map_transport.
     (Proper ((≡) ==> (≡)) (cmra_map_transport eq f)).
   Proof. naive_solver. Qed.
 
+  Lemma cmra_map_transport_compose (f : A -> A) (g : A -> A) `{!CmraMorphism f} `{!CmraMorphism g} x :
+    cmra_map_transport eq f (cmra_map_transport eq g x) = cmra_map_transport eq (f ∘ g) x.
+  Proof. destruct eq. simpl. auto. Defined.
+
   Lemma cmra_map_transport_op f `{!CmraMorphism f} x y :
     cmra_map_transport eq f (x ⋅ y) ≡
       cmra_map_transport eq f x ⋅ cmra_map_transport eq f y.

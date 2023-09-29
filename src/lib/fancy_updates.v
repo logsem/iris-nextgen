@@ -52,6 +52,7 @@ Notation HasLc := fancy_updates.HasLc.
 Notation HasNoLc := fancy_updates.HasNoLc.
 Notation ownE := wsat.ownE.
 Notation ownD := wsat.ownD.
+Notation ownI := wsat.ownI.
 
 Notation invGIndS := (invGIndS_gen HasLc).
 

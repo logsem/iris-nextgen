@@ -117,7 +117,7 @@ Qed.
   λ c', gMapTrans_lift_CmraMorphism (inv_pick_cut c').
 
 Definition inv_cond {Σ Ω A} `{pick: pick_transform_preorder A} {wsat: wsatGIndS Σ Ω A pick} Q (c : C) : iProp Σ :=
-  ■ (∀ (c' : C), ⌜CR c c'⌝ -∗ Q -∗ ⚡={transmap_insert_inG (inv_pick_transform c') Ω}=> ⚡={transmap_insert_inG (C_pick c') Ω}=> Q).
+  ■ (∀ (c' : C), ⌜CR c c'⌝ -∗ Q -∗ ⚡={transmap_insert_two_inG (inv_pick_transform c') (C_pick c') Ω}=> Q).
 
 Definition wsat `{pick: pick_transform_preorder A} `{!wsatGIndS Σ Ω A pick} : iProp Σ :=
   locked (∃ (I : gmap positive (iProp Σ)) (F : gmap positive (option C)),
@@ -175,7 +175,7 @@ Qed.
 Lemma ownI_alloc φ P c :
   (∀ E : gset positive, ∃ i, i ∉ E ∧ φ i) →
   inv_cond P c ∗
-  wsat ∗ ▷ P ==∗ ∃ i, ⌜φ i⌝ ∗ wsat ∗ ownI i P.
+  wsat ∗ ▷ P ==∗ ∃ i, ⌜φ i⌝ ∗ wsat ∗ ownI i P ∗ ownC i c.
 Proof.
   iIntros (Hfresh) "[#Hcond [Hw HP]]". rewrite /wsat -!lock.
   iDestruct "Hw" as (I F Hdom) "[Hw [HF HI]]".
@@ -193,7 +193,9 @@ Proof.
     rewrite /= lookup_fmap. assert (F !! i = None) as -> =>//.
     apply not_elem_of_dom. rewrite -Hdom.
     apply not_elem_of_dom =>//. }
-  iModIntro; iExists i;  iSplit; [done|]. rewrite /ownI; iFrame "HiP".
+  iModIntro; iExists i;  iSplit; [done|].
+  rewrite /ownI; iFrame "HiP".
+  rewrite /ownC. iDestruct "HiC" as "#HiC". iFrame "HiC".
   iExists (<[i:=P]>I),(<[i:=Some c]>F). iSplit.
   { iPureIntro. set_solver. }
   iSplitL "Hw".
@@ -207,7 +209,7 @@ Qed.
 
 Lemma ownI_alloc_open φ P c :
   (∀ E : gset positive, ∃ i, i ∉ E ∧ φ i) →
-  inv_cond P c ∗ wsat ==∗ ∃ i, ⌜φ i⌝ ∗ (ownE {[i]} -∗ wsat) ∗ ownI i P ∗ ownD {[i]}.
+  inv_cond P c ∗ wsat ==∗ ∃ i, ⌜φ i⌝ ∗ (ownE {[i]} -∗ wsat) ∗ ownI i P ∗ ownC i c ∗ ownD {[i]}.
 Proof.
   iIntros (Hfresh) "[#Hcond Hw]". rewrite /wsat -!lock. iDestruct "Hw" as (I F Hdom) "[Hw [HF HI]]".
   iMod (own_unit (gset_disjUR positive) disabled_name) as "HD".
@@ -224,7 +226,10 @@ Proof.
     rewrite /= lookup_fmap. assert (F !! i = None) as -> =>//.
     apply not_elem_of_dom. rewrite -Hdom.
     apply not_elem_of_dom =>//. }
-  iModIntro; iExists i;  iSplit; [done|]. rewrite /ownI; iFrame "HiP".
+  iModIntro; iExists i;  iSplit; [done|].
+  rewrite /ownI; iFrame "HiP".
+  iDestruct "HiC" as "#HiC".
+  rewrite /ownC; iFrame "HiC".
   unfold ownD. simpl. iFrame "HD".
   iIntros "HE". iExists (<[i:=P]>I),(<[i:=Some c]>F); iSplit.
   { iPureIntro. set_solver. }
@@ -260,6 +265,16 @@ Proof.
   iModIntro. iFrame.
 Qed.
 
+Lemma lc_ind_insert_two_intro `{lcGIndS Σ Ω} `{noTwoTransInG Σ Ω A D} (m : nat)
+  (t : A → A) (f : D -> D) `{!CmraMorphism t} `{!CmraMorphism f} :
+  £ m ⊢ ⚡={transmap_insert_two_inG t f Ω}=> £ m.
+Proof.
+  iIntros "Hm".
+  unfold lc. rewrite seal_eq /= /later_credits.lc_def /=.
+  iDestruct (transmap_own_insert_two_other t f with "Hm") as "Hm".
+  iModIntro. iFrame.
+Qed.
+
 Lemma lc_ind_intro `{lcGIndS Σ Ω} (m : nat) :
   £ m ⊢ ⚡={Ω}=> £ m.
 Proof.
@@ -284,10 +299,31 @@ Proof.
   iModIntro. iFrame.
 Qed.
 
+Lemma ls_ind_insert_two_intro `{lcGIndS Σ Ω} `{noTwoTransInG Σ Ω A B}
+  (t : A → A) (f : B → B) `{!CmraMorphism t} `{!CmraMorphism f} (m : nat) :
+  later_credits.lc_supply m ⊢ ⚡={transmap_insert_two_inG t f Ω}=> later_credits.lc_supply m.
+Proof.
+  iIntros "Hm".
+  unfold later_credits.lc_supply. rewrite seal_eq /= /later_credits.lc_supply_def.
+  iDestruct (transmap_own_insert_two_other t f with "Hm") as "Hm".
+  iModIntro. iFrame.
+Qed.
+
+
+
 Lemma ownE_ind_insert_intro `{!wsatGIndS Σ Ω A pick} `{noTransInG Σ Ω B} (E: coPset) (t : B → B) `{!CmraMorphism t} :
   ownE E ⊢ ⚡={transmap_insert_inG t Ω}=> ownE E.
 Proof.
   iIntros "Hwsat". rewrite /ownE.
+  iModIntro. iFrame.
+Qed.
+
+Lemma ownE_ind_insert_two_intro `{!wsatGIndS Σ Ω A pick} `{noTwoTransInG Σ Ω B D}
+  (E: coPset) (t : B → B) (f : D -> D) `{!CmraMorphism t} `{!CmraMorphism f} :
+  ownE E ⊢ ⚡={transmap_insert_two_inG t f Ω}=> ownE E.
+Proof.
+  iIntros "Hwsat". rewrite /ownE.
+  iDestruct (transmap_own_insert_two_other t f with "Hwsat") as "Hwsat".
   iModIntro. iFrame.
 Qed.
 
@@ -299,7 +335,7 @@ Proof.
   iModIntro. iFrame.
 Qed.
 
-Local Lemma ownD_ind_insert_intro' `{!wsatGIndS Σ Ω A pick} `{noTransInG Σ Ω B} (E: gset positive) (t : B → B) `{!CmraMorphism t} :
+Lemma ownD_ind_insert_intro `{!wsatGIndS Σ Ω A pick} `{noTransInG Σ Ω B} (E: gset positive) (t : B → B) `{!CmraMorphism t} :
   ownD E ⊢ ⚡={transmap_insert_inG t Ω}=> ownD E.
 Proof.
   iIntros "Hwsat".
@@ -307,25 +343,36 @@ Proof.
   iModIntro. iFrame.
 Qed.
 
-Lemma ownD_ind_insert_intro `{!wsatGIndS Σ Ω A pick} (E: gset positive) (c : C) : 
-  ownD E ⊢ ⚡={transmap_insert_inG (C_pick c) Ω}=> ownD E.
+Lemma ownD_ind_insert_two_intro `{!wsatGIndS Σ Ω A pick} `{noTwoTransInG Σ Ω B D}
+  (E: gset positive) (t : B → B) (f : D -> D) `{!CmraMorphism t} `{!CmraMorphism f} :
+  ownD E ⊢ ⚡={transmap_insert_two_inG t f Ω}=> ownD E.
 Proof.
   iIntros "Hwsat".
-  destruct wsatGIndS0,wsat_inG0.
-  assert (noTransInG Σ Ω A);[apply _|].
-  iApply (@ownD_ind_insert_intro' _ _ A _ _ A).
-  iFrame.
+  unfold ownD.
+  iDestruct (transmap_own_insert_two_other t f with "Hwsat") as "Hwsat".
+  iModIntro. iFrame.
 Qed.
 
-Lemma ownD_ind_pick_map_intro `{!wsatGIndS Σ Ω A pick} (E: gset positive) (c : C) :
-  ownD E ⊢ ⚡={transmap_insert_inG (inv_pick_transform c) Ω}=> ownD E.
-Proof.
-  iIntros "Hwsat".
-  destruct wsatGIndS0,wsat_inG0.
-  assert (noTransInG Σ Ω A);[apply _|].
-  iApply ownD_ind_insert_intro'.
-  iFrame.
-Qed.
+
+(* Lemma ownD_ind_insert_intro `{!wsatGIndS Σ Ω A pick} (E: gset positive) (c : C) :  *)
+(*   ownD E ⊢ ⚡={transmap_insert_inG (C_pick c) Ω}=> ownD E. *)
+(* Proof. *)
+(*   iIntros "Hwsat". *)
+(*   destruct wsatGIndS0,wsat_inG0. *)
+(*   assert (noTransInG Σ Ω A);[apply _|]. *)
+(*   iApply (@ownD_ind_insert_intro' _ _ A _ _ A). *)
+(*   iFrame. *)
+(* Qed. *)
+
+(* Lemma ownD_ind_pick_map_intro `{!wsatGIndS Σ Ω A pick} (E: gset positive) (c : C) : *)
+(*   ownD E ⊢ ⚡={transmap_insert_inG (inv_pick_transform c) Ω}=> ownD E. *)
+(* Proof. *)
+(*   iIntros "Hwsat". *)
+(*   destruct wsatGIndS0,wsat_inG0. *)
+(*   assert (noTransInG Σ Ω A);[apply _|]. *)
+(*   iApply ownD_ind_insert_intro'. *)
+(*   iFrame. *)
+(* Qed. *)
 
 Lemma ownD_ind_intro `{wsatGIndS Σ Ω} (E: gset positive) :
   ownD E ⊢ ⚡={Ω}=> ownD E.
@@ -335,11 +382,49 @@ Proof.
   iModIntro. iFrame.
 Qed.
 
-Lemma auth_invariant_insert_intro `{!wsatGIndS Σ Ω A pick} `{i : noTransInG Σ Ω B} (I : gmap positive (laterO (iPropO Σ))) (t : B → B) `{!CmraMorphism t} :
+
+
+Lemma auth_invariant_insert_intro `{!wsatGIndS Σ Ω A pick} `{i : noTransInG Σ Ω B}
+  (I : gmap positive (laterO (iPropO Σ))) (t : B → B) `{!CmraMorphism t} :
   own invariant_name (gmap_view_auth (DfracOwn 1) I)
     ⊢ ⚡={transmap_insert_inG t Ω}=> own invariant_name (gmap_view_auth (DfracOwn 1) I).
 Proof.
   iIntros "Hi".
+  iModIntro.
+  iFrame.
+Qed.
+
+Lemma auth_invariant_insert_two_intro `{!wsatGIndS Σ Ω A pick} `{i : noTwoTransInG Σ Ω B D}
+  (I : gmap positive (laterO (iPropO Σ))) (t : B → B) (f : D -> D) `{!CmraMorphism t} `{!CmraMorphism f} :
+  own invariant_name (gmap_view_auth (DfracOwn 1) I)
+    ⊢ ⚡={transmap_insert_two_inG t f Ω}=> own invariant_name (gmap_view_auth (DfracOwn 1) I).
+Proof.
+  iIntros "Hi".
+  iDestruct (transmap_own_insert_two_other t f with "Hi") as "Ho".
+  iModIntro.
+  iFrame.
+Qed.
+
+Lemma frag_invariant_insert_intro `{!wsatGIndS Σ Ω A pick} `{i : noTransInG Σ Ω B} (t : B → B)
+  (j : positive) (P : iProp Σ) `{!CmraMorphism t} :
+  ownI j P
+    ⊢ ⚡={transmap_insert_inG t Ω}=> ownI j P.
+Proof.
+  rewrite /ownI /=.
+  iIntros "Hi".
+  iModIntro.
+  iFrame.
+Qed.
+
+Lemma frag_invariant_insert_two_intro `{!wsatGIndS Σ Ω A pick} `{i : noTwoTransInG Σ Ω B D}
+  (j : positive) (P : iProp Σ)
+  (t : B → B) (f : D → D) `{!CmraMorphism t} `{!CmraMorphism f} :
+  ownI j P
+    ⊢ ⚡={transmap_insert_two_inG t f Ω}=> ownI j P.
+Proof.
+  rewrite /ownI /=.
+  iIntros "Hi".
+  iDestruct (transmap_own_insert_two_other t f with "Hi") as "Ho".
   iModIntro.
   iFrame.
 Qed.
@@ -358,6 +443,14 @@ Lemma auth_pick_map_transform_intro `{!wsatGIndS Σ Ω A pick} F (c : C) :
 Proof.
   iIntros "Hc". rewrite -map_entry_lift_gmap_view_auth.
   iApply transmap_own_insert. iFrame.
+Qed.
+
+Lemma auth_pick_map_transform_two_intro `{!wsatGIndS Σ Ω A pick} F (c : C) :
+  own pick_name (gmap_view_auth (DfracOwn 1) F) ⊢
+    ⚡={transmap_insert_two_inG (inv_pick_transform c) (C_pick c) Ω}=> own pick_name (gmap_view_auth (DfracOwn 1) (map_imap (inv_pick_cut c) F)).
+Proof.
+  iIntros "Hc". rewrite -map_entry_lift_gmap_view_auth.
+  iApply transmap_own_insert_two_left. iFrame.
 Qed.
 
 Lemma frag_pick_map_insert_intro `{!wsatGIndS Σ Ω A pick} (i : positive) (c : C) (t : A → A) `{!CmraMorphism t} :
@@ -400,6 +493,39 @@ Proof.
   rewrite decide_False//.
 Qed.
 
+Lemma frag_pick_map_transform_two_Some_intro `{!wsatGIndS Σ Ω A pick} (i : positive) (c c' : C) :
+  CR c' c ->
+  ownC i c' ⊢
+    ⚡={transmap_insert_two_inG (inv_pick_transform c) (C_pick c) Ω}=> ownC i c'.
+Proof.
+  iIntros (HCR) "Hc". rewrite /ownC.
+  iDestruct (@transmap_own_insert_two_left _ _ Σ Ω ((wsatGIndS0.(wsat_inG)).(wsatGpreS_func))
+               (inv_pick_transform c) (C_pick c) with "Hc") as "Hc".
+  iModIntro.
+  rewrite {1}/inv_pick_transform.
+  unfold map_entry_lift_gmap_view, cmra_morphism_extra.fmap_view, cmra_morphism_extra.fmap_pair. simpl.
+  rewrite /gMapTrans_frag_lift. rewrite -insert_empty.
+  erewrite map_imap_insert_Some;
+    [|rewrite /map_trans_frag_lift agree_option_map_to_agree /= //].
+  rewrite decide_True//.
+Qed.
+
+Lemma frag_pick_map_transform_two_None_intro `{!wsatGIndS Σ Ω A pick} (i : positive) (c c' : C) :
+  ¬ CR c' c ->
+  ownC i c' ⊢
+    ⚡={transmap_insert_two_inG (inv_pick_transform c) (C_pick c) Ω}=> ownN i.
+Proof.
+  iIntros (HCR) "Hc". rewrite /ownC.
+  iDestruct (@transmap_own_insert_two_left _ _ Σ Ω ((wsatGIndS0.(wsat_inG)).(wsatGpreS_func))
+               (inv_pick_transform c) (C_pick c) with "Hc") as "Hc".
+  rewrite {2}/inv_pick_transform.
+  unfold map_entry_lift_gmap_view, cmra_morphism_extra.fmap_view, cmra_morphism_extra.fmap_pair. simpl.
+  rewrite /gMapTrans_frag_lift. rewrite -insert_empty.
+  erewrite map_imap_insert_Some;
+    [|rewrite /map_trans_frag_lift agree_option_map_to_agree /= //].
+  rewrite decide_False//.
+Qed.
+
 Lemma frag_pick_map_None_intro `{!wsatGIndS Σ Ω A pick} (i : positive) (c : C) :
   ownN i ⊢
     ⚡={transmap_insert_inG (inv_pick_transform c) Ω}=> ownN i.
@@ -407,6 +533,21 @@ Proof.
   iIntros "Hc". rewrite /ownN.
   iDestruct (@transmap_own_insert _ Σ Ω (@wsat_notrans_inr _ _ _ _ wsatGIndS0)
                (inv_pick_transform c) with "Hc") as "Hc".
+  rewrite {2}/inv_pick_transform.
+  unfold map_entry_lift_gmap_view, cmra_morphism_extra.fmap_view, cmra_morphism_extra.fmap_pair. simpl.
+  rewrite /gMapTrans_frag_lift. rewrite -insert_empty.
+  erewrite map_imap_insert_Some;
+    [|rewrite /map_trans_frag_lift agree_option_map_to_agree /= //].
+  auto.
+Qed.
+
+Lemma frag_pick_map_None_two_intro `{!wsatGIndS Σ Ω A pick} (i : positive) (c : C) :
+  ownN i ⊢
+    ⚡={transmap_insert_two_inG (inv_pick_transform c) (C_pick c) Ω}=> ownN i.
+Proof.
+  iIntros "Hc". rewrite /ownN.
+  iDestruct (@transmap_own_insert_two_left _ _ Σ Ω ((wsatGIndS0.(wsat_inG)).(wsatGpreS_func))
+               (inv_pick_transform c) (C_pick c) with "Hc") as "Hc".
   rewrite {2}/inv_pick_transform.
   unfold map_entry_lift_gmap_view, cmra_morphism_extra.fmap_view, cmra_morphism_extra.fmap_pair. simpl.
   rewrite /gMapTrans_frag_lift. rewrite -insert_empty.
@@ -423,6 +564,10 @@ Proof.
   iApply transmap_own_insert_other_left.
   iFrame.
 Qed.
+
+
+
+
 
 Local Lemma transform_mono {Σ : gFunctors} {Ω : gTransformations Σ} (P : iProp Σ) :
   (⚡={Ω}=> P) ⊢ ⚡={Ω}=> P.
@@ -482,53 +627,36 @@ Proof.
 Qed.
     
 Lemma wsat_ind_insert_intro `{!wsatGIndS Σ Ω A pick} (c : C) :
-  wsat -∗ ⚡={transmap_insert_inG (inv_pick_transform c) Ω}=> ⚡={transmap_insert_inG (C_pick c) Ω}=> wsat.
+  wsat -∗ ⚡={transmap_insert_two_inG (inv_pick_transform c) (C_pick c) Ω}=> wsat.
 Proof.
   iIntros "Hw". unfold wsat.
   rewrite -lock.
   iDestruct "Hw" as (I F Hdom) "[Hi [Hc H]]".
-  iAssert ([∗ map] i↦Q ∈ I, ⚡={transmap_insert_inG (inv_pick_transform c) Ω}=> ⚡={transmap_insert_inG (C_pick c) Ω}=>
+  iAssert ([∗ map] i↦Q ∈ I, ⚡={transmap_insert_two_inG (inv_pick_transform c) (C_pick c) Ω}=>
              ownN i ∨ (∃ c' : C, ownC i c' ∗ inv_cond Q c' ∗ (▷ Q ∗ ownD {[i]} ∨ ownE {[i]})))%I with "[H]" as "H".
   { iApply (big_sepM_mono with "H").
     iIntros (k x Hx) "[HN | HC]".
-    - iDestruct (frag_pick_map_None_intro with "HN") as "HN".
-      iModIntro.
-      iDestruct (ownN_insert_intro _ (C_pick c) with "HN") as "HN".
+    - iDestruct (frag_pick_map_None_two_intro with "HN") as "HN".
       iModIntro. iLeft. iFrame.
     - iDestruct "HC" as (c') "[HC [#Hcond [[Hx HD] | HE]]]".
       + destruct (decide (CR c' c)).
-        * iDestruct (frag_pick_map_transform_Some_intro with "HC") as "HC";[eauto|].
-          iAssert (▷ ⚡={transmap_insert_inG (inv_pick_transform c) Ω}=> ⚡={transmap_insert_inG (C_pick c) Ω}=> x)%I with "[Hx]" as "Hx".
+        * iDestruct (frag_pick_map_transform_two_Some_intro with "HC") as "HC";[eauto|].
+          iAssert (▷ ⚡={transmap_insert_two_inG (inv_pick_transform c) (C_pick c) Ω}=> x)%I with "[Hx]" as "Hx".
           { iNext. iApply ("Hcond" with "[//] [$]"). }
-          iDestruct (ownD_ind_pick_map_intro _ c with "HD") as "HD".
-          iModIntro.
-          iDestruct (frag_pick_map_insert_intro _ _ (C_pick c) with "HC") as "HC".
-          iDestruct (ownD_ind_insert_intro with "HD") as "HD".
+          iDestruct (ownD_ind_insert_two_intro with "HD") as "HD".
           iModIntro.
           iRight. iExists c'. iFrame "Hcond HC". iLeft; iFrame.
-        * iDestruct (frag_pick_map_transform_None_intro with "HC") as "HC";[eauto|].
-          iClear "Hx Hcond HD". iModIntro.
-          iDestruct (ownN_insert_intro _ (C_pick c) with "HC") as "HC".
-          iModIntro. by iLeft.
+        * iDestruct (frag_pick_map_transform_two_None_intro with "HC") as "HC";[eauto|].
+          iClear "Hx Hcond HD". iModIntro. by iLeft.
       + destruct (decide (CR c' c)).
-        * iDestruct (frag_pick_map_transform_Some_intro with "HC") as "HC";[eauto|].
-          iDestruct (ownE_ind_insert_intro  _ (inv_pick_transform c) with "HE") as "HE".
-          iModIntro.
-          iDestruct (frag_pick_map_insert_intro _ _ (C_pick c) with "HC") as "HC".
-          iDestruct (ownE_ind_insert_intro  _ (C_pick c) with "HE") as "HE".
-          iModIntro.
-          iRight. iExists c'. iFrame "Hcond HC". iRight. iFrame.
-        * iDestruct (frag_pick_map_transform_None_intro with "HC") as "HC";[eauto|].
-          iClear "HE Hcond". iModIntro.
-          iDestruct (ownN_insert_intro _ (C_pick c) with "HC") as "HC".
-          iModIntro. by iLeft. }
+        * iDestruct (frag_pick_map_transform_two_Some_intro with "HC") as "HC";[eauto|].
+          iDestruct (ownE_ind_insert_two_intro  _ (inv_pick_transform c) with "HE") as "HE".
+          iModIntro. iRight. iExists c'. iFrame "Hcond HC". iRight. iFrame.
+        * iDestruct (frag_pick_map_transform_two_None_intro with "HC") as "HC";[eauto|].
+          iClear "HE Hcond". iModIntro. by iLeft. }
   rewrite transmap_big_sepM_1.
-  iDestruct (auth_pick_map_transform_intro _ c with "Hc") as "Hc".
-  iDestruct (auth_invariant_insert_intro _ (inv_pick_transform c) with "Hi") as "Hi".
-  iModIntro.
-  rewrite transmap_big_sepM_1.
-  iDestruct (auth_pick_map_insert_intro _ (C_pick c) with "Hc") as "Hc".
-  iDestruct (auth_invariant_insert_intro _ (C_pick c) with "Hi") as "Hi".
+  iDestruct (auth_pick_map_transform_two_intro _ c with "Hc") as "Hc".
+  iDestruct (auth_invariant_insert_two_intro _ (inv_pick_transform c) (C_pick c) with "Hi") as "Hi".
   iModIntro. iExists I,(map_imap (inv_pick_cut c) F). iFrame.
   rewrite map_imap_inv_pick_cut_coerce. iFrame.
   iPureIntro.

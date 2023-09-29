@@ -117,7 +117,7 @@ Proof.
   destruct (Hstep κ σ1 e2 σ2 efs) as (-> & <- & ->); auto.
   iMod "Hclose" as "_". iMod "H". iModIntro.
   iDestruct ("H" with "[//] Hcred Hσ") as "[Hσ $]".
-  iSplitL =>//. unfold bnextgen_option;destruct (next_choose e1);[iModIntro;iModIntro|]; simpl.
+  iSplitL =>//. unfold bnextgen_option;destruct (next_choose e1);[iModIntro|]; simpl.
   all: by iApply state_interp_mono.
 Qed.
 
@@ -153,7 +153,7 @@ Proof.
   iMod "Hclose" as "_". iMod "H" as "($ & HQ & $)".
   destruct (to_val e2) eqn:?; last by iExFalso.
   simpl. iModIntro.
-  unfold bnextgen_option. destruct (next_choose e1);[iModIntro;iModIntro|];
+  unfold bnextgen_option. destruct (next_choose e1);[iModIntro|];
     iApply wp_value; [..|done| |done]; by apply of_to_val.
 Qed.
 

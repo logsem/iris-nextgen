@@ -58,7 +58,7 @@ Section stack_lang_examples.
     iApply wp_stack_load;[constructor;lia|iFrame].
     iNext. iIntros "[Hsize Hl]". peel_ctx.
     iApply wp_return;[lia..|iFrame]. iNext. iIntros "Hsize".
-    iModIntro. iModIntro.
+    iModIntro.
     simpl. iApply wp_value. iApply "HΦ". simpl. auto.
   Qed.
 
@@ -75,12 +75,10 @@ Section stack_lang_examples.
     iApply wp_stack_load;[constructor;lia|iFrame].
     iNext. iIntros "[Hsize Hl]". peel_ctx.
     iApply wp_return;[lia..|iFrame]. iNext. iIntros "Hsize /=".
-    iDestruct (stack_stack_pop_inv_intro with "Hl") as "Hl".
-    iModIntro.
     iDestruct (stack_stack_pop_intro with "Hl") as "Hl";[eauto|].
     iModIntro. prepare_ctx.
     iApply wp_return;[lia..|iFrame]. iNext. iClear "Hl".
-    iIntros "Hsize /=". iClear "Hsize". iModIntro. iModIntro.
+    iIntros "Hsize /=". iClear "Hsize". iModIntro.
     iApply wp_value. iApply "HΦ";auto.
   Qed.
 
@@ -99,14 +97,15 @@ Section stack_lang_examples.
     (* NOTE: the local stack pointer has been shifted to point two frame down *)
     iApply wp_stack_load;[constructor;lia|iFrame]. iNext. iIntros "[Hsize Hl]". peel_ctx.
     iApply wp_return;[lia..|]. iFrame. iNext.
-    iIntros "Hsize /=". iModIntro.
+    iIntros "Hsize /=".
     iDestruct (stack_stack_pop_intro _ _ _ _ 2 with "Hl") as "Hl";[lia|].
     iModIntro. prepare_ctx.
     iApply wp_return;[lia..|]. iFrame. iNext. iIntros "Hsize /=".
-    iModIntro. iDestruct (stack_stack_pop_intro _ _ _ _ 1 with "Hl") as "Hl";[lia|].
+    iDestruct (stack_stack_pop_intro _ _ _ _ 1 with "Hl") as "Hl";[lia|].
     iModIntro. prepare_ctx.
     iApply wp_return;[lia..|]. iFrame. iNext. iIntros "Hsize /=".
-    iModIntro. iModIntro. iApply wp_value. iApply "HΦ";auto.
+    iClear "Hl".
+    iModIntro. iApply wp_value. iApply "HΦ";auto.
   Qed.
 
   (* The following lemma cannot be proved, since the program will get

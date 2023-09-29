@@ -179,7 +179,29 @@ Section nextgen_inG.
   Proof.
     apply bnextgen_big_sepM_1 => //.
   Qed.
-  
+
+  Lemma transmap_forall {B} (Ω : gTransformations Σ) Ψ :
+    (⚡={Ω}=> (∀ a : B, Ψ a)) ⊣⊢ (∀ a : B, ⚡={Ω}=> Ψ a).
+  Proof.
+    apply bnextgen_forall.
+  Qed.
+
+
+  Lemma transmap_wand_plainly (Ω : gTransformations Σ) (P Q : iProp Σ) :
+    (⚡={Ω}=> (■ P -∗ Q)) ⊣⊢ (■ P -∗ ⚡={Ω}=> Q).
+  Proof.
+    apply bnextgen_wand_plainly.
+  Qed.
+
+  Lemma transmap_persistently (Ω : gTransformations Σ) (P : iProp Σ) :
+    (□ ⚡={Ω}=> P) ⊣⊢ (⚡={Ω}=> □ P).
+  Proof.
+    apply bnextgen_persistently.
+  Qed.
+
+  Global Instance transmap_proper (Ω : gTransformations Σ) :
+    Proper ((≡) ==> (≡)) (nextgen_omega Ω).
+  Proof. intros ???. by apply bnextgen_proper. Qed.
 
   Lemma transmap_own_lookup_Some {Ω} γ a t `{!CmraMorphism t} :
     Ω.(gT_map) i.(inG_id) = Some (cmra_map_transport inG_prf t) →
@@ -250,6 +272,10 @@ Section nextgen_inG.
       (transmap_insert_valid _ _).
 
 End nextgen_inG.
+
+Definition transmap_insert_two_inG {A B : cmra} `{i:inG Σ A} `{j:inG Σ B}
+  (t : A → A) (f : B -> B) `{!CmraMorphism t} `{!CmraMorphism f} Ω :=
+  transmap_insert_inG t (transmap_insert_inG f Ω).
 
 (*
 (* Point-wise nexten with implicit omega. *)
@@ -388,6 +414,54 @@ Section nextgen_instances.
     simpl in *. rewrite Hext. auto.
   Qed.
 
+  Lemma two_transmap_swap {A1 A2} `{i : noTwoTransInG Σ Ω A1 A2} (t1 : A1 → A1) (t2 : A2 -> A2)
+    `{!CmraMorphism t1} `{!CmraMorphism t2} (P : iProp Σ) :
+    (⚡={transmap_insert_inG t1 Ω}=> ⚡={transmap_insert_inG t2 Ω}=> P) ⊣⊢ ⚡={transmap_insert_inG t2 Ω}=> ⚡={transmap_insert_inG t1 Ω}=> P.
+  Proof.
+    split; intros. rewrite /nextgen_omega. try uPred.unseal; rewrite  /uPred_bnextgen seal_eq;
+      rewrite !/uPred_holds /=.
+    destruct P. rewrite /upred.uPred_holds.
+    split;intros; simpl in *.
+    - eapply uPred_mono;eauto.
+      rewrite /build_trans. exists ε. rewrite ucmra_unit_right_id. simpl.
+      intros i' γ.
+      rewrite !map_imap_compose.
+      rewrite !map_lookup_imap.
+      destruct (x i' !! γ) eqn:Hsome;rewrite Hsome// /=. f_equiv.
+      destruct (decide (inG_id noTransInG_inG = i')).
+      + subst i'. pose proof noTransInG_diff.
+        rewrite transmap_insert_lookup_eq.
+        rewrite transmap_insert_lookup_ne//.
+        f_equiv. rewrite !noTransInG_trans_lookup /=.
+        rewrite !map_fold_unfold. auto.
+      + destruct (decide (inG_id (@noTransInG_inG Σ Ω _ noTransInG_A_inG) = i')).
+        * subst i'. pose proof noTransInG_diff.
+        rewrite transmap_insert_lookup_eq.
+        rewrite transmap_insert_lookup_ne//.
+        f_equiv. rewrite !noTransInG_trans_lookup /=.
+        rewrite !map_fold_unfold. auto.
+        * rewrite !transmap_insert_lookup_ne//.
+    - eapply uPred_mono;eauto.
+      rewrite /build_trans. exists ε. rewrite ucmra_unit_right_id. simpl.
+      intros i' γ.
+      rewrite !map_imap_compose.
+      rewrite !map_lookup_imap.
+      destruct (x i' !! γ) eqn:Hsome;rewrite Hsome// /=. f_equiv.
+      destruct (decide (inG_id noTransInG_inG = i')).
+      + subst i'. pose proof noTransInG_diff.
+        rewrite transmap_insert_lookup_eq.
+        rewrite transmap_insert_lookup_ne//.
+        f_equiv. rewrite !noTransInG_trans_lookup /=.
+        rewrite !map_fold_unfold. auto.
+      + destruct (decide (inG_id (@noTransInG_inG Σ Ω _ noTransInG_A_inG) = i')).
+        * subst i'. pose proof noTransInG_diff.
+        rewrite transmap_insert_lookup_eq.
+        rewrite transmap_insert_lookup_ne//.
+        f_equiv. rewrite !noTransInG_trans_lookup /=.
+        rewrite !map_fold_unfold. auto.
+        * rewrite !transmap_insert_lookup_ne//.
+  Qed.
+
   #[global]
   Instance into_pnextgen_own_insert {A}
       `{i : noTransInG Σ Ω A} (t : A → A) `{!CmraMorphism t} γ (a : A) :
@@ -436,6 +510,52 @@ Section nextgen_instances.
     iApply transmap_own_lookup_Some; last done.
     unfold transmap_insert_inG. simpl.
     rewrite transmap_insert_lookup_eq//.
+  Qed.
+
+  Lemma transmap_own_insert_two_left {A1 A2}
+    `{i : noTwoTransInG Σ Ω A1 A2} (t1 : A1 → A1) (t2 : A2 → A2)
+    `{!CmraMorphism t1} `{!CmraMorphism t2} γ (a : A1) :
+    own γ a ⊢ ⚡={transmap_insert_two_inG t1 t2 Ω}=> own γ (t1 a).
+  Proof.
+    iIntros "O".
+    iApply transmap_own_lookup_Some; last done.
+    unfold transmap_insert_two_inG. simpl.
+    rewrite transmap_insert_lookup_eq; auto.
+  Qed.
+
+  Lemma transmap_own_insert_two_right {A1 A2}
+    `{i : noTwoTransInG Σ Ω A1 A2} (t1 : A1 → A1) (t2 : A2 → A2)
+    `{!CmraMorphism t1} `{!CmraMorphism t2} γ (a : A2) :
+    own γ a ⊢ ⚡={transmap_insert_two_inG t1 t2 Ω}=> own γ (t2 a).
+  Proof.
+    iIntros "O".
+    iApply transmap_own_lookup_Some; last done.
+    unfold transmap_insert_two_inG. simpl.
+    rewrite transmap_insert_lookup_ne;cycle 1.
+    { by specialize (noTransInG_diff). }
+    rewrite transmap_insert_lookup_eq; auto.
+  Qed.
+
+  Lemma transmap_own_insert_two_other {A1 A2 A3}
+    `{i : noTwoTransInG Σ Ω A1 A2} `{j: transInG Σ Ω A3 t3} (t1 : A1 → A1) (t2 : A2 → A2)
+    `{!CmraMorphism t1} `{!CmraMorphism t2} γ (a : A3) :
+    own γ a ⊢ ⚡={transmap_insert_two_inG t1 t2 Ω}=> own γ (t3 a).
+  Proof.
+    iIntros "O".
+    iApply transmap_own_lookup_Some; last done.
+    unfold transmap_insert_two_inG. simpl.
+    rewrite !transmap_insert_lookup_ne; auto.
+    { apply genInG_trans_lookup. }
+    { specialize noTransInG_trans_lookup as look1.
+      specialize genInG_trans_lookup as look2.
+      intros eq. rewrite eq in look1.
+      rewrite look1 in look2.
+      done. }
+    { specialize (@noTransInG_trans_lookup Σ Ω A1 _) as look1.
+      specialize genInG_trans_lookup as look2.
+      intros eq. rewrite eq in look1.
+      rewrite look1 in look2.
+      done. }    
   Qed.
 
   (* Lemma transmap_own_insert_other_other_left {A1 A2 A3} *)

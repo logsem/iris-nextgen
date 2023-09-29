@@ -378,6 +378,15 @@ Section bnextgen_compose_rules.
     rewrite Hext. auto.
   Qed.
 
+  Lemma bnextgen_extensional_equiv P :
+    (forall x, f x ≡ g x) ->
+    (⚡={f}=> P) ⊣⊢ ⚡={g}=> P.
+  Proof.
+    intros Hext.
+    split. unseal. intros.
+    rewrite Hext. auto.
+  Qed.
+
 End bnextgen_compose_rules.
 
 Section bnextgen_rules_cmra_morphism.
@@ -593,8 +602,9 @@ Section into_bnextgen.
   (*   (P -∗ ⚡={f}=> Q) ⊢ *)
   (*   ⚡={f}=> (P -∗ Q). *)
   (* Proof. *)
-  (*   iIntros "H P". *)
-  (*   iDestruct (bnextgen_intro_plain f P with "P") as "P". *)
+  (*   iIntros "H". *)
+  (*   iApply into_bnextgen_wand_plain *)
+  (*   iDestruct (bnextgen_intro_plain f P with "H") as "P". *)
   (*   iModIntro. *)
   (*   iApply "H". iApply "P". *)
   (* Qed. *)
@@ -606,6 +616,16 @@ Section into_bnextgen.
     rewrite 2!left_id.
     rewrite bnextgen_intuitionistically.
     done.
+  Qed.
+
+  Lemma bnextgen_except_0 P :
+    ◇ (⚡={f}=> P) ⊣⊢ ⚡={f}=> (◇ P).
+  Proof.
+    rewrite /bi_except_0.
+    rewrite -bnextgen_or -bnextgen_later.
+    iSplit.
+    - rewrite (bnextgen_intro_plain f (▷ False)) bnextgen_later;iStopProof;auto.
+    - rewrite bnextgen_later (bnextgen_plain f (▷ False));iStopProof;auto.
   Qed.
 
   Lemma bnextgen_persistently_2 P :
@@ -646,7 +666,7 @@ Section bnextgen_pred.
 
   Ltac unseal := try uPred.unseal; rewrite !uPred_bnextgen_unseal !/uPred_holds /=.
 
-  Lemma bnextgen_pred_intro_forall P a :
+  Lemma bnextgen_pred_intro_forall (P : uPredI M) a :
     (forall a b, exists c, f a ∘ f b = f c) ->
     (∀ (a : A), ⚡={f a}=> P) ⊢ ⚡={f a}=> (∀ (a : A), ⚡={f a}=> P).
   Proof.
@@ -656,6 +676,131 @@ Section bnextgen_pred.
     specialize (Him b a) as [c Hc].
     iApply bnextgen_extensional_eq;[rewrite Hc;eauto|].
     iApply "Hcond".
+  Qed.
+
+  Lemma bnextgen_pred_intro_forall_ord {ord : A -> A -> Prop} `{dec : ∀ a1 a2, Decision (ord a1 a2)}
+    (cond : A -> Prop) (P : uPredI M) a :
+    (forall a b, if decide (ord a b) then f b ∘ f a = f b else f b ∘ f a = f a) ->
+    (forall a b, cond a -> ord a b -> cond b) ->
+    cond a ->
+    (∀ (a : A), ⌜cond a⌝ → ⚡={f a}=> P) ⊢ ⚡={f a}=> (∀ (a : A), ⌜cond a⌝ → ⚡={f a}=> P).
+  Proof.
+    iIntros (Him Hcondim Hcond) "Hcond".    
+    iApply bnextgen_forall. iIntros (b).
+    rewrite impl_wand.
+    iApply bnextgen_mono.
+    { iIntros "H".
+      iApply bnextgen_wand_plain.
+      iExact "H". }
+    iApply bnextgen_compose.
+    specialize (Him a b).
+    destruct (decide (ord a b)).
+    - iApply bnextgen_extensional_eq;[rewrite Him;eauto|].
+      apply (Hcondim _ b) in Hcond =>//.
+      iSpecialize ("Hcond" $! b Hcond).
+      iModIntro. iIntros (_). auto.
+    - iApply bnextgen_extensional_eq;[rewrite Him;eauto|].
+      iSpecialize ("Hcond" $! a Hcond).
+      iModIntro. iIntros (_). auto.
+  Qed.
+
+   Lemma bnextgen_pred_intro_forall_pre_ord {ord : A -> A -> Prop} `{!PreOrder ord} `{dec : ∀ a1 a2, Decision (ord a1 a2)}
+    (P : uPredI M) a c :
+     (forall a b, if decide (ord a b) then f b ∘ f a = f b else f b ∘ f a = f a) ->
+     ord c a ->
+     (∀ (a : A), ⌜ord c a⌝ → ⚡={f a}=> P) ⊢ ⚡={f a}=> (∀ (a : A), ⌜ord c a⌝ → ⚡={f a}=> P).
+  Proof.
+    iIntros (Him Hle) "Hcond".
+    iApply (@bnextgen_pred_intro_forall_ord ord dec);auto.
+    apply PreOrder_Transitive.
+  Qed.
+
+End bnextgen_pred.
+
+Section bnextgen_pred.
+  Context {M : ucmra} {A : Type} (f : A -> M → M) (g : A -> M -> M) `{!forall a, CmraMorphism (f a)} `{!forall a, CmraMorphism (g a)}.
+
+  Notation "P ⊢ Q" := (@uPred_entails M P%I Q%I) : stdpp_scope.
+  Notation "⊢ Q" := (bi_entails (PROP:=uPredI M) True Q).
+  Notation "(⊢)" := (@uPred_entails M) (only parsing) : stdpp_scope.
+
+  Local Arguments uPred_holds {_} !_ _ _ /.
+
+  Ltac unseal := try uPred.unseal; rewrite !uPred_bnextgen_unseal !/uPred_holds /=.
+
+  (* Lemma bnextgen_pred_two_intro_forall (P : uPredI M) a : *)
+  (*   (forall a b, exists c, f a ∘ f b = f c) -> *)
+  (*   (∀ (a : A), ⚡={f a}=> ⚡={g a}=> P) ⊢ ⚡={f a}=> ⚡={g a}=> (∀ (a : A), ⚡={f a}=> ⚡={g a}=> P). *)
+  (* Proof. *)
+  (*   iIntros (Him) "Hcond". *)
+  (*   rewrite !bnextgen_forall. iIntros (b). *)
+  (*   specialize (Him b a) as [c Hc]. *)
+    
+  (*   iApply bnextgen_compose. *)
+  (*   specialize (Him b a) as [c Hc]. *)
+  (*   iApply bnextgen_extensional_eq;[rewrite Hc;eauto|]. *)
+  (*   iApply "Hcond". *)
+  (* Qed. *)
+
+  Lemma bnextgen_pred_two_intro_forall_ord {ord : A -> A -> Prop} `{dec : ∀ a1 a2, Decision (ord a1 a2)}
+    (cond : A -> Prop) (P : uPredI M) a :
+    (forall a b, if decide (ord a b) then f b ∘ f a = f b else f b ∘ f a = f a) ->
+    (forall a b, if decide (ord a b) then g b ∘ g a = g b else g b ∘ g a = g a) ->
+    (forall a b, cond a -> ord a b -> cond b) ->
+    cond a ->
+    (∀ P a b, (⚡={f a}=> ⚡={g b}=> P) ⊣⊢ ⚡={g b}=> ⚡={f a}=> P) ->
+    (∀ (a : A), ⌜cond a⌝ → ⚡={f a}=> ⚡={g a}=> P) ⊢ ⚡={f a}=> ⚡={g a}=> (∀ (a : A), ⌜cond a⌝ → ⚡={f a}=> ⚡={g a}=> P).
+  Proof.
+    iIntros (Himf Himg Hcondim Hcond Hiff) "Hcond".    
+    rewrite !bnextgen_forall. iIntros (b).
+    rewrite impl_wand.
+    iApply bnextgen_mono.
+    { iIntros "H".
+      iApply bnextgen_mono.
+      { iIntros "H". iApply bnextgen_wand_plain.
+        iApply bnextgen_mono.
+        { iIntros "H". iApply bnextgen_wand_plain.
+          iExact "H". }
+        iExact "H". }
+      iExact "H". }
+    rewrite -Hiff.
+    iApply bnextgen_compose.
+    iApply bnextgen_mono.
+    { iIntros "H".
+      iApply bnextgen_compose.
+      iExact "H". }      
+    specialize (Himf a b).
+    specialize (Himg a b).
+    destruct (decide (ord a b)).
+    - iApply bnextgen_extensional_eq;[rewrite Himf;eauto|].
+      iApply bnextgen_mono.
+      { iIntros "H".
+        iApply bnextgen_extensional_eq;[rewrite Himg;eauto|].
+        iExact "H". }
+      apply (Hcondim _ b) in Hcond =>//.
+      iSpecialize ("Hcond" $! b Hcond).
+      iModIntro. iModIntro.
+      iIntros (_). auto.
+    - iApply bnextgen_extensional_eq;[rewrite Himf;eauto|].
+      iApply bnextgen_mono.
+      { iIntros "H".
+        iApply bnextgen_extensional_eq;[rewrite Himg;eauto|].
+        iExact "H". }
+      iSpecialize ("Hcond" $! a Hcond).
+      iModIntro. iModIntro. iIntros (_). auto.
+  Qed.
+
+   Lemma bnextgen_pred_two_intro_forall_pre_ord {ord : A -> A -> Prop} `{!PreOrder ord} `{dec : ∀ a1 a2, Decision (ord a1 a2)}
+    (P : uPredI M) a c :
+     (forall a b, if decide (ord a b) then f b ∘ f a = f b else f b ∘ f a = f a) ->
+     (forall a b, if decide (ord a b) then g b ∘ g a = g b else g b ∘ g a = g a) ->
+     ord c a ->
+     (∀ P a b, (⚡={f a}=> ⚡={g b}=> P) ⊣⊢ ⚡={g b}=> ⚡={f a}=> P) ->
+     (∀ (a : A), ⌜ord c a⌝ → ⚡={f a}=> ⚡={g a}=> P) ⊢ ⚡={f a}=> ⚡={g a}=> (∀ (a : A), ⌜ord c a⌝ → ⚡={f a}=> ⚡={g a}=> P).
+  Proof.
+    iIntros (Himf Himg Hle Hiff) "Hcond".
+    iApply (@bnextgen_pred_two_intro_forall_ord ord dec);auto.
+    apply PreOrder_Transitive.
   Qed.
 
 End bnextgen_pred.

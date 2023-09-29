@@ -46,10 +46,6 @@ Qed.
   : IntoPnextgen Ω _ _ := transform_later P.
 #[local] Instance insert_plain_into_pnextgen {Σ : gFunctors} {Ω : gTransformations Σ} (P : iProp Σ)
   : IntoPnextgen Ω _ _ := transform_plain P.
-#[local] Instance lc_insert_into_pnextgen `{lcGIndS Σ Ω} `{noTransInG Σ Ω A}
-    (m : nat) (t : A → A) `{!CmraMorphism t} : IntoPnextgen _ _ _ :=
-  lc_ind_insert_intro m t.
-
 
 Section adequacy.
 Context `{!irisGS_gen HasNoLc Λ Σ Ω T}.
@@ -172,9 +168,11 @@ Proof.
   iApply (step_fupdN_wand with "HH").
   iIntros "HH". iModIntro.
   iMod "HH". iModIntro. iDestruct "HH" as "[? H]".
-  unfold bnextgen_option. case_match;[iModIntro;iModIntro|]; rewrite /= Nat.add_0_r.
-  all: iApply (IH with "[$] [H] [$]");first eauto.
-  all: simpl; iFrame.
+  unfold bnextgen_option.
+  case_match.
+  1: iDestruct (lc_ind_insert_two_intro _ (inv_pick_transform c) (C_pick c) with "Hc2") as "Hc2".
+  1: iModIntro.
+  all: rewrite /= PeanoNat.Nat.add_0_r; iApply (IH with "[$] [H] [$]");first eauto;by iFrame.
 Qed.
 
 Local Lemma wp_not_stuck κs nt e σ ns Φ :

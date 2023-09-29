@@ -75,7 +75,7 @@ Local Lemma fupd_soundness_no_lc_unfold_alt `{!invGIndpreS Σ Ω T pick} m E :
   ⊢ |==> ∃ `(Hws: !invGIndS_gen HasNoLc Σ Ω T pick) (ω : coPset -> iProp Σ),
       £ m ∗ ω E
         ∗ ■ (∀ (E1 E2 : coPset) (P : iPropI Σ), (|={E1,E2}=> P) -∗ ω E1 ==∗ ◇ (ω E2 ∗ P))
-        ∗ ■ (∀ E (c : C), ω E -∗ ⚡={transmap_insert_inG (inv_pick_transform c) Ω}=> ⚡={transmap_insert_inG (C_pick c) Ω}=>  ω E).
+        ∗ ■ (∀ E (c : C), ω E -∗ ⚡={transmap_insert_two_inG (inv_pick_transform c) (C_pick c) Ω}=> ω E).
 Proof.
   destruct invGIndpreS0.
   iMod wsat_alloc as (Hw) "[Hw HE]".
@@ -93,9 +93,7 @@ Proof.
     iMod ("HP" with "[$Hw $HE]") as ">(Hw & HE & HP)". by iFrame. }
   { iModIntro. iIntros (E1 c) "[Hw HE]".
     iDestruct (wsat_ind_insert_intro c with "Hw") as "Hw".
-    iDestruct (ownE_ind_insert_intro _ (inv_pick_transform c) with "HE") as "HE".
-    iModIntro.
-    iDestruct (ownE_ind_insert_intro _ (C_pick c) with "HE") as "HE".
+    iDestruct (ownE_ind_insert_two_intro _ (inv_pick_transform c) with "HE") as "HE".
     iModIntro. iFrame. }
 Qed.
 
@@ -291,7 +289,7 @@ Section bnextgen_pred_imod.
 
   Definition bnextgen_option (a : A) (P : iProp Σ) : iProp Σ :=
     match f a with
-    | Some c => ⚡={transmap_insert_inG (inv_pick_transform c) Ω}=> ⚡={transmap_insert_inG (C_pick c) Ω}=> P
+    | Some c => ⚡={transmap_insert_two_inG (inv_pick_transform c) (C_pick c) Ω}=> P
     | None => P
     end.
 
@@ -340,7 +338,7 @@ Section bnextgen_pred_imod.
     iApply (step_fupdN_mono with "H"). iIntros "H".
     iMod "H". iModIntro.
     unfold bnextgen_option.
-    case_match;[iModIntro;iModIntro|];by iApply IHl.
+    case_match;[iModIntro|];by iApply IHl.
   Qed.
 
   Lemma bnextgen_n_open_mono P Q l n :
@@ -351,7 +349,7 @@ Section bnextgen_pred_imod.
     iMod "H". iModIntro.
     iApply (step_fupdN_mono with "H"). iIntros "H".
     unfold bnextgen_option.
-    case_match;[iModIntro;iModIntro|];by iApply IHl.
+    case_match;[iModIntro|];by iApply IHl.
   Qed.
 
   Global Instance bnextgen_n_mono' l n :
@@ -370,7 +368,8 @@ Section bnextgen_pred_imod.
     apply fupd_ne,later_ne, fupd_ne.
     apply step_fupdN_ne. apply fupd_ne.
     unfold bnextgen_option. case_match.
-    - apply bnextgen_ne. apply bnextgen_ne. apply IHl. auto.
+    - apply bnextgen_ne. apply IHl.
+      auto.
     - apply IHl. auto.
   Qed.
 
@@ -386,10 +385,10 @@ Section bnextgen_pred_imod.
       all: iModIntro.
       all: iApply (step_fupdN_mono with "H"); iIntros "H".
       + rewrite {1}/bnextgen_option {1}/bnextgen_option;case_match.
-        1: iModIntro; iApply (bnextgen_mono with "H"); iIntros "H".
+        1: iModIntro.
         all: rewrite -PeanoNat.Nat.add_succ_comm; iApply IHl; iFrame.
       + rewrite {1}/bnextgen_option {3}/bnextgen_option;case_match.
-        1: iModIntro; iApply (bnextgen_mono with "H"); iIntros "H".
+        1: iModIntro.
         all: rewrite -PeanoNat.Nat.add_succ_comm; iApply IHl; iFrame.
   Qed.
 
@@ -400,12 +399,13 @@ Section bnextgen_pred_imod.
     - simpl. iSplit; iIntros "H"; rewrite Nat.add_0_r; auto.
     - simpl. iSplit;iIntros ">H".
       all: iModIntro.
-      all: iApply (step_fupdN_mono with "H"); iIntros "H".
+      all: iApply (step_fupdN_mono with "H"); iIntros "H";
+        iApply (fupd_mono with "H"); iIntros "H".
       + rewrite {1}/bnextgen_option {1}/bnextgen_option;case_match.
-        1: iApply (bnextgen_mono with "H"); iIntros "H";iModIntro.
+        1: iModIntro.
         all: rewrite -PeanoNat.Nat.add_succ_comm; iApply IHl; iFrame.
       + rewrite {1}/bnextgen_option {3}/bnextgen_option;case_match.
-        1: iApply (bnextgen_mono with "H"); iIntros "H";iModIntro.
+        1: iModIntro.
         all: rewrite -PeanoNat.Nat.add_succ_comm; iApply IHl; iFrame.
   Qed.
   
@@ -422,7 +422,7 @@ Section bnextgen_pred_imod.
       iIntros "[H1 H2]".
       iMod "H1". iModIntro.
       unfold bnextgen_option;case_match.
-      1: iModIntro;iModIntro. all: iApply IHl;iFrame.
+      1: iModIntro. all: iApply IHl;iFrame.
   Qed.
 
   Lemma bnextgen_n_sep_nextgen l n P Q :
@@ -436,7 +436,7 @@ Section bnextgen_pred_imod.
       iNext. iIntros "H2".
       iMod "H2". iModIntro.
       unfold bnextgen_option;case_match.
-      1: iModIntro;iModIntro. all: iApply IHl;iFrame.
+      1: iModIntro. all: iApply IHl;iFrame.
   Qed.
 
   Lemma bnextgen_n_open_emp_intro P l n :
@@ -446,7 +446,7 @@ Section bnextgen_pred_imod.
     revert n; induction l =>n;simpl;auto.
     iApply step_fupdN_intro;auto.
     iModIntro. iNext. iModIntro.
-    iNext. unfold bnextgen_option;case_match;[iModIntro;iModIntro|].
+    iNext. unfold bnextgen_option;case_match;[iModIntro|].
     all: iStopProof;eauto.
     all: apply IHl.
   Qed.
@@ -460,7 +460,7 @@ Section bnextgen_pred_imod.
     iApply fupd_mask_intro;auto. iIntros "Hcls".
     iModIntro. iNext. iModIntro.
     iNext. iMod "Hcls". iModIntro. iClear "Hcls".
-    unfold bnextgen_option;case_match;[iModIntro;iModIntro|].
+    unfold bnextgen_option;case_match;[iModIntro|].
     all: iStopProof;eauto.
     all: apply IHl.
   Qed.
@@ -470,7 +470,7 @@ Section bnextgen_pred_imod.
   Proof.
     intros HP.
     induction l;simpl;auto.
-    unfold bnextgen_option;case_match;[iModIntro;iModIntro|].
+    unfold bnextgen_option;case_match;[iModIntro|].
     all: auto.
   Qed.
     
@@ -549,15 +549,12 @@ Section bnextgen_n_open_soundness.
         iMod "H". iIntros "!>!>". iApply "J". iFrame. }
       iIntros "[Hω HP]".
       unfold bnextgen_option. destruct (f a).
-      + iApply (transmap_plain (transmap_insert_inG (inv_pick_transform c) Ω)).
-        iAssert (⚡={transmap_insert_inG (inv_pick_transform c) Ω}=> ⚡={transmap_insert_inG (C_pick c) Ω}=> ω ∅)%I with "[Hω]" as "HA1".
+      + iApply (transmap_plain (transmap_insert_two_inG (inv_pick_transform c) (C_pick c) Ω)).
+        iAssert (⚡={transmap_insert_two_inG (inv_pick_transform c) (C_pick c) Ω}=> ω ∅)%I with "[Hω]" as "HA1".
         { iApply "Hintro". iFrame. }
         iClear "Hone Hm".
-        iDestruct (lc_ind_insert_intro _ (inv_pick_transform c) with "Hn") as "Hn".
-        iModIntro.
-        iApply (transmap_plain (transmap_insert_inG (C_pick c) Ω)).
-        iDestruct (lc_ind_insert_intro _ (C_pick c) with "Hn") as "Hn".
-        iModIntro.
+        iDestruct (lc_ind_insert_two_intro _ (inv_pick_transform c) with "Hn") as "Hn".
+        iModIntro. 
         iDestruct (IHl with "[$H $HA1 $Hn $HP $Hintro]") as "HH".
         rewrite /num. simpl. iNext. iApply (laterN_mono with "HH"). auto.
       + iDestruct (IHl with "[$H $Hω $Hn $HP $Hintro]") as "HH".
@@ -602,14 +599,11 @@ Section bnextgen_n_open_soundness.
       iMod ("H" with "HP Hω") as "[>Hω >HP]".
       iModIntro.
       unfold bnextgen_option. destruct (f a).
-      + iApply (transmap_plain (transmap_insert_inG (inv_pick_transform c) Ω)).
-        iAssert (⚡={transmap_insert_inG (inv_pick_transform c) Ω}=> ⚡={transmap_insert_inG (C_pick c) Ω}=> ω ⊤)%I with "[Hω]" as "HA1".
+      + iApply (transmap_plain (transmap_insert_two_inG (inv_pick_transform c) (C_pick c) Ω)).
+        iAssert (⚡={transmap_insert_two_inG (inv_pick_transform c) (C_pick c) Ω}=> ω ⊤)%I with "[Hω]" as "HA1".
         { iApply "Hintro". iFrame. }
-        iDestruct (lc_ind_insert_intro _ (inv_pick_transform c) with "Hn") as "Hn".
+        iDestruct (lc_ind_insert_two_intro _ (inv_pick_transform c) with "Hn") as "Hn".
         iClear "Hone Hm". iModIntro.
-        iDestruct (lc_ind_insert_intro _ (C_pick c) with "Hn") as "Hn".
-        iApply (transmap_plain (transmap_insert_inG (C_pick c) Ω)).
-        iModIntro.
         iDestruct (IHl with "[$H $HA1 $Hn $HP $Hintro]") as "HH";auto.
       + iDestruct (IHl with "[$H $Hω $Hn $HP $Hintro]") as "HH";auto.
   Qed.

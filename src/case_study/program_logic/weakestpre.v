@@ -173,7 +173,7 @@ Proof.
      proper instance for step_fupdN. *)
   induction num_laters_per_step as [|k IHk]; simpl; last by rewrite IHk.
   unfold bnextgen_option. case_match;
-    [do 4 ((do 2 apply nextgen_basic.bnextgen_ne) || f_contractive || f_equiv)
+    [do 4 ((apply nextgen_basic.bnextgen_ne) || f_contractive || f_equiv)
     | do 3 (f_contractive || f_equiv)].
   all: rewrite IH; [done|lia|]; intros v'; eapply dist_le; [apply HΦ|lia].
 Qed.
@@ -192,7 +192,7 @@ Proof.
      proper instance for step_fupdN. *)
   induction num_laters_per_step as [|k IHk]; simpl; last by rewrite IHk.
   do 3 f_equiv. unfold bnextgen_option.
-  case_match;[do 2 apply bnextgen_ne|]; do 2 f_equiv;auto.
+  case_match;[apply bnextgen_ne|]; do 2 f_equiv;auto.
 Qed.
 
 Lemma wp_value_fupd' s E Φ v : WP of_val v @ s; E {{ Φ }} ⊣⊢ |={E}=> Φ v.
@@ -216,7 +216,7 @@ Proof.
   iMod ("H" with "[//] Hcred") as "H". iIntros "!> !>".  iMod "H". iModIntro.
   iApply (step_fupdN_wand with "[H]"); first by iApply "H".
   iIntros ">($ & H & Hefs)". iMod "Hclose" as "_". iModIntro. iSplitR "Hefs".
-  - unfold bnextgen_option. destruct (next_choose e);[iModIntro;iModIntro|];
+  - unfold bnextgen_option. destruct (next_choose e);[iModIntro|];
     iApply ("IH" $! e2 with "[//] H"); auto.
   - iApply (big_sepL_impl with "Hefs"); iIntros "!>" (k ef _).
     iIntros "H". (* iModIntro.  *) iApply ("IH" with "[] H"); auto.
@@ -320,7 +320,7 @@ Proof.
   { etrans; last apply Htri. lia. }
   iApply (step_fupdN_wand with "Hwp"). iIntros ">(SI & Hwp & $)".
   iMod ("Hpost" with "Hk SI") as "[$ #HP]". iModIntro.
-  unfold bnextgen_option;case_match;[iModIntro;iModIntro|].
+  unfold bnextgen_option;case_match;[iModIntro|].
   all: iApply (wp_strong_mono with "Hwp"); [by auto..|].
   all: iModIntro.
   all: iIntros (v) "HΦ"; iApply ("HΦ" with "HP").
@@ -363,7 +363,7 @@ Proof.
   iInduction n as [|n] "IH" forall (n0 Hn).
   - iApply (step_fupdN_wand with "H"). iIntros ">($ & Hwp & $)". iMod "HP".
     iModIntro.
-    unfold bnextgen_option;case_match;[iModIntro;iModIntro|].
+    unfold bnextgen_option;case_match;[iModIntro|].
     all: iApply (wp_strong_mono with "Hwp");auto; iDestruct "HP" as "#HP"; iModIntro.
     all: iIntros (v) "HΦ".
     all: iApply ("HΦ" with "HP").
@@ -393,7 +393,7 @@ Proof.
   iMod "H". iModIntro. iApply (step_fupdN_wand with "H"). iIntros "H".
   iMod "H" as "(HH & H & Htp)". iModIntro.
   unfold bnextgen_option. rewrite next_state_ctx//.
-  iFrame. destruct (next_choose e);[iModIntro;iModIntro|];by iApply "IH".
+  iFrame. destruct (next_choose e);[iModIntro|];by iApply "IH".
 Qed.
 
 Lemma wp_bind_inv K `{!LanguageCtx K} s E e Φ :
@@ -415,7 +415,7 @@ Proof.
   iIntros "!> !>". iMod "H". iModIntro. iApply (step_fupdN_wand with "H").
   iIntros "H". iMod "H" as "(HH & H & Htp)". iModIntro.
   unfold bnextgen_option. rewrite next_state_ctx//.
-  iFrame. destruct (next_choose e);[iModIntro;iModIntro|];by iApply "IH".
+  iFrame. destruct (next_choose e);[iModIntro|];by iApply "IH".
 Qed.
 
 (** * Derived rules *)
