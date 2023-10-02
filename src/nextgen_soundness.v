@@ -508,7 +508,7 @@ Fixpoint steps_sum (num_laters_per_step : nat → nat) (start ns : nat) : nat :=
   end.
 
 Section bnextgen_n_open_soundness.
-  Context {A : Type} {Σ : gFunctors} {Ω : gTransformations Σ} {B : cmra} {pick: pick_transform_preorder B} (f : A -> option C)
+  Context {A : Type} {Σ : gFunctors} {Ω : gTransformations Σ} {B : cmra} {pick: pick_transform_rel B} (f : A -> option C)
     {num_laters_per_step : nat -> nat}.
 
   Notation "?={ e }=> P" := (@bnextgen_option _ _ _ _ _ _ _ f e P)

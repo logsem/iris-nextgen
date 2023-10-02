@@ -12,23 +12,23 @@ exception of what's in the [wsatGS] module. The module [wsatGS] is thus exported
 [fancy_updates], where [wsat] is only imported. *)
 Module wsatGS.
 
-Class pick_transform_preorder (A : cmra) : Type := TransPre {
+Class pick_transform_rel (A : cmra) : Type := TransRel {
   C : Type;
   CR : relation C;
-  C_pre :> PreOrder CR;
+  C_pre :> Transitive CR;
   C_pick : C -> (A -> A);
   C_pick_cmramorphism :> ∀ (c : C), CmraMorphism (C_pick c);
   C_dec :> ∀ (c1 c2 : C), Decision (CR c1 c2)
 }.
   
-Class wsatGIndpreS (Σ : gFunctors) (Ω : gTransformations Σ) (A : cmra) (pick: pick_transform_preorder A) : Set := WsatGIndpreS {
+Class wsatGIndpreS (Σ : gFunctors) (Ω : gTransformations Σ) (A : cmra) (pick: pick_transform_rel A) : Set := WsatGIndpreS {
   wsatGpreS_inv : genIndInG Σ Ω (gmap_viewR positive (laterO (iPropO Σ)));
   wsatGpreS_func : noTwoTransInG Σ Ω (gmap_viewR positive (optionO (leibnizO C))) A;
   wsatGpreS_enabled : genIndInG Σ Ω coPset_disjR;
   wsatGpreS_disabled : genIndInG Σ Ω (gset_disjR positive);
 }.
 
-Class wsatGIndS (Σ : gFunctors) (Ω : gTransformations Σ) (A : cmra) (pick: pick_transform_preorder A) : Set := WsatGInd {
+Class wsatGIndS (Σ : gFunctors) (Ω : gTransformations Σ) (A : cmra) (pick: pick_transform_rel A) : Set := WsatGInd {
   wsat_inG : wsatGIndpreS Σ Ω A pick;
   invariant_name : gname;
   enabled_name : gname;
@@ -55,10 +55,10 @@ Import wsatGS.
 Local Existing Instances wsat_inG wsatGpreS_inv wsatGpreS_enabled wsatGpreS_disabled.
 
 
-#[global] Instance into_wsatpres `{pick: pick_transform_preorder A} `{!wsatGIndpreS Σ Ω A pick} : wsatGpreS Σ :=
+#[global] Instance into_wsatpres `{pick: pick_transform_rel A} `{!wsatGIndpreS Σ Ω A pick} : wsatGpreS Σ :=
   WsatGpreS Σ wsatGpreS_inv.(genInG_inG) wsatGpreS_enabled.(genInG_inG) wsatGpreS_disabled.(genInG_inG).
   
-#[global] Instance into_wsats `{pick: pick_transform_preorder A} `{!wsatGIndS Σ Ω A pick} : wsatGS Σ  :=
+#[global] Instance into_wsats `{pick: pick_transform_rel A} `{!wsatGIndS Σ Ω A pick} : wsatGS Σ  :=
   WsatG Σ (@into_wsatpres A pick Σ Ω wsat_inG) invariant_name enabled_name disabled_name.
 
 #[global] Instance into_lcpres `{Hlc: lcGIndpreS Σ Ω} : lcGpreS Σ :=
@@ -67,7 +67,7 @@ Local Existing Instances wsat_inG wsatGpreS_inv wsatGpreS_enabled wsatGpreS_disa
 #[global] Instance into_lcs `{Hlc: lcGIndS Σ Ω} : lcGS Σ :=
   LcGS Σ lcGS_inG.(genInG_inG) lcGS_name.
 
-#[global] Instance cmra_morphism_pick `{Hpre : pick_transform_preorder A} : ∀ c', CmraMorphism (C_pick c') :=
+#[global] Instance cmra_morphism_pick `{Hpre : pick_transform_rel A} : ∀ c', CmraMorphism (C_pick c') :=
   Hpre.(C_pick_cmramorphism).
 
 #[global] Instance wsat_notrans_inl `{wsat: !wsatGIndS Σ Ω A pick} : noTransInG Σ Ω A | 2 :=
@@ -82,29 +82,29 @@ Local Existing Instances wsat_inG wsatGpreS_inv wsatGpreS_enabled wsatGpreS_disa
 #[local] Instance inG_wsatGS_inr `{Hpre : wsatGIndpreS Σ Ω T} : inG Σ T :=
   (wsatGpreS_func.(noTransInG_B_inG)).(noTransInG_inG).
 
-Definition pick_coerce `{pick_transform_preorder A} (c : option C) : optionO (leibnizO C) := c.
+Definition pick_coerce `{pick_transform_rel A} (c : option C) : optionO (leibnizO C) := c.
 
-Definition ownC `{pick: pick_transform_preorder A} `{!wsatGIndS Σ Ω A pick} (i : positive) (c : C) : iProp Σ :=
+Definition ownC `{pick: pick_transform_rel A} `{!wsatGIndS Σ Ω A pick} (i : positive) (c : C) : iProp Σ :=
   own pick_name (gmap_view_frag i DfracDiscarded (pick_coerce (Some c))).
 Global Typeclasses Opaque ownC.
 Global Instance: Params (@ownC) 2 := {}.
 
-Definition ownN `{pick: pick_transform_preorder A} `{!wsatGIndS Σ Ω A pick} (i : positive) : iProp Σ :=
+Definition ownN `{pick: pick_transform_rel A} `{!wsatGIndS Σ Ω A pick} (i : positive) : iProp Σ :=
   own pick_name (gmap_view_frag i DfracDiscarded None).
 Global Typeclasses Opaque ownN.
 Global Instance: Params (@ownN) 1 := {}.
 
-#[global] Instance ownC_persistent `{pick: pick_transform_preorder A} `{!wsatGIndS Σ Ω A pick} (i : positive) (c : C) : Persistent (ownC i c).
+#[global] Instance ownC_persistent `{pick: pick_transform_rel A} `{!wsatGIndS Σ Ω A pick} (i : positive) (c : C) : Persistent (ownC i c).
 Proof. rewrite /ownC. apply _. Qed.
-#[global] Instance ownN_persistent `{pick: pick_transform_preorder A} `{!wsatGIndS Σ Ω A pick} (i : positive) : Persistent (ownN i).
+#[global] Instance ownN_persistent `{pick: pick_transform_rel A} `{!wsatGIndS Σ Ω A pick} (i : positive) : Persistent (ownN i).
 Proof. rewrite /ownN. apply _. Qed.
 
 
-Definition inv_pick_cut `{pick_transform_preorder A} (c : C) (i : positive) (v : optionO (leibnizO C)) :=
+Definition inv_pick_cut `{pick_transform_rel A} (c : C) (i : positive) (v : optionO (leibnizO C)) :=
  Some (v ≫= (λ c', if decide (CR c' c) then Some c' else None)).
-Definition inv_pick_transform `{pick_transform_preorder A} (c : C) := (map_entry_lift_gmap_view (inv_pick_cut c)).
+Definition inv_pick_transform `{pick_transform_rel A} (c : C) := (map_entry_lift_gmap_view (inv_pick_cut c)).
 
-#[global] Instance inv_pick_mapTrans `{pick_transform_preorder A} (c : C) : MapTrans (inv_pick_cut c).
+#[global] Instance inv_pick_mapTrans `{pick_transform_rel A} (c : C) : MapTrans (inv_pick_cut c).
 Proof.
   split.
   - intros l v1 Hcontr. done.
@@ -113,13 +113,13 @@ Proof.
     rewrite H2. auto.    
 Qed.
 
-#[global] Instance cmra_morphism_pick_transform `{pick_transform_preorder A} : ∀ c', CmraMorphism (inv_pick_transform c') :=
+#[global] Instance cmra_morphism_pick_transform `{pick_transform_rel A} : ∀ c', CmraMorphism (inv_pick_transform c') :=
   λ c', gMapTrans_lift_CmraMorphism (inv_pick_cut c').
 
-Definition inv_cond {Σ Ω A} `{pick: pick_transform_preorder A} {wsat: wsatGIndS Σ Ω A pick} Q (c : C) : iProp Σ :=
+Definition inv_cond {Σ Ω A} `{pick: pick_transform_rel A} {wsat: wsatGIndS Σ Ω A pick} Q (c : C) : iProp Σ :=
   ■ (∀ (c' : C), ⌜CR c c'⌝ -∗ Q -∗ ⚡={transmap_insert_two_inG (inv_pick_transform c') (C_pick c') Ω}=> Q).
 
-Definition wsat `{pick: pick_transform_preorder A} `{!wsatGIndS Σ Ω A pick} : iProp Σ :=
+Definition wsat `{pick: pick_transform_rel A} `{!wsatGIndS Σ Ω A pick} : iProp Σ :=
   locked (∃ (I : gmap positive (iProp Σ)) (F : gmap positive (option C)),
     ⌜dom I = dom F⌝ ∗
      own invariant_name (gmap_view_auth (DfracOwn 1) (invariant_unfold <$> I)) ∗
@@ -597,7 +597,7 @@ Qed.
 #[local] Instance insert_plain_into_pnextgen {Σ : gFunctors} {Ω : gTransformations Σ} (P : iProp Σ)
   : IntoPnextgen Ω _ _ := transform_plain P.
 
-Local Lemma map_imap_inv_pick_cut_coerce {A : cmra} `{pick: pick_transform_preorder A} (c : C) (F : gmap positive (option C)) :
+Local Lemma map_imap_inv_pick_cut_coerce {A : cmra} `{pick: pick_transform_rel A} (c : C) (F : gmap positive (option C)) :
   pick_coerce <$> (map_imap (inv_pick_cut c) F) = map_imap (inv_pick_cut c) (pick_coerce <$> F).
 Proof.
   induction F using map_ind.
@@ -612,7 +612,7 @@ Proof.
     + done.
 Qed.
 
-Local Lemma dom_map_imap_inv_pick_cut {Σ} {A : cmra} `{pick: pick_transform_preorder A} (c : C) (I : gmap positive (iProp Σ)) (F : gmap positive (option C)) :
+Local Lemma dom_map_imap_inv_pick_cut {Σ} {A : cmra} `{pick: pick_transform_rel A} (c : C) (I : gmap positive (iProp Σ)) (F : gmap positive (option C)) :
   dom I = dom F ->
   dom I = dom (map_imap (inv_pick_cut c) F).
 Proof.

@@ -10,7 +10,7 @@ Import uPred.
 From nextgen Require Export utils nextgen_soundness nextgen_persistently nextgen_basic nextgen_pointwise.
 
 Class irisGS_gen (hlc : has_lc) (Λ : language) (Σ : gFunctors) (Ω : gTransformations Σ) (A : cmra) := IrisG {
-  iris_pick :> pick_transform_preorder A;
+  iris_pick :> pick_transform_rel A;
   iris_invGS :> invGIndS_gen hlc Σ Ω A iris_pick;
                                                                                                
   (** The state interpretation is an invariant that should hold in

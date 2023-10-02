@@ -27,7 +27,7 @@ Inductive locality_lifetime : Type :=
 
 Inductive locality_lifetime_rel : relation locality_lifetime :=
 | rel_heap c : locality_lifetime_rel c lifetime_heap
-| rel_stack f1 f2 : f2 <= f1 -> locality_lifetime_rel (lifetime_stack f1) (lifetime_stack f2).
+| rel_stack f1 f2 : f1 < f2 -> locality_lifetime_rel (lifetime_stack f1) (lifetime_stack f2).
 
 Definition state_trans (n : nat) := (map_entry_lift_gmap_view (stack_location_cut n)).
 
@@ -41,14 +41,12 @@ Lemma pick_state_trans_eq (Σ : gFunctors) (Ω : gTransformations Σ) `{!inG Σ 
   transmap_insert_inG (state_trans n) Ω = transmap_insert_inG (locality_pick (lifetime_stack n)) Ω.
 Proof. auto. Qed.
 
-Global Instance locality_lifetime_rel_pre : PreOrder locality_lifetime_rel.
+Global Instance locality_lifetime_rel_pre : Transitive locality_lifetime_rel.
 Proof.
-  split.
-  - intros l. destruct l;simpl;constructor. auto.
-  - intros l1 l2 l3 Hl1 Hl2.
-    destruct l1,l2,l3;try by inversion Hl1;try by inversion Hl2.
-    + constructor. inversion Hl2;subst. inversion Hl1;subst. lia.
-    + constructor.
+  intros l1 l2 l3 Hl1 Hl2.
+  destruct l1,l2,l3;try by inversion Hl1;try by inversion Hl2.
+  + constructor. inversion Hl2;subst. inversion Hl1;subst. lia.
+  + constructor.
 Qed.
 
 Global Instance locality_lifetime_cmra_morphism : ∀ l, CmraMorphism (locality_pick l) :=
@@ -62,12 +60,12 @@ Proof.
   intros l1 l2. destruct l1,l2;simpl;[|left;constructor|
                                        right;intros Hcontr;inversion Hcontr|
                                        left;constructor].
-  destruct (decide (n0 <= n));[left;by constructor|right].
+  destruct (decide (n < n0));[left;by constructor|right].
   intros Hcontr. inversion Hcontr;subst. inversion Hcontr;subst. lia.
 Qed.
 
 Global Instance locality_lifetime_pick
-  : pick_transform_preorder (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) :=
+  : pick_transform_rel (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) :=
   { C := locality_lifetime;
     CR := locality_lifetime_rel;
     C_pick := locality_pick;
@@ -408,7 +406,7 @@ Section heapG_nextgen_updates.
   Qed.
 
   Lemma next_state_stack_inv_intro N n1 n2 P :
-    n2 <= n1 ->
+    n1 < n2 ->
     inv N (lifetime_stack n1) P ⊢ ⚡={next_state Ω (lifetime_stack n2)}=> inv N (lifetime_stack n1) P.
   Proof.
     intros Hle.

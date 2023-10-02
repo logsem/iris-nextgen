@@ -29,7 +29,7 @@ Global Instance pretty_val : Pretty val :=
     | BoolV b => "#v" +:+ if b then "true" else "false"
     | UnitV => "#v()"
     | LamV δ k x e => "λ: " +:+ pretty δ +:+ ", " +:+ pretty k +:+ ", " +:+ pretty x +:+ ", <body>"
-    | PairV v1 v2 => "<" +:+ go v1 +:+ ", " +:+ go v2 +:+ ">"
+    | PairV v1 v2 => "⟪" +:+ go v1 +:+ ", " +:+ go v2 +:+ "⟫"
     end.
 
 Global Instance pretty_bin_op : Pretty binop :=
@@ -60,8 +60,8 @@ Notation "# ( δ , l )" := (LocV δ l%Z%V%stdpp) (at level 8, format "# ( δ , l
 
 (** Syntax inspired by Coq/Ocaml. Constructions with higher precedence come
     first. *)
-Notation "< e1 , e2 , .. , en >" := (Pair .. (Pair e1 e2) .. en) : expr_scope.
-Notation "< e1 , e2 , .. , en >" := (PairV .. (PairV e1 e2) .. en) : val_scope.
+Notation "⟪ e1 , e2 , .. , en ⟫" := (Pair .. (Pair e1 e2) .. en) : expr_scope.
+Notation "⟪ e1 , e2 , .. , en ⟫" := (PairV .. (PairV e1 e2) .. en) : val_scope.
 
 Notation "()" := lang.Unit : expr_scope.
 Notation "! e" := (Load e%E) (at level 9, right associativity) : expr_scope.

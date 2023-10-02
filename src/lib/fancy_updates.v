@@ -23,12 +23,12 @@ From nextgen Require Import nextgen_pointwise.
     We don't use that notation in this file to avoid confusion.
  *)
 
-Class invGIndpreS (Σ : gFunctors) (Ω : gTransformations Σ) (A : cmra) (pick: pick_transform_preorder A) : Set := InvGIndpreS {
+Class invGIndpreS (Σ : gFunctors) (Ω : gTransformations Σ) (A : cmra) (pick: pick_transform_rel A) : Set := InvGIndpreS {
   invGIndpreS_wsat : wsatGIndpreS Σ Ω A pick;
   invGIndpreS_lc : lcGIndpreS Σ Ω;
 }.
 
-Class invGIndS_gen (hlc : fancy_updates.has_lc) (Σ : gFunctors) (Ω : gTransformations Σ) (A : cmra) (pick: pick_transform_preorder A) : Set := InvIndG {
+Class invGIndS_gen (hlc : fancy_updates.has_lc) (Σ : gFunctors) (Ω : gTransformations Σ) (A : cmra) (pick: pick_transform_rel A) : Set := InvIndG {
   invGS_wsat : wsatGIndS Σ Ω A pick;
   invGS_lc : lcGIndS Σ Ω;
 }.
