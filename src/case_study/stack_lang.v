@@ -863,9 +863,9 @@ Module lang.
     i = (Z.abs_nat j) ->
     to_val e = Some v ->
     scope v j ->
-    shift_val v i = v' ->
+    shift_val v j = v' ->
     is_Some ([[σ @ i]] !! l) ->
-    head_step K (n, Store (Loc (local j) l) e) σ [] (n,Unit) (<[i@l:=v]>σ) [] NormalMode
+    head_step K (n, Store (Loc (local j) l) e) σ [] (n,Unit) (<[i@l:=v']>σ) [] NormalMode
 
   (** Downgrade Heap Location *)
   | MaskS K l σ n :

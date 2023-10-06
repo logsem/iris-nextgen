@@ -746,8 +746,8 @@ Section lifting.
 
   Lemma wp_stack_store K E e l j v v' w Φ `{!IntoVal (n,e) (n,v)} :
     scope v j ->
-    shift_val v (Z.abs_nat j) = v' ->
-    ▷ ([size] n ∗ (n - 1 - Z.abs_nat j) @@ l ↦ v -∗ WP fill K (n,lang.Unit) @ E {{ Φ }})
+    shift_val v j = v' ->
+    ▷ ([size] n ∗ (n - 1 - Z.abs_nat j) @@ l ↦ v' -∗ WP fill K (n,lang.Unit) @ E {{ Φ }})
       ∗ ▷ (n - 1 - Z.abs_nat j) @@ l ↦ w
       ∗ ▷ [size] n
       ⊢ WP fill K (n,Store (Loc (local j) l) e) @ E {{ Φ }}.
@@ -767,7 +767,7 @@ Section lifting.
     iNext. iIntros (rm r0 σ2 efs Hstep) "Hp".
     resolve_next_state. inversion H13.
     iMod "Hcls". 
-    iMod (gen_stack_update _ _ _ _ _ v0 with "Hl Hs") as "[Hl Hs]";eauto.
+    iMod (gen_stack_update _ _ _ _ _ (shift_val v0 j) with "Hl Hs") as "[Hl Hs]";eauto.
     rewrite /insert /insert_state_Insert /insert_state /insert_stack /= Hs0.
     iModIntro. iDestruct ("HΦ" with "[$]") as "Hwp".
     rewrite insert_length. iFrame.
