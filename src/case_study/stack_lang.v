@@ -14,7 +14,7 @@ Proof. solve_decision. Defined.
 Inductive tag :=
 | global : tag
 | borrow : tag
-| local : Z -> tag.
+| local : nat -> tag.
 
 Global Instance tag_dec_eq : EqDecision tag.
 Proof. solve_decision. Defined.
@@ -41,7 +41,7 @@ Module lang.
   | Store (e1 e2 : expr)
   | Mask (e : expr)
   (* Control Flow *)
-  | Cont (i : Z) (K : list ectx_item)
+  | Cont (i : nat) (K : list ectx_item)
   | Call (e1 : expr) (e2 : expr)
   | Return (e1 : expr) (e2 : expr)
   (* Products *)
@@ -77,7 +77,7 @@ Module lang.
   | BoolV (b : bool)
   | UnitV
   | LocV (δ : tag) (l : loc)
-  | ContV (i : Z) (K : list ectx_item)
+  | ContV (i : nat) (K : list ectx_item)
   | PairV (v1 v2 : val)
   .
 
@@ -546,48 +546,98 @@ Module lang.
   (*** Operational Semantics *)
 
 
-  Fixpoint shift_val (v : val) (off : Z) : val :=
+  Fixpoint shift_val (v : val) (off : Z) : option val :=
     match v with
-    | LamV (local i) k x e => LamV (local (i + off)) k x e (* e is only shifted once λe is invoked *)
-    | LocV (local i) l => LocV (local (i + off)) l
-    | ContV i K => ContV (i + off) K (* no need to shift K, since invoking it pops the stack to correct shape *)
-    | PairV v1 v2 => PairV (shift_val v1 off) (shift_val v2 off)
-    | _ => v
+    | LamV (local i) k x e =>
+        let j := (Z.of_nat i + off)%Z in
+        if (j <? 0)%Z then None
+        else 
+          Some (LamV (local (Z.abs_nat j)) k x e) (* e is only shifted once λe is invoked *)
+    | LocV (local i) l =>
+        let j := (Z.of_nat i + off)%Z in
+        if (j <? 0)%Z then None
+        else 
+          Some (LocV (local (Z.abs_nat j)) l)
+    | ContV i K =>
+        let j := (Z.of_nat i + off)%Z in
+        if (j <? 0)%Z then None
+        else 
+          Some (ContV (Z.abs_nat j) K) (* no need to shift K, since invoking it pops the stack to correct shape *)
+    | PairV v1 v2 =>
+        v1' ← shift_val v1 off;
+        v2' ← shift_val v2 off;
+        Some (PairV v1' v2')
+    | _ => Some v
     end.
 
-  Fixpoint shift_expr (e : expr) (off : Z) : expr :=
+  Fixpoint shift_expr (e : expr) (off : Z) : option expr :=
     match e with
-    | Var x => Var x
-    | Lam (local i) k x e => Lam (local (i + off)) k x e
-    | Lam δ k x e => Lam δ k x e
-    | LetIn x e1 e2 => LetIn x (shift_expr e1 off) (shift_expr e2 off)
-    | Call e1 e2 => Call (shift_expr e1 off) (shift_expr e2 off)
-    | Unit => Unit
-    | Nat n => Nat n
-    | Bool b => Bool b
-    | BinOp op e1 e2 => BinOp op (shift_expr e1 off) (shift_expr e2 off)
-    | If e0 e1 e2 => If (shift_expr e0 off) (shift_expr e1 off) (shift_expr e2 off)
-    | Pair e1 e2 => Pair (shift_expr e1 off) (shift_expr e2 off)
-    | Fst e => Fst (shift_expr e off)
-    | Snd e => Snd (shift_expr e off)
-    | Loc (local i) l => Loc (local (i + off)) l
-    | Loc δ l => Loc δ l
-    | Halloc e => Halloc (shift_expr e off)
-    | Salloc e => Salloc (shift_expr e off)
-    | Mask e => Mask (shift_expr e off)
-    | Load e => Load (shift_expr e off)
-    | Store e1 e2 => Store (shift_expr e1 off) (shift_expr e2 off)
-    | Return e1 e2 => Return (shift_expr e1 off) (shift_expr e2 off)
-    | Cont i K => Cont (i + off) K
+    | Var x => Some (Var x)
+    | Lam (local i) k x e => let j := (Z.of_nat i + off)%Z in
+        if (j <? 0)%Z then None
+        else 
+          Some (Lam (local (Z.abs_nat j)) k x e)
+    | Lam δ k x e => Some (Lam δ k x e)
+    | LetIn x e1 e2 =>
+        e1' ← shift_expr e1 off;
+        e2' ← shift_expr e2 off;
+        Some (LetIn x e1' e2')
+    | Call e1 e2 =>
+        e1' ← shift_expr e1 off;
+        e2' ← shift_expr e2 off;
+        Some (Call e1' e2')
+    | Unit => Some Unit
+    | Nat n => Some (Nat n)
+    | Bool b => Some (Bool b)
+    | BinOp op e1 e2 =>
+        e1' ← shift_expr e1 off;
+        e2' ← shift_expr e2 off;
+        Some (BinOp op e1' e2')
+    | If e0 e1 e2 =>
+        e0' ← shift_expr e0 off;
+        e1' ← shift_expr e1 off;
+        e2' ← shift_expr e2 off;
+        Some (If e0' e1' e2')
+    | Pair e1 e2 =>
+        e1' ← shift_expr e1 off;
+        e2' ← shift_expr e2 off;
+        Some (Pair e1' e2')
+    | Fst e => e1' ← shift_expr e off; Some (Fst e1')
+    | Snd e => e1' ← shift_expr e off; Some (Snd e1')
+    | Loc (local i) l =>
+        let j := (Z.of_nat i + off)%Z in
+        if (j <? 0)%Z then None
+        else 
+          Some (Loc (local (Z.abs_nat j)) l)
+    | Loc δ l => Some (Loc δ l)
+    | Halloc e => e' ← shift_expr e off; Some (Halloc e')
+    | Salloc e => e' ← shift_expr e off; Some (Salloc e')
+    | Mask e => e' ← shift_expr e off; Some (Mask e')
+    | Load e => e' ← shift_expr e off; Some (Load e')
+    | Store e1 e2 =>
+        e1' ← shift_expr e1 off;
+        e2' ← shift_expr e2 off;
+        Some (Store e1' e2')
+    | Return e1 e2 =>
+        e1' ← shift_expr e1 off;
+        e2' ← shift_expr e2 off;
+        Some (Return e1' e2')
+    | Cont i K =>
+        let j := (Z.of_nat i + off)%Z in
+        if (j <? 0)%Z then None
+        else 
+          Some (Cont (Z.abs_nat j) K)
     end.
 
   Lemma shift_of_val v off :
-    of_val (shift_val v off) = shift_expr (of_val v) off.
+    (shift_val v off) ≫= (λ v, Some (of_val v)) = shift_expr (of_val v) off.
   Proof.
     induction v;auto.
-    - destruct δ;simpl;auto.
-    - destruct δ;simpl;auto.
-    - rewrite /= IHv1 IHv2 //.
+    - destruct δ =>// /=;case_match =>//.
+    - destruct δ =>// /=;case_match =>//.
+    - simpl. case_match =>//.
+    - rewrite /=. destruct (shift_val v1 off),(shift_val v2 off); simpl in * =>//.
+      all: destruct (shift_expr (of_val v1) off),(shift_expr (of_val v2) off); simpl in *;simplify_eq =>//.
   Qed.
 
   Definition heap : Type := gmap loc val.
@@ -600,10 +650,10 @@ Module lang.
   Definition stack_expr : Type := nat * expr.
   Definition stack_val : Type := nat * val.
   
-  Inductive scope_tag : tag -> Prop :=
-  | borrowScope : scope_tag borrow
-  | globalScope : scope_tag global
-  | localScope i : (i <= 0)%Z -> scope_tag (local i).
+  (* Inductive scope_tag : tag -> Prop := *)
+  (* | borrowScope : scope_tag borrow *)
+  (* | globalScope : scope_tag global *)
+  (* | localScope i : (i <= 0)%Z -> scope_tag (local i). *)
 
   Inductive permanent : val -> Prop :=
   | lamPerm k x e : permanent (LamV global k x e)
@@ -613,11 +663,11 @@ Module lang.
   | locPerm l : permanent (LocV global l)
   | pairPerm v1 v2 : permanent v1 -> permanent v2 -> permanent (PairV v1 v2).
 
-  Inductive scope : val -> Z -> Prop :=
-  | permScope v n : permanent v -> scope v n
-  | locScope δ l n : scope_tag δ -> scope (LocV δ l) n
-  | lamScope δ k x e n : scope_tag δ -> scope (LamV δ k x e) n
-  | contScope i K j : (i <= j)%Z -> scope (ContV i K) j.
+  (* Inductive scope : val -> Z -> Prop := *)
+  (* | permScope v n : permanent v -> scope v n *)
+  (* | locScope δ l n : scope_tag δ -> scope (LocV δ l) n *)
+  (* | lamScope δ k x e n : scope_tag δ -> scope (LamV δ k x e) n *)
+  (* | contScope i K j : (i <= j)%Z -> scope (ContV i K) j. *)
 
   Inductive heap_tag : tag -> Prop :=
   | borrowHeap : heap_tag borrow
@@ -784,28 +834,26 @@ Module lang.
 
   Inductive head_step : list ectx_item -> stack_expr -> state -> list observation -> stack_expr -> state -> list stack_expr -> RedMode -> Prop :=
   (** Local Lam-β *)
-  | LamBetaLocalS n K k x e1 i e2 v2 σ e1' v2' :
+  | LamBetaLocalS n K k x e1 (i : nat) e2 v2 σ e1' v2' :
     to_val e2 = Some v2 ->
-    scope_tag (local i) ->
-    shift_val v2 (-1) = v2' ->
-    shift_expr e1 (i - 1) = e1' ->
+    shift_val v2 1 = Some v2' ->
+    shift_expr e1 (i + 1)%Z = Some e1' ->
     head_step K (n,Call (Lam (local i) k x e1) e2) σ []
-      (n+1,Return (Cont (-1) K) (subst' k (ContV (-1) K) (subst' x v2' e1'))) (push σ) [] CaptureMode
+      (n+1,Return (Cont 1 K) (subst' k (ContV 1 K) (subst' x v2' e1'))) (push σ) [] CaptureMode
 
   (** Global Lam-β *)
   | LamBetaGlobalS n K k x e1 e2 v2 σ v2' :
     to_val e2 = Some v2 ->
-    shift_val v2 (-1) = v2' ->
+    shift_val v2 1 = Some v2' ->
     head_step K (n, Call (Lam global k x e1) e2) σ []
-      (n+1,Return (Cont (-1) K) (subst' k (ContV (-1) K) (subst' x v2' e1))) (push σ) [] CaptureMode
+      (n+1,Return (Cont 1 K) (subst' k (ContV 1 K) (subst' x v2' e1))) (push σ) [] CaptureMode
 
   (** Return *)
-  | ReturnS n K K' i e e' v σ :
+  | ReturnS n K K' (i : nat) e e' v σ :
     to_val e = Some v ->
-    shift_expr e i = e' ->
-    (i <= 0)%Z ->
-    length (stack_of σ) >= Z.abs_nat i ->
-    head_step K (n, Return (Cont i K') e) σ [] (n - (Z.abs_nat i), foldl (flip fill_item) e' K') (popN σ (Z.abs_nat i)) [] ThrowMode
+    shift_expr e i = Some e' ->
+    i ≤ length (stack_of σ) ->
+    head_step K (n, Return (Cont i K') e) σ [] (n - i, foldl (flip fill_item) e' K') (popN σ i) [] ThrowMode
 
   (** zeta *)
   | ZetaS n K x e1 e2 v1 σ :
@@ -835,7 +883,6 @@ Module lang.
 
   | SallocS n K e v σ l :
     to_val e = Some v ->
-    scope v 0 ->
     [[σ @ 0]] !! l = None ->
     head_step K (n, Salloc e) σ [] (n, Loc (local 0) l) (<[0@l:=v]>σ) [] NormalMode
 
@@ -845,10 +892,9 @@ Module lang.
     heap_tag δ ->
     head_step K (n, Load (Loc δ l)) σ [] (n, of_val v) σ [] NormalMode
 
-  | LoadStackS n K v v' l i σ :
+  | LoadStackS n K v v' l (i : nat) σ :
     [[σ @ (Z.abs_nat i)]] !! l = Some v ->
-    scope_tag (local i) ->
-    shift_val v i = v' ->
+    shift_val v i = Some v' ->
     head_step K (n, Load (Loc (local i) l)) σ [] (n, of_val v') σ [] NormalMode
 
   (** Storing *)
@@ -859,13 +905,11 @@ Module lang.
     is_Some ([[σ @@]] !! l) ->
     head_step K (n, Store (Loc δ l) e) σ [] (n,Unit) (<[l@@:=v]>σ) [] NormalMode
 
-  | StoreStackS n K e v v' l j i σ :
-    i = (Z.abs_nat j) ->
+  | StoreStackS n K e v v' l (i : nat) σ :
     to_val e = Some v ->
-    scope v j ->
-    shift_val v j = v' ->
+    shift_val v (- i) = Some v' ->
     is_Some ([[σ @ i]] !! l) ->
-    head_step K (n, Store (Loc (local j) l) e) σ [] (n,Unit) (<[i@l:=v']>σ) [] NormalMode
+    head_step K (n, Store (Loc (local i) l) e) σ [] (n,Unit) (<[i@l:=v']>σ) [] NormalMode
 
   (** Downgrade Heap Location *)
   | MaskS K l σ n :
@@ -930,37 +974,21 @@ Module lang.
   Definition capture K (e : stack_expr) :=
     match e.2 with
     | Call (Lam global k x e1) e2 =>
-        match to_val e2 with
-        | Some v2 => 
-            let v2' := shift_val v2 (-1) in
-            Some (e.1+1,Return (Cont (-1) K) (subst' k (ContV (-1) K) (subst' x v2' e1)))
-        | None => None
-        end
+        v2 ← to_val e2; v2' ← shift_val v2 1;
+        Some (e.1+1,Return (Cont (1) K) (subst' k (ContV (1) K) (subst' x v2' e1)))
     | Call (Lam (local i) k x e1) e2 =>
-        if (i <=? 0)%Z then
-          match to_val e2 with
-          | Some v2 =>
-              let v2' := shift_val v2 (-1) in
-              let e1' := shift_expr e1 (i - 1) in
-              Some (e.1+1,Return (Cont (-1) K) (subst' k (ContV (-1) K) (subst' x v2' e1')))
-          | None => None
-          end
-        else None
+        v2 ← to_val e2; v2' ← shift_val v2 1; e1' ← shift_expr e1 (i + 1);
+        Some (e.1+1,Return (Cont (1) K) (subst' k (ContV (1) K) (subst' x v2' e1')))
     | _ => None
     end.
 
-  Lemma scope_tag_local_leb i :
-    scope_tag (local i) ->
-    (i <=? 0)%Z = true.
-  Proof. inversion 1;lia. Qed.
-  
   Lemma ectxi_capture_captures K e1 σ1 κ e2 σ2 efs :
     head_step K e1 σ1 κ e2 σ2 efs CaptureMode →
     capture K e1 = Some e2.
   Proof.
     inversion 1; eauto.
-    - (* destruct e2; inversion H8. *) simplify_eq. unfold capture. simpl. rewrite /= scope_tag_local_leb /= //.
-      simplify_option_eq. auto.
+    - simplify_eq. unfold capture. simpl.
+      simplify_option_eq =>//.
     - unfold capture. simplify_eq. simpl. simplify_option_eq. auto.
   Qed.
 
@@ -977,7 +1005,7 @@ Module lang.
              head_step K' e1 σ1 κ e2' σ2 efs CaptureMode.
   Proof.
     inversion 1; subst; simpl; eauto using head_step.
-    - unfold capture. simplify_option_eq. rewrite /= scope_tag_local_leb /= //.
+    - unfold capture. simplify_option_eq.
       eauto using head_step.
     - unfold capture. simplify_option_eq. eauto using head_step.
   Qed.
@@ -999,7 +1027,6 @@ Module lang.
     let l := fresh (dom s) in
     stack_of σ !! (length (stack_of σ) - 1) = Some s ->
     to_val e = Some v →
-    scope v 0 ->
     head_step K (n,Salloc e) σ [] (n, Loc (local 0) l) (<[0 @ l:=v]>σ) [] NormalMode.
   Proof.
     intros; apply SallocS;auto.
@@ -1032,7 +1059,7 @@ Canonical Structure lang := CC_ectx_lang (lang.stack_expr).
 
 Export lang.
 
-Inductive throw_reducible_fill : expr -> Z -> Prop :=
+Inductive throw_reducible_fill : expr -> nat -> Prop :=
 | throw_reduce_fill i K v Ks : throw_reducible_fill (foldl (flip fill_item) (Return (Cont i K) (of_val v)) Ks) i.
 (* | throw_reduce_fill_ctx n Ks e : throw_reducible_fill (n, foldl (flip fill_item) Ks e). *)
 
@@ -1040,7 +1067,7 @@ Inductive throw_reducible : expr -> Prop :=
 | throw_reduce i K v : throw_reducible ( Return (Cont i K) (of_val v))
 | throw_reduce_ctx K e : throw_reducible (e) -> throw_reducible ( fill_item K e).
 
-Inductive throw_reducible_i : expr -> Z -> Prop :=
+Inductive throw_reducible_i : expr -> nat -> Prop :=
 | throw_reduce_i i K v : throw_reducible_i (Return (Cont i K) (of_val v)) i
 | throw_reduce_i_ctx K e i : throw_reducible_i e i -> throw_reducible_i (fill_item K e) i.
 
@@ -1213,7 +1240,7 @@ Proof.
     rewrite -(IHKs e1)//.
 Qed.
 
-Definition find_i (e : expr) : option Z :=
+Definition find_i (e : expr) : option nat :=
   let '(Ks,e') := construct_ctx e in
   match (Ks,e') with
   | (ReturnRCtx (ContV i _) :: Ks', e) => to_val e ≫= λ _, Some i
