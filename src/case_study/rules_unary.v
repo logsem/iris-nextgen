@@ -818,7 +818,7 @@ Section lifting.
   Qed.
 
   Lemma wp_return K K' E n (i : nat) e e' v Φ `{!IntoVal (n,e) v} :
-    shift_expr e i = Some e' ->
+    shift_expr e (-i) = Some e' ->
     i <= n ->
     ▷ ([size] (n - i) -∗
          ⚡={next_state Ω (lifetime_stack (n - i))}=>

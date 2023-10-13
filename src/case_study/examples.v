@@ -121,7 +121,6 @@ Section stack_lang_examples.
     iIntros (Φ) "Hsize #HΦ /=". rewrite /stuck_example. prepare_ctx.
     iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /=". prepare_ctx.
     iApply wp_stack_alloc;[repeat constructor|iFrame]. iNext. iIntros (l) "[Hsize Hl]". peel_ctx.
-    iApply wp_return;[eauto|lia|iFrame]. iNext. iIntros "Hsize /=". iModIntro.
     (* STUCK! the points-to for l gets lost, its lifetime is not less than 1 *)
   Abort.
 

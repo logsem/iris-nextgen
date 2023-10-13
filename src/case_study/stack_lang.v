@@ -851,7 +851,7 @@ Module lang.
   (** Return *)
   | ReturnS n K K' (i : nat) e e' v σ :
     to_val e = Some v ->
-    shift_expr e i = Some e' ->
+    shift_expr e (-i) = Some e' ->
     i ≤ length (stack_of σ) ->
     head_step K (n, Return (Cont i K') e) σ [] (n - i, foldl (flip fill_item) e' K') (popN σ i) [] ThrowMode
 
