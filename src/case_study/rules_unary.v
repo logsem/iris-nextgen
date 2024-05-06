@@ -6,10 +6,10 @@ From nextgen.case_study Require Export stack_lang stack_transform.
 From iris.proofmode Require Import tactics.
 From stdpp Require Import fin_maps.
 From nextgen Require Import nextgen_basic gen_trans gmap_view_transformation nextgen_id.
-From nextgen Require Export nextgen_pointwise.
 Set Default Proof Using "Type".
 Import uPred.
 From nextgen.lib Require Import wsat fancy_updates invariants.
+From nextgen Require Export nextgen_pointwise.
 
 
 (** Basic rules for language operations. *)
@@ -25,9 +25,14 @@ Inductive locality_lifetime : Type :=
   | lifetime_stack : nat -> locality_lifetime
   | lifetime_heap : locality_lifetime.
 
+Global Instance locality_lifetime_eq_dec : EqDecision locality_lifetime.
+Proof. solve_decision. Qed.
+
 Inductive locality_lifetime_rel : relation locality_lifetime :=
 | rel_heap c : locality_lifetime_rel c lifetime_heap
 | rel_stack f1 f2 : f1 < f2 -> locality_lifetime_rel (lifetime_stack f1) (lifetime_stack f2).
+
+Notation "c1 ≤ c2" := (rc locality_lifetime_rel c1 c2) (at level 70).
 
 Definition state_trans (n : nat) := (map_entry_lift_gmap_view (stack_location_cut n)).
 
@@ -64,9 +69,70 @@ Proof.
   intros Hcontr. inversion Hcontr;subst. inversion Hcontr;subst. lia.
 Qed.
 
+Global Instance id_stack_idemp : Idemp equiv (id : gmap_view.gmap_viewR (nat * loc) (leibnizO val) -> gmap_view.gmap_viewR (nat * loc) (leibnizO val)).
+Proof. intros c. simpl. auto. Qed.
+Global Instance locality_pick_idemp (c : locality_lifetime) : Idemp equiv (locality_pick c) :=
+  match c with
+  | lifetime_heap => id_stack_idemp
+  | lifetime_stack n => gMapTrans_lift_IdemP (stack_location_cut n)
+  end.
+Global Instance locality_pick_trichotomy : Trichotomy locality_lifetime_rel.
+Proof.
+  intros c c'.
+  destruct c,c';auto.
+  - destruct (decide (n < n0)),(decide (n = n0));[lia|..].
+    + left. by constructor.
+    + subst. by right;left.
+    + right;right. constructor. lia.
+  - left. constructor.
+  - right;right. constructor.
+Qed.
+Global Instance locality_pick_indep (c1 c2 : locality_lifetime) : Indep equiv (locality_pick c1) (locality_pick c2).
+Proof.
+  rewrite /locality_pick.
+  destruct c1,c2;simpl;[|intros ?;simpl;auto..].
+  rewrite /state_trans.
+  apply gMapTrans_lift_Indep;try apply _.
+  intros [??]. intros ?.
+  rewrite /stack_location_cut.
+  case_match;case_match;simpl;auto.
+  - by rewrite H H0.
+  - by rewrite H0.
+  - by rewrite H.
+Qed.
+Global Instance stack_location_cut_oindep n0 n l : OIndep eq (stack_location_cut n0 l) (stack_location_cut n l).
+Proof.
+  intros m.
+  rewrite /stack_location_cut.
+  case_match;case_match;simpl;auto.
+  - by rewrite H H0.
+  - by rewrite H0.
+  - by rewrite H.
+Qed.    
+Global Instance locality_pick_compose_subsume : ComposeSubsume equiv locality_lifetime_rel locality_pick.
+Proof.
+  intros c1 c2 m Hcr.
+  rewrite /locality_pick.
+  destruct c1,c2;simpl;auto;inversion Hcr;subst.
+  rewrite /state_trans.
+  pose proof (map_entry_lift_gmap_view_compose (stack_location_cut n)) as Heq.
+  simpl in Heq. rewrite Heq.
+  apply map_entry_lift_gmap_equiv;try apply _.
+  intros [n1 l] v.
+  rewrite /stack_location_cut.
+  rewrite /stack_cond /=.
+  case_match;case_match;simpl;auto.
+  - by rewrite H0.
+  - by rewrite H0.
+  - apply bool_decide_eq_false in H.
+    apply bool_decide_eq_true in H0.
+    lia.
+Qed.
+
 Global Instance locality_lifetime_pick
   : pick_transform_rel (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) :=
   { C := locality_lifetime;
+    C_bot := lifetime_stack 0;
     CR := locality_lifetime_rel;
     C_pick := locality_pick;
   }.
@@ -113,21 +179,25 @@ Section StackSize.
     
 End StackSize.
 
-#[global] Instance heapG_inv_transform_inG `{H:heapGS Σ Ω} : inG Σ (gmap_view.gmap_viewR positive (optionO (leibnizO C))) :=
-  ((((heapG_invGS.(invGS_wsat)).(wsat_inG)).(wsatGpreS_func)).(noTransInG_A_inG)).(noTransInG_inG).
+Global Existing Instances heapG_invGS.
+Local Existing Instances heapG_gen_heapGS heapG_gen_stackGS.
+
+(* #[global] Instance heapG_inv_transform_inG `{H:heapGS Σ Ω} : inG Σ (gmap_view.gmap_viewR positive (optionO (leibnizO C))) := *)
+(*   ((((heapG_invGS.(invGS_wsat)).(wsat_inG)).(wsatGpreS_func)).(noTransInG_A_inG)).(noTransInG_inG). *)
 
 (* #[global] Instance gmap_view_inG `{H:heapGS Σ Ω} : ghost_mapNoG Σ Ω (nat * loc) (leibnizO val) := *)
 (*   @GhostMapNoG Σ Ω (nat * loc) (leibnizO val) _ _ *)
 (*     (((heapG_invGS.(invGS_wsat)).(wsat_inG)).(wsatGpreS_func)).(noTransInG_B_inG). *)
 
 #[global] Instance gmap_view_inG `{H:invGIndS_gen fancy_updates.HasNoLc Σ Ω (gmap_view.gmap_viewR (nat * loc) (leibnizO val))} : ghost_mapNoG Σ Ω (nat * loc) (leibnizO val) :=
-  @GhostMapNoG Σ Ω (nat * loc) (leibnizO val) _ _
-    ((invGS_wsat.(wsat_inG)).(wsatGpreS_func)).(noTransInG_B_inG).
-  (* @GhostMapNoG Σ Ω (nat * loc) (leibnizO val) _ _ *)
+  @GhostMapNoG Σ Ω (nat * loc) (leibnizO val) _ _ _.
+    (* ((invGS_wsat.(wsat_inG)).(wsatGpreS_func)).(noTransInG_B_inG). *)
+
+(* @GhostMapNoG Σ Ω (nat * loc) (leibnizO val) _ _ *)
   (*   (wsatGpreS_func).(noTransInG_B_inG). *)
 
-#[global] Instance heapG_wsatpre `{H:heapGS Σ Ω} : invGIndS_gen fancy_updates.HasNoLc Σ Ω (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) locality_lifetime_pick :=
-  heapG_invGS.
+(* #[global] Instance heapG_wsatpre `{H:heapGS Σ Ω} : invGIndS_gen fancy_updates.HasNoLc Σ Ω (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) locality_lifetime_pick := *)
+(*   heapG_invGS. *)
 
 #[global] Instance heapG_gen_heapGS_inG `{H:heapGS Σ Ω} : gen_heapGS (nat * loc) val Σ :=
   @into_gen_heap_from_no (nat * loc) val Σ Ω _ _ _ heapG_gen_stackGS.
@@ -210,7 +280,7 @@ Qed.
 Lemma next_state_eq' `{H : heapGS Σ Ω} n :
   next_state Ω (lifetime_stack n) = transmap_insert_two_inG (inv_pick_transform (lifetime_stack n)) (state_trans n) Ω.
 Proof.
-  rewrite next_state_unseal /next_state_def /= //. 
+  rewrite next_state_unseal /next_state_def /= //.
 Qed.
   
 #[global]
@@ -307,7 +377,8 @@ Section heapG_nextgen_updates.
     iIntros "Hs". rewrite /gen_stack_interp /=.
     rewrite /ghost_map.ghost_map_auth seal_eq /ghost_map.ghost_map_auth_def /=.
     rewrite next_state_unseal /next_state_def /=.
-    iDestruct (transmap_own_insert_two_right _ (state_trans (length s1 - i)) with "Hs") as "Hs".
+    iDestruct (transmap_own_insert_two_right (inv_pick_transform (lifetime_stack (length s1 - i)))
+                 (state_trans (length s1 - i)) with "Hs") as "Hs".
     iApply (bnextgen_mono with "Hs").
     rewrite /state_trans
       /map_entry_lift_gmap_view /= /cmra_morphism_extra.fmap_view /= /cmra_morphism_extra.fmap_pair /=.
@@ -402,18 +473,20 @@ Section heapG_nextgen_updates.
     rewrite next_state_unseal /next_state_def.
     iIntros "#Hinv".
     iApply inv_mod_intro;auto.
-    simpl. constructor.
+    simpl. do 2 constructor.
   Qed.
 
   Lemma next_state_stack_inv_intro N n1 n2 P :
-    n1 < n2 ->
+    n1 <= n2 ->
     inv N (lifetime_stack n1) P ⊢ ⚡={next_state Ω (lifetime_stack n2)}=> inv N (lifetime_stack n1) P.
   Proof.
     intros Hle.
     rewrite next_state_unseal /next_state_def.
     iIntros "#Hinv".
     iApply inv_mod_intro;auto.
-    simpl. by constructor.
+    destruct (decide (n1 = n2));subst.
+    - apply rc_l.
+    - simpl. do 2 constructor. lia.
   Qed.
 
   (* Repeating the following two instances here make typeclass resolution much faster *)
@@ -498,6 +571,9 @@ Section lifting.
   Implicit Types σ : state.
   Implicit Types e : expr.
 
+  Global Instance wp' : Wp (iProp Σ) (stack_expr) (stack_val) (stuckness * locality_lifetime) :=
+    @wp' _ lang Σ Ω _ heapG_irisGS.
+
   Hint Extern 1 =>
          match goal with
          | |- ∀ σ, head_nonthrow_reducible _ _ σ => repeat econstructor
@@ -538,88 +614,94 @@ Section lifting.
          match goal with
          | |- context [ (?={ ?Ω <- ?e }=> ?P)%I ] =>
              rewrite /bnextgen_option; simpl next_choose; inv_head_step; rewrite /next_choose_f /find_i /=; (try rewrite !to_of_val); (try rewrite construct_ctx_of_val /=); (try rewrite !to_of_val); simpl
+         | |- context [ bounded_nextgen ?c (?n, ?e) ] =>
+             rewrite /bounded_nextgen; simpl next_choose; inv_head_step; rewrite /next_choose_f /find_i /=; (try rewrite !to_of_val); (try rewrite construct_ctx_of_val /=); (try rewrite !to_of_val); simpl
          end.
 
   Notation id := (id : (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) -> (gmap_view.gmap_viewR (nat * loc) (leibnizO val))).
 
-  Lemma wp_LetIn K E e1 e2 v1 x Φ (n : nat) `{!IntoVal (n,e1) v1} :
-                               ▷ (WP fill K (n,subst' x v1.2 e2) @ E {{ Φ }}) ⊢ WP fill K (n,LetIn x e1 e2) @ E {{ Φ }}.
+  Lemma wp_LetIn K c E e1 e2 v1 x Φ (n : nat) `{!IntoVal (n,e1) v1} :
+                               ▷ (WP fill K (n,subst' x v1.2 e2) @ ↑c; E {{ Φ }}) ⊢ WP fill K (n,LetIn x e1 e2) @ ↑c; E {{ Φ }}.
   Proof.
     iIntros "H".
     iApply (wp_lift_nonthrow_pure_det_head_step_no_fork' K (n,LetIn _ _ _) _);eauto.
     intros; inv_head_step;eauto.
     { intros. iIntros "Hs". by resolve_next_state. }
+    { by resolve_next_state. }
     iNext. iIntros "H1". by resolve_next_state.
   Qed.
 
-  Lemma wp_bin_op K E op e1 e2 n v1 v2 w Φ `{!IntoVal (n,e1) (n,v1), !IntoVal (n,e2) (n,v2)} :
+  Lemma wp_bin_op K c E op e1 e2 n v1 v2 w Φ `{!IntoVal (n,e1) (n,v1), !IntoVal (n,e2) (n,v2)} :
     binop_eval op v1 v2 = Some w →
-    ▷ (WP fill K (n, of_val w) @ E {{ Φ }})
-      ⊢ WP fill K (n, BinOp op e1 e2) @ E {{ Φ }}.
+    ▷ (WP fill K (n, of_val w) @ ↑c; E {{ Φ }})
+      ⊢ WP fill K (n, BinOp op e1 e2) @ ↑c; E {{ Φ }}.
   Proof.
     iIntros (?) "H".
     iApply (wp_lift_nonthrow_pure_det_head_step_no_fork' K (n,BinOp op _ _) _);eauto.
     intros; inv_head_step;eauto.
     { intros. iIntros "Hs". by resolve_next_state. }
+    { by resolve_next_state. }
     iNext. iIntros "H1". by resolve_next_state.
   Qed.
 
-  Lemma wp_if_true K E e1 e2 n Φ :
-    ▷ (WP fill K (n,e1) @ E {{ Φ }}) ⊢ WP fill K (n,If (#♭ true) e1 e2) @ E {{ Φ }}.
+  Lemma wp_if_true K c E e1 e2 n Φ :
+    ▷ (WP fill K (n,e1) @ ↑c; E {{ Φ }}) ⊢ WP fill K (n,If (#♭ true) e1 e2) @ ↑c; E {{ Φ }}.
   Proof.
     iIntros "H".
     iApply (wp_lift_nonthrow_pure_det_head_step_no_fork' K (n,If _ _ _) _);eauto.
-    intros; inv_head_step;eauto.
+    intros; inv_head_step;eauto. by resolve_next_state.
   Qed.
 
-  Lemma wp_if_false K E e1 e2 n Φ :
-    ▷ (WP fill K (n,e2) @ E {{ Φ }}) ⊢ WP fill K (n, If (#♭ false) e1 e2) @ E {{ Φ }}.
+  Lemma wp_if_false K c E e1 e2 n Φ :
+    ▷ (WP fill K (n,e2) @ ↑c; E {{ Φ }}) ⊢ WP fill K (n, If (#♭ false) e1 e2) @ ↑c; E {{ Φ }}.
   Proof.
     iIntros "H".
     iApply (wp_lift_nonthrow_pure_det_head_step_no_fork' K (n,If _ _ _) _);eauto.
-    intros; inv_head_step;eauto.
+    intros; inv_head_step;eauto. by resolve_next_state.
   Qed.
 
-  Lemma wp_fst K E e1 e2 v1 n Φ `{!IntoVal (n,e1) v1, !AsVal (n,e2)} :
-    ▷ (WP fill K (n,e1) @ E {{ Φ }})
-      ⊢ WP fill K (n,Fst (Pair e1 e2)) @ E {{ Φ }}.
+  Lemma wp_fst K c E e1 e2 v1 n Φ `{!IntoVal (n,e1) v1, !AsVal (n,e2)} :
+    ▷ (WP fill K (n,e1) @ ↑c; E {{ Φ }})
+      ⊢ WP fill K (n,Fst (Pair e1 e2)) @ ↑c; E {{ Φ }}.
   Proof.
     iIntros "H".
     iApply (wp_lift_nonthrow_pure_det_head_step_no_fork' K (n,Fst _) _);eauto.
     inv_head_step. eauto. intros; inv_head_step;eauto.
     { intros. iIntros "Hs". by resolve_next_state. }
+    { by resolve_next_state. } 
     iNext. iIntros "H1". by resolve_next_state.
   Qed.
 
-  Lemma wp_snd K E e1 e2 n v2 Φ `{!AsVal (n,e1), !IntoVal (n,e2) v2} :
-    ▷ (WP fill K (n,e2) @ E {{ Φ }})
-      ⊢ WP fill K (n, Snd (Pair e1 e2)) @ E {{ Φ }}.
+  Lemma wp_snd K c E e1 e2 n v2 Φ `{!AsVal (n,e1), !IntoVal (n,e2) v2} :
+    ▷ (WP fill K (n,e2) @ ↑c; E {{ Φ }})
+      ⊢ WP fill K (n, Snd (Pair e1 e2)) @ ↑c; E {{ Φ }}.
   Proof.
     iIntros "H".
     iApply (wp_lift_nonthrow_pure_det_head_step_no_fork' K (n,Snd _) _);eauto.
     inv_head_step. eauto. intros; inv_head_step;eauto.
     { intros. iIntros "Hs". by resolve_next_state. }
+    { by resolve_next_state. }
     iNext. iIntros "H1". by resolve_next_state.
   Qed.
 
-  Lemma wp_mask K E l n Φ :
-    ▷ (WP fill K (n,Loc borrow l) @ E {{ Φ }})
-      ⊢ WP fill K (n, Mask (Loc global l)) @ E {{ Φ }}.
+  Lemma wp_mask K c E l n Φ :
+    ▷ (WP fill K (n,Loc borrow l) @ ↑c; E {{ Φ }})
+      ⊢ WP fill K (n, Mask (Loc global l)) @ ↑c; E {{ Φ }}.
   Proof.
     iIntros "H".
     iApply (wp_lift_nonthrow_pure_det_head_step_no_fork' K (n,Mask _) _);eauto.
-    inv_head_step. eauto.
+    inv_head_step. eauto. by resolve_next_state.
   Qed.
 
   (** ------------------------------------------------------------ *)
   (** ------------------------ Allocations ----------------------- *)
   (** ------------------------------------------------------------ *)
 
-  Lemma wp_stack_alloc K E n e v Φ `{!IntoVal (n,e) (n,v)} :
+  Lemma wp_stack_alloc K c E n e v Φ `{!IntoVal (n,e) (n,v)} :
     0 < n -> (* stack is non empty *)
-    ▷ (∀ l, [size] n ∗ (n - 1) @@ l ↦ v -∗ WP fill K (n,Loc (local 0) l) @ E {{ Φ }})
+    ▷ (∀ l, [size] n ∗ (n - 1) @@ l ↦ v -∗ WP fill K (n,Loc (local 0) l) @ ↑c; E {{ Φ }})
       ∗ ▷ [size] n
-      ⊢ WP fill K (n,Salloc e) @ E {{ Φ }}.
+      ⊢ WP fill K (n,Salloc e) @ ↑c; E {{ Φ }}.
   Proof.
     iIntros (Hlt) "[HΦ >Hsize]".
     iApply wp_lift_nonthrow_head_step; auto.
@@ -642,13 +724,13 @@ Section lifting.
     rewrite /insert /insert_state_Insert /insert_state /= PeanoNat.Nat.sub_0_r /= Hs' /=.
     iDestruct "Hstate" as "[? [? ?]]". rewrite insert_length. iFrame.
     iModIntro.
-    iApply "HΦ". iFrame.
+    iSplit;[iPureIntro;by resolve_next_state|]. iApply "HΦ". iFrame.
   Qed.
 
-  Lemma wp_heap_alloc K E n e v Φ `{!IntoVal (n,e) (n,v)} :
+  Lemma wp_heap_alloc K c E n e v Φ `{!IntoVal (n,e) (n,v)} :
     permanent v ->
-    ▷ (∀ l, l ↦ v -∗ WP fill K (n,Loc global l) @ E {{ Φ }})
-      ⊢ WP fill K (n,Halloc e) @ E {{ Φ }}.
+    ▷ (∀ l, l ↦ v -∗ WP fill K (n,Loc global l) @ ↑c; E {{ Φ }})
+      ⊢ WP fill K (n,Halloc e) @ ↑c; E {{ Φ }}.
   Proof.
     iIntros (Hperm) "HΦ".
     iApply wp_lift_nonthrow_head_step; auto.
@@ -662,18 +744,18 @@ Section lifting.
     iMod "Hcls".
     iMod (gen_heap_alloc _ l v0 with "Hh") as "[Hh [Hl _]]";[auto|].
     iDestruct ("HΦ" with "Hl") as "Hwp".
-    iModIntro. iFrame.
+    iModIntro. iFrame. iPureIntro. by resolve_next_state.
   Qed.
 
   (** ------------------------------------------------------------ *)
   (** ---------------------- Load and Store ---------------------- *)
   (** ------------------------------------------------------------ *)
 
-  Lemma wp_heap_load K E l δ n v Φ :
+  Lemma wp_heap_load K c E l δ n v Φ :
     heap_tag δ ->
-    ▷ (l ↦ v -∗ WP fill K (n,of_val v) @ E {{ Φ }})
+    ▷ (l ↦ v -∗ WP fill K (n,of_val v) @ ↑c; E {{ Φ }})
       ∗ ▷ l ↦ v
-      ⊢ WP fill K (n,Load (Loc δ l)) @ E {{ Φ }}.
+      ⊢ WP fill K (n,Load (Loc δ l)) @ ↑c; E {{ Φ }}.
   Proof.
     iIntros (Hδ) "[HΦ >Hl]".
     iApply wp_lift_nonthrow_head_step; auto.
@@ -692,12 +774,12 @@ Section lifting.
     iModIntro. iFrame.
   Qed.
 
-  Lemma wp_stack_load K E l (j : nat) v v' n Φ :
+  Lemma wp_stack_load K c E l (j : nat) v v' n Φ :
     shift_val v j = Some v' ->
-    ▷ ([size] n ∗ (n - 1 - Z.abs_nat j) @@ l ↦ v -∗ WP fill K (n,of_val v') @ E {{ Φ }})
+    ▷ ([size] n ∗ (n - 1 - Z.abs_nat j) @@ l ↦ v -∗ WP fill K (n,of_val v') @ ↑c; E {{ Φ }})
       ∗ ▷ (n - 1 - Z.abs_nat j) @@ l ↦ v
       ∗ ▷ [size] n
-      ⊢ WP fill K (n,Load (Loc (local j) l)) @ E {{ Φ }}.
+      ⊢ WP fill K (n,Load (Loc (local j) l)) @ ↑c; E {{ Φ }}.
   Proof.
     iIntros (Hscope) "[HΦ [>Hl >Hsize] ]".
     iApply wp_lift_nonthrow_head_step; auto.
@@ -718,12 +800,12 @@ Section lifting.
     iFrame.
   Qed.
 
-  Lemma wp_heap_store K E e l δ v Φ `{!IntoVal (n,e) (n,v)} :
+  Lemma wp_heap_store K c E e l δ v Φ `{!IntoVal (n,e) (n,v)} :
     permanent v ->
     heap_tag δ ->
-    ▷ (l ↦ v -∗ WP fill K (n,lang.Unit) @ E {{ Φ }})
+    ▷ (l ↦ v -∗ WP fill K (n,lang.Unit) @ ↑c; E {{ Φ }})
       ∗ ▷ l ↦ -
-      ⊢ WP fill K (n,Store (Loc δ l) e) @ E {{ Φ }}.
+      ⊢ WP fill K (n,Store (Loc δ l) e) @ ↑c; E {{ Φ }}.
   Proof.
     iIntros (Hperm Hδ) "[HΦ >Hl]".
     iApply wp_lift_nonthrow_head_step; auto.
@@ -740,15 +822,15 @@ Section lifting.
     iMod "Hcls".
     iMod (gen_heap_update _ _ _ v0 with "Hh Hl") as "[Hh Hl]".
     iDestruct ("HΦ" with "Hl") as "Hwp".
-    iModIntro. iFrame.
+    iModIntro. iFrame. iPureIntro. by resolve_next_state.
   Qed.
 
-  Lemma wp_stack_store K E e l (j : nat) v v' w Φ `{!IntoVal (n,e) (n,v)} :
+  Lemma wp_stack_store K c E e l (j : nat) v v' w Φ `{!IntoVal (n,e) (n,v)} :
     shift_val v (-j) = Some v' ->
-    ▷ ([size] n ∗ (n - 1 - j) @@ l ↦ v' -∗ WP fill K (n,lang.Unit) @ E {{ Φ }})
+    ▷ ([size] n ∗ (n - 1 - j) @@ l ↦ v' -∗ WP fill K (n,lang.Unit) @ ↑c; E {{ Φ }})
       ∗ ▷ (n - 1 - j) @@ l ↦ w
       ∗ ▷ [size] n
-      ⊢ WP fill K (n,Store (Loc (local j) l) e) @ E {{ Φ }}.
+      ⊢ WP fill K (n,Store (Loc (local j) l) e) @ ↑c; E {{ Φ }}.
   Proof.
     iIntros (Hperm) "[HΦ [>Hl >Hsize] ]".
     iApply wp_lift_nonthrow_head_step; auto.
@@ -768,7 +850,7 @@ Section lifting.
     iMod (gen_stack_update _ _ _ _ _ (v') with "Hl Hs") as "[Hl Hs]";eauto.
     rewrite /insert /insert_state_Insert /insert_state /insert_stack /= Hs0.
     iModIntro. iDestruct ("HΦ" with "[$]") as "Hwp".
-    rewrite insert_length. iFrame.
+    rewrite insert_length. iFrame. iPureIntro. by resolve_next_state.
   Qed.
 
   (** ------------------------------------------------------------ *)
@@ -776,11 +858,11 @@ Section lifting.
   (** ------------------------------------------------------------ *)
     
   (** Control flow -- stateful due to stack frames *)
-  Lemma wp_call_global K E n k x e1 e2 v2' v2 Φ `{!IntoVal (n,e2) (n,v2)} :
+  Lemma wp_call_global K c E n k x e1 e2 v2' v2 Φ `{!IntoVal (n,e2) (n,v2)} :
     shift_val v2 (1) = Some v2' ->
-    ▷ ([size] (S n) -∗ WP fill K (S n,Return (Cont (1) K) (subst' k (ContV (1) K) (subst' x v2' e1))) @ E {{ Φ }})
+    ▷ ([size] (S n) -∗ WP fill K (S n,Return (Cont (1) K) (subst' k (ContV (1) K) (subst' x v2' e1))) @ ↑c; E {{ Φ }})
       ∗ ▷ [size] n
-      ⊢ WP fill K (n,Call (Lam global k x e1) e2) @ E {{ Φ }}.
+      ⊢ WP fill K (n,Call (Lam global k x e1) e2) @ ↑c; E {{ Φ }}.
   Proof.
     iIntros (Hshift) "[HΦ >Hs]".
     iApply wp_lift_nonthrow_head_step; auto.
@@ -794,15 +876,16 @@ Section lifting.
     rewrite /gen_stack_interp.
     rewrite list_to_gmap_stack_push_stack push_stack_length.
     rewrite PeanoNat.Nat.add_1_r. iFrame.
-    by iApply "HΦ".
+    iSplit; [|by iApply "HΦ"].
+    iPureIntro. by resolve_next_state.
   Qed.
 
-  Lemma wp_call_local K E n (i : nat) k x e1 e2 e1' v2' v2 Φ `{!IntoVal (n,e2) (n,v2)} :
+  Lemma wp_call_local K c E n (i : nat) k x e1 e2 e1' v2' v2 Φ `{!IntoVal (n,e2) (n,v2)} :
     shift_expr e1 (i + 1) = Some e1' ->
     shift_val v2 (1) = Some v2' ->
-    ▷ ([size] (S n) -∗ WP fill K (S n, Return (Cont (1) K) (subst' k (ContV (1) K) (subst' x v2' e1'))) @ E {{ Φ }})
+    ▷ ([size] (S n) -∗ WP fill K (S n, Return (Cont (1) K) (subst' k (ContV (1) K) (subst' x v2' e1'))) @ ↑c; E {{ Φ }})
       ∗ ▷ [size] n
-      ⊢ WP fill K (n, Call (Lam (local i) k x e1) e2) @ E {{ Φ }}.
+      ⊢ WP fill K (n, Call (Lam (local i) k x e1) e2) @ ↑c; E {{ Φ }}.
   Proof.
     iIntros (Hshift1 Hshift2) "[HΦ >Hs]".
     iApply wp_lift_nonthrow_head_step; auto.
@@ -814,19 +897,22 @@ Section lifting.
     iNext. iIntros (rm r0 σ2 efs Hstep) "Hp".
     resolve_next_state. iMod "Hcls". iModIntro.
     rewrite /gen_stack_interp list_to_gmap_stack_push_stack push_stack_length. iFrame.
-    rewrite PeanoNat.Nat.add_1_r. by iApply "HΦ".
+    rewrite PeanoNat.Nat.add_1_r. iSplit; [|by iApply "HΦ"].
+    iPureIntro. by resolve_next_state.
   Qed.
 
-  Lemma wp_return K K' E n (i : nat) e e' v Φ `{!IntoVal (n,e) v} :
+  Lemma wp_return K K' E c n (i : nat) e e' v Φ `{!IntoVal (n,e) v} :
+    (* let c : C := lifetime_stack m in *)
+    c ≤ (lifetime_stack (n - i)) ->
     shift_expr e (-i) = Some e' ->
     i <= n ->
     ▷ ([size] (n - i) -∗
          ⚡={next_state Ω (lifetime_stack (n - i))}=>
-         WP fill K' (n - i,e') @ E {{ Φ }})
+         WP fill K' (n - i,e') @ ↑c; E {{ Φ }})
       ∗ ▷ [size] n
-      ⊢ WP fill K (n,Return (Cont i K') e) @ E {{ Φ }}.
+      ⊢ WP fill K (n,Return (Cont i K') e) @ ↑c; E {{ Φ }}.
   Proof.
-    iIntros (Hle Hlen) "[HΦ >Hn]".
+    iIntros (Hc Hle Hlen) "[HΦ >Hn]".
     iApply wp_lift_throw_head_step;auto.
     iIntros ([h1 s1] ns κ κs nt) "Hstate".
     iApply fupd_mask_intro;[set_solver|]. iIntros "Hcls".
@@ -842,6 +928,8 @@ Section lifting.
     iDestruct (stack_size_auth_intro _ (lifetime_stack (length s1 - i)) with "Hsize") as "Hsize".
     iModIntro. iClear "Hp".
     iDestruct ("HΦ" with "Hn") as "Hwp". iFrame.
+    iSplitR.
+    { iPureIntro. resolve_next_state. auto. }
     iSplitR "Hwp".
     - rewrite <- (@next_state_eq Σ Ω H).
       iModIntro. iFrame. rewrite popN_stack_length. iFrame.

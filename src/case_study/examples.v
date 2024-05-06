@@ -6,6 +6,7 @@ From nextgen.case_study Require Export stack_lang stack_transform.
 From iris.proofmode Require Import tactics.
 From stdpp Require Import fin_maps.
 
+From nextgen Require Import nextgen_independent.
 From nextgen.lib Require Import invariants.
 From nextgen.case_study Require Import rules_unary stack_lang_notation.
 
@@ -51,23 +52,28 @@ End examples.
 Section stack_lang_examples.
   Context `{heapGS Σ}.
 
+  Notation "^ n" := (lifetime_stack n) (at level 70, format "^ n").
+  Notation "#∞" := (lifetime_heap).
+
   Lemma example1_spec :
-    {{{ [size] 0 }}} (0,example1) {{{ v, RET v; ⌜v.2 = NatV 42⌝ }}}.
+    {{{ [size] 0 }}} (0,example1) @ ↑^0 {{{ v, RET v; ⌜v.2 = NatV 42⌝ }}}.
   Proof.
-    iIntros (Φ) "Hsize #HΦ /=". rewrite /example1. prepare_ctx.
+    iIntros (Φ) "Hsize HΦ /=". rewrite /example1. prepare_ctx.
     iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /=". prepare_ctx.
     iApply wp_stack_alloc;[repeat constructor|iFrame].
     iNext. iIntros (l) "[Hsize Hl]". peel_ctx.
     iApply wp_LetIn. iIntros "!>". simpl subst'.
     iApply (wp_stack_load);[|iFrame];[eauto|].
     iNext. iIntros "[Hsize Hl]". peel_ctx.
-    iApply wp_return;[eauto|lia|iFrame]. iNext. iIntros "Hsize".
+    iApply wp_return;[|eauto|lia|iFrame].
+    { apply rc_l. }
+    iNext. iIntros "Hsize". iClear "Hl".
     iModIntro.
     simpl. iApply wp_value. iApply "HΦ". simpl. auto.
   Qed.
 
   Lemma example2_spec :
-    {{{ [size] 0 }}} (0,example2) {{{ v, RET v; ⌜v.2 = NatV 42⌝ }}}.
+    {{{ [size] 0 }}} (0,example2) @ ↑^0 {{{ v, RET v; ⌜v.2 = NatV 42⌝ }}}.
   Proof.
     iIntros (Φ) "Hsize #HΦ /=". rewrite /example2. prepare_ctx.
     iApply wp_call_global;[eauto|iFrame]. iIntros "!>". iIntros "Hsize /=". prepare_ctx.
@@ -78,16 +84,17 @@ Section stack_lang_examples.
     prepare_ctx.
     iApply wp_stack_load;[|iFrame];eauto.
     iNext. iIntros "[Hsize Hl]". peel_ctx.
-    iApply wp_return;[eauto|lia|iFrame]. iNext. iIntros "Hsize /=".
+    iApply wp_return;[|eauto|lia|iFrame];[do 2 constructor;lia|].
+    iNext. iIntros "Hsize /=".
     iDestruct (stack_stack_pop_intro with "Hl") as "Hl";[eauto|].
     iModIntro. prepare_ctx.
-    iApply wp_return;[eauto|lia..|iFrame]. iNext. iClear "Hl".
+    iApply wp_return;[|eauto|lia..|iFrame];[apply rc_l|]. iNext. iClear "Hl".
     iIntros "Hsize /=". iClear "Hsize". iModIntro.
     iApply wp_value. iApply "HΦ";auto.
   Qed.
 
   Lemma example3_spec :
-    {{{ [size] 0 }}} (0,example3) {{{ v, RET v; ⌜v.2 = NatV 42⌝ }}}.
+    {{{ [size] 0 }}} (0,example3) @ ↑^0 {{{ v, RET v; ⌜v.2 = NatV 42⌝ }}}.
   Proof.
     iIntros (Φ) "Hsize #HΦ /=". rewrite /example2. prepare_ctx.
     iApply wp_LetIn. iIntros "!>". simpl subst'.
@@ -100,14 +107,14 @@ Section stack_lang_examples.
     iNext. iIntros "Hsize".
     (* NOTE: the local stack pointer has been shifted to point two frame down *)
     iApply wp_stack_load;[|iFrame];eauto. iNext. iIntros "[Hsize Hl]". peel_ctx.
-    iApply wp_return;[eauto|lia|]. iFrame. iNext.
+    iApply wp_return;[do 2 constructor;lia|eauto|lia|]. iFrame. iNext.
     iIntros "Hsize /=".
     iDestruct (stack_stack_pop_intro _ _ _ _ 2 with "Hl") as "Hl";[lia|].
     iModIntro. prepare_ctx.
-    iApply wp_return;[eauto|lia|]. iFrame. iNext. iIntros "Hsize /=".
+    iApply wp_return;[do 2 constructor;lia|eauto|lia|]. iFrame. iNext. iIntros "Hsize /=".
     iDestruct (stack_stack_pop_intro _ _ _ _ 1 with "Hl") as "Hl";[lia|].
     iModIntro. prepare_ctx.
-    iApply wp_return;[eauto|lia..|]. iFrame. iNext. iIntros "Hsize /=".
+    iApply wp_return;[do 2 constructor;lia|eauto|lia..|]. iFrame. iNext. iIntros "Hsize /=".
     iClear "Hl".
     iModIntro. iApply wp_value. iApply "HΦ";auto.
   Qed.
@@ -116,7 +123,7 @@ Section stack_lang_examples.
   stuck once the caller tried to load the callee's now popped stack
   location *)
   Lemma stuck_example_failed_spec :
-    {{{ [size] 1 }}} (1,stuck_example) {{{ v, RET v; False }}}.
+    {{{ [size] 1 }}} (1,stuck_example) @ ↑^0 {{{ v, RET v; False }}}.
   Proof.
     iIntros (Φ) "Hsize #HΦ /=". rewrite /stuck_example. prepare_ctx.
     iApply wp_call_global;[eauto|iFrame]. iNext. iIntros "Hsize /=". prepare_ctx.
@@ -125,20 +132,23 @@ Section stack_lang_examples.
   Abort.
 
   Definition logN : namespace := nroot .@ "logN".
+
+  Local Definition inv : namespace -> locality_lifetime -> iProp Σ -> iProp Σ := inv.
   
   Lemma example4_spec (e : expr) :
     (forall v, expr_subst "f" v e = e) -> (* e does not contain free f *)
-    (∀ (j : nat) v1 v2 K', {{{ [size] j
+    (∀ (j k : nat) v1 v2 K', ⌜k <= j⌝ →
+                      {{{ [size] j
                       ∗ (∃ (i : nat) K (off : nat), ⌜(off ≤ j)⌝ ∧ ⌜shift_expr v2 (-1) = Some (Cont off K)⌝ ∧ ⌜(i = j - off)⌝ ∧
                                       (∀ v', (∃ n, ⌜v' = Nat n⌝) → [size] i -∗
-                                      ⚡={Ω <- (lifetime_stack i)}=> WP fill K (i,v') {{ λ v, ∃ n, ⌜v.2 = NatV n⌝ }}))
+                                      ⚡={Ω <- (lifetime_stack i)}=> WP fill K (i,v') @ ↑^i {{ λ v, ∃ n, ⌜v.2 = NatV n⌝ }}))
                       ∗ (∃ i l (off : nat), ⌜(off <= j)⌝ ∧ ⌜shift_expr v1 1 = Some (Loc (local off) l)⌝ ∧ ⌜(i = j - (Z.abs_nat off))⌝ ∧
-                                      inv (logN .@ l) (lifetime_stack i) (∃ v, i @@ l ↦ v ∗ ∃ m, ⌜v = NatV m⌝))
+                                      inv (logN .@ l) (^S i) (∃ v, i @@ l ↦ v ∗ ∃ m, ⌜v = NatV m⌝))
                       ∗ (∀ v', (∃ n, ⌜v' = Nat n⌝) → [size] j -∗
-                        ⚡={Ω <- (lifetime_stack j)}=> WP fill K' (j,v') {{ λ v, ∃ n, ⌜v.2 = NatV n⌝ }}) }}}
-                  fill K' ((j, (λ: global, "k", "x", e) ⟪ v1, v2 ⟫))
+                        ⚡={Ω <- (lifetime_stack j)}=> WP fill K' (j,v') @ ↑^k {{ λ v, ∃ n, ⌜v.2 = NatV n⌝ }}) }}}
+                  fill K' ((j, (λ: global, "k", "x", e) ⟪ v1, v2 ⟫)) @ ↑^k
                   {{{ v, RET v; ∃ n, ⌜v.2 = NatV n⌝ }}}) ⊢
-    {{{ [size] 0 }}} (0,example4 (λ: global, "k", "x", e)) {{{ v, RET v; ∃ n, ⌜v.2 = NatV n⌝ }}}.
+    {{{ [size] 0 }}} (0,example4 (λ: global, "k", "x", e)) @ ↑^0 {{{ v, RET v; ∃ n, ⌜v.2 = NatV n⌝ }}}.
   Proof.
     iIntros (Hfree) "#Hadv_spec".
     iModIntro. iIntros (Φ) "Hsize #HΦ /=". rewrite /example4. prepare_ctx.
@@ -148,14 +158,17 @@ Section stack_lang_examples.
     iApply wp_LetIn. iIntros "!> /=".
     prepare_ctx. rewrite Hfree. iApply fupd_wp.
     iMod (@inv_alloc _ _ _ _ locality_lifetime_pick _ (logN .@ l) _
-            (lifetime_stack 0) (∃ v, 0 @@ l ↦ v ∗ ∃ m, ⌜v = NatV m⌝) with "[Hl]") as "#Hinv".
-    { iSplitR;[|eauto]. iClear "#".
-      iModIntro. iIntros (c' Hle) "Hl". iDestruct "Hl" as (v) "[Hl Hcond]".
-      iDestruct "Hcond" as (m) "->". inversion Hle;subst.
-      - rewrite -next_state_eq. iModIntro. eauto.
-      - iDestruct (stack_stack_pop_intro _ _ _ _ f2 with "Hl") as "Hl";[auto|].
-        rewrite -next_state_eq. iModIntro. eauto. }
-    iApply ("Hadv_spec" with "[-] [//]"). iFrame.
+            (lifetime_stack 1) (∃ v, 0 @@ l ↦ v ∗ ∃ m, ⌜v = NatV m⌝) with "[Hl]") as "#Hinv".
+    { intros c' Hle. iIntros "(%v & Hl & (%m & ->))".
+      inversion Hle;subst.
+      - inversion H0;subst.
+        + rewrite -next_state_eq. iModIntro;eauto.
+        + iDestruct (stack_stack_pop_intro _ _ _ _ f2 with "Hl") as "Hl";[lia|].
+          rewrite -next_state_eq. iModIntro. eauto.
+      - iDestruct (stack_stack_pop_intro _ _ _ _ 1 with "Hl") as "Hl";[lia|].
+          rewrite -next_state_eq. iModIntro. eauto. }
+    { eauto. }
+    iApply ("Hadv_spec" with "[] [-] [//]");[iPureIntro;lia|]. iFrame.
     iSplitR;[|iSplitR].
     - (* the unknown function returns to the first caller *)
       iExists 1,[],0.
@@ -188,7 +201,7 @@ Section stack_lang_examples.
       iFrame. iIntros "!> [Hsize Hl] /=".
       iApply wp_value. iMod ("Hcls" with "[Hl]") as "_";[eauto|].
       iModIntro. prepare_ctx.
-      iApply wp_return;[eauto|lia|]. iFrame.
+      iApply wp_return;[apply rc_l|eauto|lia|]. iFrame.
       iIntros "!> Hsize". iClear "Hinv". iModIntro.
       simpl. iApply wp_value. eauto.
   Qed.

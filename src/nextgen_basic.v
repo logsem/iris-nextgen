@@ -75,7 +75,7 @@ Section bnextgen_rules.
   Qed.
 
   Lemma bnextgen_idemp P :
-    (∀ x, f x = f (f x)) →
+    (∀ x, f x ≡ f (f x)) →
     (⚡={f}=> P) ⊣⊢ (⚡={f}=> ⚡={f}=>P).
   Proof.
     intros ?. unseal. split. simpl. intros.
@@ -221,7 +221,7 @@ Section bnextgen_rules.
   Qed.
 
   Lemma bnextgen_idemp_mono P Q :
-    (forall x, f x = f (f x)) →
+    (forall x, f x ≡ f (f x)) →
     (P ⊢ ⚡={f}=> Q) -> (⚡={f}=> P) ⊢ ⚡={f}=> Q.
   Proof.
     intros ??.
@@ -230,7 +230,7 @@ Section bnextgen_rules.
   Qed.
 
   Lemma bnextgen_idemp_mono_2 P Q :
-    (forall x, f x = f (f x)) →
+    (forall x, f x ≡ f (f x)) →
     ((⚡={f}=> P) ⊢ Q) -> (⚡={f}=> P) ⊢ ⚡={f}=> Q.
   Proof.
     intros ??.
@@ -590,12 +590,18 @@ Section into_bnextgen.
   Qed.
 
   Lemma bnextgen_wand_plain P `{!Plain P, !Absorbing P} Q :
-    (⚡={f}=> (P -∗ Q)) ⊢ P -∗ ⚡={f}=> Q.
+    (⚡={f}=> (P -∗ Q)) ⊣⊢ (P -∗ ⚡={f}=> Q).
   Proof.
-    iIntros "H P".
-    iDestruct (bnextgen_intro_plain f P with "P") as "P".
-    iModIntro.
-    iApply "H". iApply "P".
+    rewrite -(plain_plainly P).
+    iApply bnextgen_wand_plainly.
+  Qed.
+
+  Lemma bnextgen_impl_plain P `{!Plain P, !Absorbing P} Q :
+    (⚡={f}=> (P → Q)) ⊣⊢ (P → ⚡={f}=> Q).
+  Proof.
+    rewrite -(plain_plainly P).
+    rewrite !impl_wand_plainly.
+    iApply bnextgen_wand_plainly. 
   Qed.
 
   (* Lemma bnextgen_wand_plain_2 P `{!Plain P, !Absorbing P} Q : *)

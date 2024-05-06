@@ -3,7 +3,7 @@ From iris.algebra Require Import gmap auth agree gset coPset.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Export own.
 From iris.base_logic.lib Require Import wsat.
-From nextgen.lib Require Import wsat.
+From nextgen.lib Require Export wsat.
 From iris.base_logic Require Export later_credits.
 From iris.prelude Require Import options.
 Export wsatGS.
@@ -29,8 +29,8 @@ Class invGIndpreS (Σ : gFunctors) (Ω : gTransformations Σ) (A : cmra) (pick: 
 }.
 
 Class invGIndS_gen (hlc : fancy_updates.has_lc) (Σ : gFunctors) (Ω : gTransformations Σ) (A : cmra) (pick: pick_transform_rel A) : Set := InvIndG {
-  invGS_wsat : wsatGIndS Σ Ω A pick;
-  invGS_lc : lcGIndS Σ Ω;
+  invGS_ind_wsat : wsatGIndS Σ Ω A pick;
+  invGS_ind_lc : lcGIndS Σ Ω;
 }.
 Global Hint Mode invGIndS_gen - - - - - : typeclass_instances.
 Global Hint Mode invGIndpreS - - - - : typeclass_instances.
@@ -39,13 +39,13 @@ Local Existing Instances invGIndpreS_wsat invGIndpreS_lc.
 (* [invGS_lc] needs to be global in order to enable the use of lemmas like [lc_split]
    that require [lcGS], and not [invGS].
    [invGS_wsat] also needs to be global as the lemmas in [invariants.v] require it. *)
-Global Existing Instances invGS_lc invGS_wsat.
+Global Existing Instances invGS_ind_lc invGS_ind_wsat.
 
 #[global] Instance into_invpres `{Hinv: !invGIndpreS Σ Ω A pick} : fancy_updates.invGpreS Σ :=
   fancy_updates.InvGpreS Σ (@into_wsatpres A pick Σ Ω invGIndpreS_wsat) (@into_lcpres Σ Ω invGIndpreS_lc).
 
 #[global] Instance into_invs `{Hinv: !invGIndS_gen hlc Σ Ω A pick} : fancy_updates.invGS_gen hlc Σ :=
-  fancy_updates.InvG hlc Σ (@into_wsats A pick Σ Ω invGS_wsat) (@into_lcs Σ Ω invGS_lc).
+  fancy_updates.InvG hlc Σ (@into_wsats A pick Σ Ω invGS_ind_wsat) (@into_lcs Σ Ω invGS_ind_lc).
 
 Notation has_lc := fancy_updates.has_lc.
 Notation HasLc := fancy_updates.HasLc.

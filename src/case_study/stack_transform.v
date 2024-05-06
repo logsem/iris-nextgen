@@ -222,10 +222,20 @@ Section pop_func.
       rewrite bool_decide_false //.
   Qed.
 
+  Lemma stack_map_idemp (n : nat) (l : nat * loc) (v v' : leibnizO val) :
+    stack_location_cut n l v = Some v' → stack_location_cut n l v' = Some v'.
+  Proof.
+    rewrite /stack_location_cut.
+    case_match;[|naive_solver].
+    intros Heq. simplify_eq.
+    rewrite H //.
+  Qed.    
+
   Global Instance stack_mapTrans (n : nat) : MapTrans (stack_location_cut n).
   Proof.
     split.
     - apply stack_map_trans_frag_discard_all.
+    - apply stack_map_idemp.
     - apply stack_location_cut_ne.
   Qed.
     

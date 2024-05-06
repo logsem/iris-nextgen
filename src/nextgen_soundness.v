@@ -72,17 +72,17 @@ Qed.
   : IntoPnextgen Ω _ _ := transform_plain P.
    
 Local Lemma fupd_soundness_no_lc_unfold_alt `{!invGIndpreS Σ Ω T pick} m E :
-  ⊢ |==> ∃ `(Hws: !invGIndS_gen HasNoLc Σ Ω T pick) (ω : coPset -> iProp Σ),
+  ⊢ |==> ∃ `(Hws: !invGIndS_gen HasNoLc Σ Ω T pick) (ω : coPset -> iProp Σ) (_ : wsat_ind_inG = invGIndpreS_wsat),
       £ m ∗ ω E
         ∗ ■ (∀ (E1 E2 : coPset) (P : iPropI Σ), (|={E1,E2}=> P) -∗ ω E1 ==∗ ◇ (ω E2 ∗ P))
         ∗ ■ (∀ E (c : C), ω E -∗ ⚡={transmap_insert_two_inG (inv_pick_transform c) (C_pick c) Ω}=> ω E).
 Proof.
   destruct invGIndpreS0.
-  iMod wsat_alloc as (Hw) "[Hw HE]".
+  iMod wsat_alloc as (Hw <-) "[Hw HE]".
   (* We don't actually want any credits, but we need the [lcGS]. *)
   iMod (lc_alloc m) as (Hc) "[Hsupply Hm]".
   set (Hi := InvIndG HasNoLc _ Ω _ _ Hw Hc).
-  iExists Hi, (λ E, wsat ∗ ownE E)%I.
+  iExists Hi, (λ E, wsat ∗ ownE E)%I, eq_refl.
   rewrite (union_difference_L E ⊤); [|set_solver].
   rewrite wsat.ownE_op; [|set_solver]. iFrame.
   iDestruct "HE" as "[HE _]". iFrame.
@@ -93,7 +93,7 @@ Proof.
     iMod ("HP" with "[$Hw $HE]") as ">(Hw & HE & HP)". by iFrame. }
   { iModIntro. iIntros (E1 c) "[Hw HE]".
     iDestruct (wsat_ind_insert_intro c with "Hw") as "Hw".
-    iDestruct (ownE_ind_insert_two_intro _ (inv_pick_transform c) with "HE") as "HE".
+    iDestruct (ownE_ind_insert_two_intro with "HE") as "HE".
     iModIntro. iFrame. }
 Qed.
 
@@ -101,7 +101,7 @@ Local Lemma fupd_soundness_no_lc_unfold `{!invGIndpreS Σ Ω T pick} m E :
   ⊢ |==> ∃ `(Hws: !invGIndS_gen HasNoLc Σ Ω T pick) (ω : coPset → iProp Σ),
     £ m ∗ ω E ∗ □ (∀ E1 E2 P, (|={E1, E2}=> P) -∗ ω E1 ==∗ ◇ (ω E2 ∗ P)).
 Proof.
-  iMod fupd_soundness_no_lc_unfold_alt as (Hws ω) "(?&?&?&?)".
+  iMod fupd_soundness_no_lc_unfold_alt as (Hws ω _) "(?&?&?&?)".
   iExists Hws,ω. iModIntro. iFrame. eauto.
 Qed.
 
@@ -144,7 +144,7 @@ Proof.
   intros Hfupd. eapply (lc_soundness (S n)); first done.
   intros Hc. rewrite lc_succ.
   iIntros "[Hone Hn]". rewrite -le_upd.le_upd_trans. iApply le_upd.bupd_le_upd.
-  iMod wsat_alloc as (Hw) "[Hw HE]".
+  iMod wsat_alloc as (Hw <-) "[Hw HE]".
   set (Hi := InvIndG HasLc _ _ _ _ Hw Hc).
   iAssert (|={⊤,E2}=> ⚡={f}=> P)%I with "[Hn]" as "H".
   { iMod (fupd_mask_subseteq E1) as "_"; first done. by iApply (Hfupd Hi). }
@@ -526,7 +526,7 @@ Section bnextgen_n_open_soundness.
   Proof.
     intros until P. intros HPlain n m  Hiter.
     apply (laterN_soundness _ (steps_sum num_laters_per_step (n) (S (length l)) + steps_sum num_laters_per_step (n) (S (length l)))).
-    iMod (fupd_soundness_no_lc_unfold_alt (m + (steps_sum num_laters_per_step (n) (length l))) ∅) as (Hws ω) "[Hm [Hω [#H #H']]]".
+    iMod (fupd_soundness_no_lc_unfold_alt (m + (steps_sum num_laters_per_step (n) (length l))) ∅) as (Hws ω Heq) "[Hm [Hω [#H #H']]]".
     specialize (Hiter Hws).
     rewrite lc_split. iDestruct "Hm" as "[Hm Hn]".
     iDestruct (Hiter with "Hm") as "HH". clear Hiter.
@@ -551,7 +551,7 @@ Section bnextgen_n_open_soundness.
       unfold bnextgen_option. destruct (f a).
       + iApply (transmap_plain (transmap_insert_two_inG (inv_pick_transform c) (C_pick c) Ω)).
         iAssert (⚡={transmap_insert_two_inG (inv_pick_transform c) (C_pick c) Ω}=> ω ∅)%I with "[Hω]" as "HA1".
-        { iApply "Hintro". iFrame. }
+        { rewrite Heq. iApply "Hintro". iFrame. }
         iClear "Hone Hm".
         iDestruct (lc_ind_insert_two_intro _ (inv_pick_transform c) with "Hn") as "Hn".
         iModIntro. 
@@ -566,9 +566,9 @@ Section bnextgen_n_open_soundness.
     invGIndpreS Σ Ω B pick → ∀ P : iProp Σ,
         Plain P → ∀ (n m : nat), (∀ (Hinv : invGIndS_gen HasNoLc Σ Ω B pick), £ m ={⊤}=∗ ⚡={[l]}▷=>^(n) |={⊤,∅}=> P) → (⊢ P)%stdpp.
   Proof.
-    intros until P. inversion H. intros HPlain n m  Hiter.
+    intros until P. intros HPlain n m  Hiter.
     apply (laterN_soundness _ (steps_sum num_laters_per_step (n) (S (length l)) + steps_sum num_laters_per_step (n) (S (length l)))).
-    iMod (fupd_soundness_no_lc_unfold_alt (m + (steps_sum num_laters_per_step (n) (length l))) ⊤) as (Hws ω) "[Hm [Hω [#H #H']]]".
+    iMod (fupd_soundness_no_lc_unfold_alt (m + (steps_sum num_laters_per_step (n) (length l))) ⊤) as (Hws ω _) "[Hm [Hω [#H #H']]]".
     specialize (Hiter Hws).
     rewrite lc_split. iDestruct "Hm" as "[Hm Hn]".
     iDestruct (Hiter with "Hm") as "HH". clear Hiter.
@@ -651,7 +651,7 @@ Section bnextgen_n_open_soundness.
     (* apply (lc_soundness (m + 2 + steps_sum (λ n, 4 + 3 * num_laters_per_step n) n (length l)));[auto|]. *)
     (* intros Hc. iIntros "Hlc". *)
     apply (laterN_soundness _ ((m + 3 + steps_sum (λ n0 : nat, 4 + 3 * num_laters_per_step n0) n (length l)) * S (S (length l)))).
-    iMod wsat_alloc as (Hw) "[Hw HE]".
+    iMod wsat_alloc as (Hw <-) "[Hw HE]".
     iMod (lc_alloc (m + 2 + steps_sum (λ n, 4 + 3 * num_laters_per_step n) n (length l))) as (Hc) "[Hsuppl Hlc]".
     set (Hinv := InvIndG HasLc _ Ω _ _ Hw Hc).
     specialize (Hiter Hinv).

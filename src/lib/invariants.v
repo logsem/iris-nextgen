@@ -1,7 +1,7 @@
 From stdpp Require Export namespaces.
 From iris.algebra Require Import gmap.
 From iris.proofmode Require Import proofmode.
-From nextgen.lib Require Import wsat.
+From nextgen.lib Require Export wsat.
 From nextgen.lib Require Export fancy_updates.
 From nextgen Require Import nextgen_pointwise.
 From iris.prelude Require Import options.
@@ -75,24 +75,25 @@ Section inv.
     apply gset_to_coPset_finite.
   Qed.
 
-  Lemma own_inv_alloc N E c P : inv_cond P c ∗ ▷ P ={E}=∗ own_inv N c P.
+  Lemma own_inv_alloc N E c P : frame_cond P c -> ▷ P ={E}=∗ own_inv N c P.
   Proof.
+    intros Hcond.
     rewrite fancy_updates.uPred_fupd_unseal /fancy_updates.uPred_fupd_def.
-    iIntros "[#Hcond HP] [Hw $]".
-    iMod (ownI_alloc (.∈ (↑N : coPset)) P with "[$HP $Hw $Hcond]")
-      as (i ?) "[$ [? ?]]"; auto using fresh_inv_name.
+    iIntros "HP [Hw $]".
+    iMod (ownI_alloc (.∈ (↑N : coPset)) P with "[$HP $Hw]")
+      as (i ?) "[$ [? ?]]"; auto using fresh_inv_name;eauto.
     do 2 iModIntro. iExists i. auto.
   Qed.
 
   (* This does not imply [own_inv_alloc] due to the extra assumption [↑N ⊆ E]. *)
   Lemma own_inv_alloc_open N E c P :
-    ↑N ⊆ E → inv_cond P c ⊢ |={E, E∖↑N}=> own_inv N c P ∗ (▷ P ={E∖↑N, E}=∗ True).
+    ↑N ⊆ E → frame_cond P c -> ⊢ |={E, E∖↑N}=> own_inv N c P ∗ (▷ P ={E∖↑N, E}=∗ True).
   Proof.
-    iIntros (Sub) "#Hcond".
+    iIntros (Sub Hcond).
     rewrite fancy_updates.uPred_fupd_unseal /fancy_updates.uPred_fupd_def.
     iIntros "[Hw HE]".
-    iMod (ownI_alloc_open (.∈ (↑N : coPset)) P with "[$Hcond $Hw]")
-      as (i ?) "(Hw & #Hi & #Hc & HD)"; auto using fresh_inv_name.
+    iMod (ownI_alloc_open (.∈ (↑N : coPset)) P with "[$Hw]")
+      as (i ?) "(Hw & #Hi & #Hc & HD)"; auto using fresh_inv_name;eauto.
     iAssert (ownE {[i]} ∗ ownE (↑ N ∖ {[i]}) ∗ ownE (E ∖ ↑ N))%I
       with "[HE]" as "(HEi & HEN\i & HE\N)".
     { rewrite -?wsat.ownE_op; [|set_solver..].
@@ -160,8 +161,9 @@ Section inv.
   Global Instance inv_sem_persistent N c P : Persistent (inv_sem N c P).
   Proof. rewrite inv_sem_unseal. apply _. Qed.
 
+  
   Lemma inv_mod_intro N c P c' :
-    CR c c' ->
+    rc CR c c' ->
     inv N c P ⊢ ⚡={transmap_insert_two_inG (inv_pick_transform c') (C_pick c') Ω}=> inv N c P.
   Proof.
     rewrite inv_unseal /own_inv.
@@ -188,17 +190,17 @@ Section inv.
     - iIntros "HQ". by iApply "HPQ".
   Qed.
 
-  Lemma inv_alloc N E c P : inv_cond P c ∗ ▷ P ={E}=∗ inv N c P.
+  Lemma inv_alloc N E c P : frame_cond P c -> ▷ P ={E}=∗ inv N c P.
   Proof.
-    iIntros "[#Hcond HP]". iApply (own_inv_to_inv _ c).
-    iApply (own_inv_alloc N E with "[$HP $Hcond]").
+    iIntros (Hcond) "HP". iApply (own_inv_to_inv _ c).
+    iApply (own_inv_alloc N E with "[$HP]");auto.
   Qed.
 
   Lemma inv_alloc_open N E c P :
-    ↑N ⊆ E → inv_cond P c ⊢ |={E, E∖↑N}=> inv N c P ∗ (▷P ={E∖↑N, E}=∗ True).
+    ↑N ⊆ E → frame_cond P c -> ⊢ |={E, E∖↑N}=> inv N c P ∗ (▷P ={E∖↑N, E}=∗ True).
   Proof.
-    iIntros (?) "#Hcond".
-    iMod (own_inv_alloc_open with "[$]") as "[HI $]"; first done.
+    iIntros (? ?).
+    iMod (own_inv_alloc_open) as "[HI $]"; first done;eauto.
     iApply own_inv_to_inv. done.
   Qed.
 

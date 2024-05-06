@@ -36,6 +36,13 @@ Definition cmra_map_transport {A B : cmra}
     (Heq : A = B) (f : A → A) : (B → B) :=
   eq_rect A (λ T, T → T) f _ Heq.
 
+Class Idemp {A} (R : relation A) (f : A -> A) : Prop :=
+  idemp x : R (f (f x)) (f x).
+Class Indep {A} (R : relation A) (f : A -> A) (g : A -> A) : Prop :=
+  indep x : R (f (g x)) (g (f x)).
+Class OIndep {A} (R : relation (option A)) (f : A -> option A) (g : A -> option A) : Prop :=
+  oindep (x : A) : R (f x ≫= g) (g x ≫= f).
+
 Section cmra_map_transport.
   Context {A B : cmra} (eq : A = B).
 
@@ -78,6 +85,18 @@ Section cmra_map_transport.
     CmraMorphism f → CmraMorphism (cmra_map_transport eq f).
   Proof. destruct eq. done. Qed.
 
+  #[global]
+   Instance idemP_cmra_map_transport (f : A -> A) :
+    IdemP equiv (λ x _, f x) ->
+    IdemP equiv (λ x _, (cmra_map_transport eq f) x).
+  Proof. destruct eq. done. Qed.
+
+  #[global]
+   Instance idemp_cmra_map_transport (f : A -> A) :
+    Idemp equiv f ->
+    Idemp equiv (cmra_map_transport eq f).
+  Proof. destruct eq. done. Qed.
+  
 End cmra_map_transport.
 
 Lemma löb_wand_plainly {M} (P : uPredI M) `{!Absorbing P} :
@@ -99,4 +118,15 @@ Proof.
   rewrite intuitionistically_plainly.
   rewrite bi.and_sep_intuitionistically.
   rewrite bi.intuitionistically_sep_2 -plainly_sep. rewrite bi.wand_elim_r. auto.
+Qed.
+
+Lemma map_imap_ext `{FinMap K M} {A1 A2 B} `{Equiv B}
+  (f1 : K → A1 → option B)
+  (f2 : K → A2 → option B) (m1 : M A1) (m2 : M A2) :
+  (∀ k, f1 k <$> (m1 !! k) ≡ f2 k <$> (m2 !! k)) →
+  map_imap f1 m1 ≡ map_imap f2 m2.
+Proof.
+  intros HExt. intros i. (* apply map_equiv. intros i. *) rewrite !map_lookup_imap.
+  specialize (HExt i). destruct (m1 !! i), (m2 !! i); simpl in *; inversion HExt; auto.
+  apply None_equiv_eq. auto.
 Qed.
