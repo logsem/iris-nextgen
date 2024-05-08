@@ -30,30 +30,27 @@ Section examples.
   Open Scope expr_scope.
 
   Definition example1 : expr :=
-    (λ: global, "k", "y", let: "x" := sref 42 in !"x") ().
+    (λ: global, "k", "y" := let: "x" := sref 42 in !"x") ().
 
   Definition example2 : expr :=
-    (λ: global, "<>", "f", let: "y" := sref 42 in "f" ("y")) (λ: global, "<>", "x", !"x").
+    (λ: global, "<>", "f" := let: "y" := sref 42 in "f" ("y")) (λ: global, "<>", "x" := !"x").
 
   Definition example3 : expr :=
-    let: "g" := λ: global, "<>", "f'", "f'" () in
-    let: "f" := λ: global, "<>", "<>", let: "x" := sref 42 in "g" (λ: local 0, "<>", "<>", !"x") in
+    let: "g" := λ: global, "<>", "f'" := "f'" () in
+    let: "f" := λ: global, "<>", "<>" := let: "x" := sref 42 in "g" (λ: local 0, "<>", "<>" := !"x") in
     "f" ().
   
   Definition stuck_example : expr :=
-    ! ((λ: global, "<>", "<>", sref 42) ()).
+    ! ((λ: global, "<>", "<>" := sref 42) ()).
 
   Definition example4 g : expr :=
-    let: "f" := λ: global, "k", "g", let: "x" := sref 42 in "g" ⟪"x","k"⟫ ;; !"x" in
+    let: "f" := λ: global, "k", "g" := let: "x" := sref 42 in "g" ⟪"x","k"⟫ ;; !"x" in
     "f" g.
 
 End examples.
 
 Section stack_lang_examples.
   Context `{heapGS Σ}.
-
-  Notation "^ n" := (lifetime_stack n) (at level 70, format "^ n").
-  Notation "#∞" := (lifetime_heap).
 
   Lemma example1_spec :
     {{{ [size] 0 }}} (0,example1) @ ↑^0 {{{ v, RET v; ⌜v.2 = NatV 42⌝ }}}.
@@ -118,7 +115,7 @@ Section stack_lang_examples.
     iClear "Hl".
     iModIntro. iApply wp_value. iApply "HΦ";auto.
   Qed.
-
+  
   (* The following lemma cannot be proved, since the program will get
   stuck once the caller tried to load the callee's now popped stack
   location *)
@@ -146,9 +143,9 @@ Section stack_lang_examples.
                                       inv (logN .@ l) (^S i) (∃ v, i @@ l ↦ v ∗ ∃ m, ⌜v = NatV m⌝))
                       ∗ (∀ v', (∃ n, ⌜v' = Nat n⌝) → [size] j -∗
                         ⚡={Ω <- (lifetime_stack j)}=> WP fill K' (j,v') @ ↑^k {{ λ v, ∃ n, ⌜v.2 = NatV n⌝ }}) }}}
-                  fill K' ((j, (λ: global, "k", "x", e) ⟪ v1, v2 ⟫)) @ ↑^k
+                  fill K' ((j, (λ: global, "k", "x" := e) ⟪ v1, v2 ⟫)) @ ↑^k
                   {{{ v, RET v; ∃ n, ⌜v.2 = NatV n⌝ }}}) ⊢
-    {{{ [size] 0 }}} (0,example4 (λ: global, "k", "x", e)) @ ↑^0 {{{ v, RET v; ∃ n, ⌜v.2 = NatV n⌝ }}}.
+    {{{ [size] 0 }}} (0,example4 (λ: global, "k", "x" := e)) @ ↑^0 {{{ v, RET v; ∃ n, ⌜v.2 = NatV n⌝ }}}.
   Proof.
     iIntros (Hfree) "#Hadv_spec".
     iModIntro. iIntros (Φ) "Hsize #HΦ /=". rewrite /example4. prepare_ctx.

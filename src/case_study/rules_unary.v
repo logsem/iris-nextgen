@@ -148,6 +148,9 @@ Class heapGS (Σ : gFunctors) (Ω : gTransformations Σ) := HeapGS {
   heapG_stacksizeGS :> stacksizeGS Σ Ω
 }.
 
+Notation "^ n" := (lifetime_stack n) (at level 70, format "^ n").
+Notation "#∞" := (lifetime_heap).
+
 Section StackSize.
   Context `{!stacksizeGS Σ Ω}.
 
@@ -660,6 +663,26 @@ Section lifting.
     intros; inv_head_step;eauto. by resolve_next_state.
   Qed.
 
+  Lemma wp_case_injl K c E e v e1 e2 n m Φ `{!IntoVal (n,e) (m,InjLV v)} :
+    ▷ (WP fill K (n,Call e1 (of_val v)) @ ↑c; E {{ Φ }}) ⊢ WP fill K (n,Case e e1 e2) @ ↑c; E {{ Φ }}.
+  Proof.
+    iIntros "H".
+    eassert (e = InjL _) as ->;[by inv_head_step|].
+    iApply (wp_lift_nonthrow_pure_det_head_step_no_fork' K (n,Case _ _ _) _);eauto.
+    intros; inv_head_step;eauto. all: try resolve_next_state;auto.
+    intros. resolve_next_state. auto.
+  Qed.
+
+  Lemma wp_case_injr K c E e v e1 e2 n m Φ `{!IntoVal (n,e) (m,InjRV v)} :
+    ▷ (WP fill K (n,Call e2 (of_val v)) @ ↑c; E {{ Φ }}) ⊢ WP fill K (n,Case e e1 e2) @ ↑c; E {{ Φ }}.
+  Proof.
+    iIntros "H".
+    eassert (e = InjR _) as ->;[by inv_head_step|].
+    iApply (wp_lift_nonthrow_pure_det_head_step_no_fork' K (n,Case _ _ _) _);eauto.
+    intros; inv_head_step;eauto. all: try resolve_next_state;auto.
+    intros. resolve_next_state. auto.
+  Qed.
+
   Lemma wp_fst K c E e1 e2 v1 n Φ `{!IntoVal (n,e1) v1, !AsVal (n,e2)} :
     ▷ (WP fill K (n,e1) @ ↑c; E {{ Φ }})
       ⊢ WP fill K (n,Fst (Pair e1 e2)) @ ↑c; E {{ Φ }}.
@@ -858,11 +881,11 @@ Section lifting.
   (** ------------------------------------------------------------ *)
     
   (** Control flow -- stateful due to stack frames *)
-  Lemma wp_call_global K c E n k x e1 e2 v2' v2 Φ `{!IntoVal (n,e2) (n,v2)} :
+  Lemma wp_call_global K c E n k f x e1 e2 v2' v2 Φ `{!IntoVal (n,e2) (n,v2)} :
     shift_val v2 (1) = Some v2' ->
-    ▷ ([size] (S n) -∗ WP fill K (S n,Return (Cont (1) K) (subst' k (ContV (1) K) (subst' x v2' e1))) @ ↑c; E {{ Φ }})
+    ▷ ([size] (S n) -∗ WP fill K (S n,Return (Cont (1) K) (subst' k (ContV (1) K) (subst' f (RecV global k f x e1) (subst' x v2' e1)))) @ ↑c; E {{ Φ }})
       ∗ ▷ [size] n
-      ⊢ WP fill K (n,Call (Lam global k x e1) e2) @ ↑c; E {{ Φ }}.
+      ⊢ WP fill K (n,Call (Rec global k f x e1) e2) @ ↑c; E {{ Φ }}.
   Proof.
     iIntros (Hshift) "[HΦ >Hs]".
     iApply wp_lift_nonthrow_head_step; auto.
@@ -880,12 +903,12 @@ Section lifting.
     iPureIntro. by resolve_next_state.
   Qed.
 
-  Lemma wp_call_local K c E n (i : nat) k x e1 e2 e1' v2' v2 Φ `{!IntoVal (n,e2) (n,v2)} :
+  Lemma wp_call_local K c E n (i : nat) k f x e1 e2 e1' v2' v2 Φ `{!IntoVal (n,e2) (n,v2)} :
     shift_expr e1 (i + 1) = Some e1' ->
     shift_val v2 (1) = Some v2' ->
-    ▷ ([size] (S n) -∗ WP fill K (S n, Return (Cont (1) K) (subst' k (ContV (1) K) (subst' x v2' e1'))) @ ↑c; E {{ Φ }})
+    ▷ ([size] (S n) -∗ WP fill K (S n, Return (Cont (1) K) (subst' k (ContV (1) K) (subst' f (RecV (local i) k f x e1) (subst' x v2' e1')))) @ ↑c; E {{ Φ }})
       ∗ ▷ [size] n
-      ⊢ WP fill K (n, Call (Lam (local i) k x e1) e2) @ ↑c; E {{ Φ }}.
+      ⊢ WP fill K (n, Call (Rec (local i) k f x e1) e2) @ ↑c; E {{ Φ }}.
   Proof.
     iIntros (Hshift1 Hshift2) "[HΦ >Hs]".
     iApply wp_lift_nonthrow_head_step; auto.
