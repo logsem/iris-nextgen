@@ -73,6 +73,17 @@ Section bnextgen_ind_rules.
     by apply gen_trans_validN.
   Qed.
 
+  Lemma bnextgen_ind_weaken `{!Transitive R} c' c P :
+    rc R c c' ->
+    (⚡◻{ (R,pick) ↑ c } P) ⊢ (⚡◻{ (R,pick) ↑ c' } P).
+  Proof.
+    unseal. rewrite /uPred_bnextgen_ind_def/=.
+    split;simpl;intros???[HP Hcond].
+    split;auto.
+    intros c'' Hc'. apply Hcond.
+    etrans;eauto.
+  Qed.
+
   Lemma bnextgen_ind_bnextgen `{!∀ c1 c2, Decision (R c1 c2)} `{!Trichotomy R}
     `{Hidemp: !∀ c, Idemp (≡) (pick c)}
     `{compose_R_cond: !∀ c1 c2 x, R c1 c2 -> pick c2 (pick c1 x) ≡ pick c1 x }
@@ -165,6 +176,30 @@ Section bnextgen_ind_rules.
     - destruct HP as [HP Hc'].
       split;auto.
   Qed.
+
+  Global Instance bnextgen_ind_mono' c :
+    Proper ((⊢) ==> (⊢)) (uPred_bnextgen_ind R pick c).
+  Proof. intros P Q. apply bnextgen_ind_mono. Qed.
+
+  Global Instance bnextgen_ind_ne c :
+    NonExpansive (uPred_bnextgen_ind R pick c).
+  Proof.
+    intros ??? Hne.
+    unseal.
+    split;intros.
+    apply Hne in H1 as Hne';auto.
+    rewrite /uPred_bnextgen_ind_def /=.
+    split;intros;split;try naive_solver;intros ??.
+    - apply (gen_trans_validN (pick c')) in H1.
+      apply Hne in H1;auto. apply H1.
+      apply H2. auto.
+    - apply (gen_trans_validN (pick c')) in H1.
+      apply Hne in H1;auto. apply H1.
+      apply H2. auto.
+  Qed.
+
+  Global Instance bnextgen_ind_proper c :
+    Proper ((≡) ==> (≡)) (uPred_bnextgen_ind R pick c) := ne_proper _.
     
 End bnextgen_ind_rules.
 
@@ -227,6 +262,37 @@ Section bnextgen_ind_rules.
     rewrite Heq. split;[|naive_solver]. auto.
   Qed.
 
+  Lemma bnextgen_ind_wand_plainly (P Q : uPred M) c :
+    (⚡◻{ (R,pick) ↑ c } ■ P -∗ Q) ⊣⊢ (■ P -∗ ⚡◻{ (R,pick) ↑ c } Q).
+  Proof.
+    unseal. rewrite /uPred_bnextgen_ind_def.
+    split;simpl;intros ?? Hx.
+    split.
+    - intros Hcond ?? Hle Hv HP.
+      edestruct Hcond as [HQ Hng].
+      split;[naive_solver|].
+      intros c' Hc.
+      apply (gen_trans_validN (pick c')) in Hv as Hvg.
+      rewrite cmra_morphism_op in Hvg.
+      apply Hng in Hvg;auto.
+      by rewrite cmra_morphism_op.
+    - intros Hcond. split.
+      + intros n' x' Hle Hv HP. naive_solver.
+      + intros c' Hc n' x' Hle Hvg HP.
+        assert (✓{n'} (x ⋅ ε)) as Hv';
+          [rewrite right_id;eapply cmra_validN_le;eauto|].
+        specialize (Hcond n' ε Hle Hv' HP) as [HQ Hcond].
+        apply Hcond in Hc. rewrite right_id in Hc.
+        eapply uPred_mono;[apply Hc|..|lia].
+        exists x';auto.
+  Qed.
+
+  Lemma bnextgen_ind_impl (P Q : uPred M) c :
+    (⚡◻{ (R,pick) ↑ c } ■ P → Q) ⊣⊢ (■ P → ⚡◻{ (R,pick) ↑ c } Q).
+  Proof.
+    rewrite !impl_wand_plainly. iApply bnextgen_ind_wand_plainly.
+  Qed.
+  
 End bnextgen_ind_rules.
 
 
@@ -329,7 +395,7 @@ End gen_independent_instances.
 
 (** * Class for iProps that are independent by an Ω <- (f1,f2) transformation *)
 
-Notation GenIndependent2Ω Ω c P := (GenIndependent CR (λ c, build_trans ((transmap_insert_two_inG (inv_pick_transform c) (C_pick c) Ω).(gT_map))) c P).
+(* Notation GenIndependent2Ω Ω c P := (GenIndependent CR (λ c, build_trans ((transmap_insert_two_inG (inv_pick_transform c) (C_pick c) Ω).(gT_map))) c P). *)
 
 Notation "⚡={ M }=> P" := (nextgen_omega M P)
                             (at level 99, M at level 50, P at level 200, format "⚡={ M }=>  P") : bi_scope.
@@ -343,6 +409,10 @@ Definition bnextgen_bounded_ind {Σ : gFunctors} {A : cmra} {pick : pick_transfo
 Notation "⚡◻{ Ω ↑ c } P" := (bnextgen_bounded_ind Ω c P)
                                (at level 99, Ω at level 50, c at level 20, P at level 200, format "⚡◻{ Ω  ↑  c }  P") : bi_scope.
 
+Class IntoInextgen {Σ : gFunctors} {A : cmra} {pick : pick_transform_rel A}
+  (Ω : gTransformations Σ) `{!noTwoTransInG Σ Ω (gmap_viewR positive (optionO (leibnizO C))) A} (c : C) (P : iProp Σ) (Q : iProp Σ) :=
+  into_inextgen : P ⊢ ⚡◻{ Ω ↑ c } Q.
+Global Hint Mode IntoInextgen + + + + ! ! - - : typeclass_instances.
 
 Section bnextgen_bounded_ind_rules.
   Context {Σ : gFunctors} {A : cmra} {pick : pick_transform_rel A}
@@ -430,6 +500,36 @@ Section bnextgen_bounded_ind_rules.
     apply bnextgen_ind_always.
   Qed.
 
+  Lemma bnextgen_bounded_ind_sep P Q c :
+    (⚡◻{ Ω ↑ c } P) ∗ (⚡◻{ Ω ↑ c } Q) ⊢ (⚡◻{ Ω ↑ c } P ∗ Q).
+  Proof.
+    apply bnextgen_ind_sep.
+  Qed.
+
+  Lemma bnextgen_bounded_ind_and P Q c :
+    (⚡◻{ Ω ↑ c } P) ∧ (⚡◻{ Ω ↑ c } Q) ⊢ (⚡◻{ Ω ↑ c } P ∧ Q).
+  Proof.
+    apply bnextgen_ind_and.
+  Qed.
+
+  Lemma bnextgen_bounded_ind_forall {B : Type} (P : B -> iProp Σ) c :
+    (∀ x, ⚡◻{ Ω ↑ c } P x) ⊢ ⚡◻{ Ω ↑ c } ∀ x, P x.
+  Proof.
+    apply bnextgen_ind_forall.
+  Qed.
+
+  Lemma bnextgen_bounded_ind_wand_plainly (P Q : iProp Σ) c :
+    (⚡◻{ Ω ↑ c }  ■ P -∗ Q) ⊣⊢ (■ P -∗ ⚡◻{ Ω ↑ c } Q).
+  Proof.
+    iApply bnextgen_ind_wand_plainly.
+  Qed.
+
+  Lemma bnextgen_bounded_ind_impl (P Q : iProp Σ) c :
+    (⚡◻{ Ω ↑ c } ■ P → Q) ⊣⊢ (■ P → ⚡◻{ Ω ↑ c } Q).
+  Proof.
+    iApply bnextgen_ind_impl.
+  Qed.
+
   Lemma bnextgen_bounded_ind_if_always P c b :
     (□?b ⚡◻{ Ω ↑ c } P) ⊣⊢ (⚡◻{ Ω ↑ c } □?b P).
   Proof.
@@ -438,23 +538,138 @@ Section bnextgen_bounded_ind_rules.
     - auto. 
   Qed.
 
+  Lemma bnextgen_bounded_ind_weaken c' c P :
+    rc CR c c' ->
+    (⚡◻{ Ω ↑ c } P) ⊢ (⚡◻{ Ω ↑ c' } P).
+  Proof.
+    intros Hcr.
+    apply bnextgen_ind_weaken;auto.
+    apply _.
+  Qed.
+
+  Lemma bnextgen_bounded_ind_weaken_once c' c P :
+    rc CR c c' ->
+    (⚡◻{ Ω ↑ c } P) ⊢ (⚡◻{ Ω ↑ c' } ⚡◻{ Ω ↑ c } P).
+  Proof.
+    iIntros (Hcr) "Hc".
+    rewrite {1}bnextgen_bounded_ind_idemp.
+    iDestruct (bnextgen_bounded_ind_weaken with "Hc") as "$";eauto.
+  Qed.
+
   Lemma bnextgen_bounded_ind_GenIndependent_intro P c :
-    GenIndependent2Ω Ω c P ->
+    (∀ c', rc CR c c' -> P ⊢ ⚡={ transmap_insert_two_inG (inv_pick_transform c') (C_pick c') Ω }=> P) ->
     P ⊢ ⚡◻{ Ω ↑ c } P.
   Proof.
-    rewrite /GenIndependent.
     iIntros (HP) "HP".
     iApply bnextgen_ind_intro;auto.
   Qed.
+
+  Lemma modality_bnextgen_bounded_ind_mixin c :
+    modality_mixin (bnextgen_bounded_ind Ω c)
+      (MIEnvTransform (IntoInextgen Ω c)) (MIEnvTransform (IntoInextgen Ω c)).
+  Proof.
+    split; simpl; split_and?.
+    - intros ?? Hi.
+      rewrite Hi.
+      rewrite bnextgen_bounded_ind_always.
+      auto.
+    - intros. rewrite bnextgen_ind_and. auto.
+    - done.
+    - iIntros "_". iApply bnextgen_ind_from_plainly;auto.
+    - intros. apply bnextgen_ind_mono;auto.
+    - intros. apply bnextgen_bounded_ind_sep.
+  Qed.
+  Definition modality_inextgen c :=
+    Modality _ (modality_bnextgen_bounded_ind_mixin c).
+
+  Global Instance from_modal_inextgen P c :
+    FromModal True (modality_inextgen c) (⚡◻{ Ω ↑ c } P) (⚡◻{ Ω ↑ c } P) P | 1.
+  Proof. by rewrite /FromModal. Qed.
+
+  Global Instance into_inextgen_mono P c :
+    IntoInextgen Ω c (⚡◻{ Ω ↑ c } P) (⚡◻{ Ω ↑ c } P).
+  Proof. rewrite /IntoInextgen. iIntros "HP".
+         rewrite -bnextgen_bounded_ind_idemp. auto. Qed.
+
+  Global Instance into_inextgen_plain P c `{!Plain P} :
+    IntoInextgen Ω c P P.
+  Proof. rewrite /IntoInextgen. iIntros "HP".
+         iDestruct (plain_plainly_2 with "HP") as "HP".
+         by iApply bnextgen_ind_from_plainly. Qed.
+
+  Global Instance into_inextgen_and P P' Q Q' c :
+    IntoInextgen Ω c P P' →
+    IntoInextgen Ω c Q Q' →
+    IntoInextgen Ω c (P ∧ Q) (P' ∧ Q').
+  Proof. rewrite /IntoInextgen. iIntros (HP HQ) "HP".
+         rewrite HP HQ. iApply bnextgen_ind_and;auto. Qed.
+
+  Global Instance into_inextgen_sep P P' Q Q' c :
+    IntoInextgen Ω c P P' →
+    IntoInextgen Ω c Q Q' →
+    IntoInextgen Ω c (P ∗ Q) (P' ∗ Q').
+  Proof. rewrite /IntoInextgen. iIntros (HP HQ) "HP".
+         rewrite HP HQ. iApply bnextgen_ind_sep;auto. Qed.
+
+  Global Instance into_inextgen_later P P' c :
+    IntoInextgen Ω c P P' ->
+    IntoInextgen Ω c (▷ P) (▷ P').
+  Proof. rewrite /IntoInextgen. iIntros (HP) "HP".
+         rewrite -bnextgen_bounded_ind_later. iNext.
+         by rewrite HP. Qed.
+
+  Global Instance into_inextgen_forall {B : Type} (Ψ Ψ' : B -> iProp Σ) c :
+    (∀ x, IntoInextgen Ω c (Ψ x) (Ψ' x)) → IntoInextgen Ω c (∀ x, Ψ x) (∀ x, Ψ' x).
+  Proof. rewrite /IntoInextgen. iIntros (HP) "HP".
+         rewrite -bnextgen_bounded_ind_forall. iIntros (x).
+         iSpecialize ("HP" $! x). by rewrite HP. Qed.
+
+  Global Instance into_inextgen_exists {B : Type} (Ψ Ψ' : B -> iProp Σ) c :
+    (∀ x, IntoInextgen Ω c (Ψ x) (Ψ' x)) → IntoInextgen Ω c (∃ x, Ψ x) (∃ x, Ψ' x).
+  Proof. rewrite /IntoInextgen. iIntros (HP) "(%x & HP)".
+         rewrite HP. iApply (bnextgen_ind_mono with "HP");iIntros "HP".
+         iExists x. auto. Qed.
+
+  Global Instance into_inextgen_wand_plain P `{!Plain P} Q Q' c :
+      IntoInextgen Ω c Q Q' → IntoInextgen Ω c (P -∗ Q) (P -∗ Q').
+  Proof.
+    rewrite /IntoInextgen. iIntros (HQ) "HP".
+    rewrite HQ.
+    rewrite -{1}(plain_plainly P).
+    iDestruct (bnextgen_bounded_ind_wand_plainly with "HP") as "HP".
+    iApply (bnextgen_ind_mono with "HP");iIntros "HP".
+    by rewrite plain_plainly.
+  Qed.
+
+  Global Instance into_inextgen_impl_plain P `{!Plain P} Q Q' c :
+      IntoInextgen Ω c Q Q' → IntoInextgen Ω c (P → Q) (P → Q').
+  Proof.
+    rewrite /IntoInextgen. iIntros (HQ) "HP".
+    rewrite HQ.
+    rewrite -{1}(plain_plainly P).
+    iDestruct (bnextgen_bounded_ind_impl with "HP") as "HP".
+    iApply (bnextgen_ind_mono with "HP");iIntros "HP".
+    by rewrite plain_plainly.
+  Qed.
+  
+End bnextgen_bounded_ind_rules.
+
+Notation GenIndependent2Ω Ω c P := (IntoInextgen Ω c P P).
+
+Section bnextgen_bounded_ind_rules.
+  Context {Σ : gFunctors} {A : cmra} {pick : pick_transform_rel A}
+    `{!noTwoTransInG Σ Ω (gmap_viewR positive (optionO (leibnizO C))) A}.
 
   Lemma gen_ind_insert2_intro P c c' :
     GenIndependent2Ω Ω c P ->
     rc CR c c' ->
     P ⊢ ⚡={transmap_insert_two_inG (inv_pick_transform c') (C_pick c') Ω}=> P.
   Proof.
-    rewrite /GenIndependent.
+    rewrite /IntoInextgen.
     intros Hind Hcr.
-    apply Hind in Hcr;auto.
+    iIntros "HP". iDestruct (Hind with "HP") as "HP".
+    iDestruct (bnextgen_bounded_ind_bnextgen_intro with "HP") as "HP";[eauto|].
+    iModIntro. iDestruct (bnextgen_bounded_ind_elim with "HP") as "$".
   Qed.
-  
+
 End bnextgen_bounded_ind_rules.

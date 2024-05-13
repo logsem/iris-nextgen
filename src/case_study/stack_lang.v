@@ -51,7 +51,7 @@ Module lang.
   (* Sums *)
   | InjL (e : expr)
   | InjR (e : expr)
-  | Case (e0 : expr) (e1 : expr) (e2 : expr)
+  | Case (e0 : expr) (x : binder) (e1 : expr) (e2 : expr)
   (* If then else *)
   | If (e0 e1 e2 : expr)
 
@@ -76,7 +76,7 @@ Module lang.
   | IfCtx (e1 e2 : expr)
   | InjLCtx
   | InjRCtx
-  | CaseCtx (e1 : expr) (e2 : expr)
+  | CaseCtx (x : binder) (e1 : expr) (e2 : expr)
 
 
   with val :=
@@ -129,7 +129,7 @@ Module lang.
     | PairRCtx v1 => Pair (of_val v1) e
     | InjLCtx => InjL e
     | InjRCtx => InjR e
-    | CaseCtx e1 e2 => Case e e1 e2
+    | CaseCtx x e1 e2 => Case e x e1 e2
     | BinOpLCtx op e2 => BinOp op e e2
     | BinOpRCtx op v1 => BinOp op (of_val v1) e
     | FstCtx => Fst e
@@ -178,9 +178,9 @@ Module lang.
     match e with
     | Var z => Var $ if decide (x = z) then y else z
     | Rec δ k f z e =>
-        if decide (BNamed x = k) then Rec δ (BNamed y) f z e
-        else if decide (BNamed x = f) then Rec δ k (BNamed y) z e
-             else if decide (BNamed x = z) then Rec δ k f (BNamed y) e
+        if decide (BNamed x = k) then Rec δ (BNamed y) f z (expr_rename x y e)
+        else if decide (BNamed x = f) then Rec δ k (BNamed y) z (expr_rename x y e)
+             else if decide (BNamed x = z) then Rec δ k f (BNamed y) (expr_rename x y e)
              else Rec δ k f z (expr_rename x y e)
     | LetIn z e1 e2 =>
         if decide (BNamed x = z) then LetIn (BNamed y) (expr_rename x y e1) (expr_rename x y e2)
@@ -196,7 +196,9 @@ Module lang.
     | Snd e => Snd (expr_rename x y e)
     | InjL e => InjL (expr_rename x y e)
     | InjR e => InjR (expr_rename x y e)
-    | Case e1 e2 e3 => Case (expr_rename x y e1) (expr_rename x y e2) (expr_rename x y e3)
+    | Case e1 z1 e2 e3 => 
+        if decide (BNamed x = z1) then Case (expr_rename x y e1) (BNamed y) (expr_rename x y e2) (expr_rename x y e3)
+        else Case (expr_rename x y e1) z1 (expr_rename x y e2) (expr_rename x y e3)
     | Loc δ l => Loc δ l
     | Halloc e => Halloc (expr_rename x y e)
     | Salloc e => Salloc (expr_rename x y e)
@@ -229,7 +231,8 @@ Module lang.
          | SndCtx => SndCtx
          | InjLCtx => InjLCtx
          | InjRCtx => InjRCtx
-         | CaseCtx e1 e2 => CaseCtx (expr_rename x y e1) (expr_rename x y e2)
+         | CaseCtx z1 e1 e2 => if decide (BNamed x = z1) then CaseCtx (BNamed y) (expr_rename x y e1) (expr_rename x y e2)
+                              else CaseCtx z1 (expr_rename x y e1) (expr_rename x y e2)
          | IfCtx e1 e2 => IfCtx (expr_rename x y e1) (expr_rename x y e2)
          end
   with val_rename (x y : string) (v : val) : val :=
@@ -273,7 +276,10 @@ Module lang.
     | Snd e => Snd (expr_subst x v e)
     | InjL e => InjL (expr_subst x v e)
     | InjR e => InjR (expr_subst x v e)
-    | Case e0 e1 e2 => Case (expr_subst x v e0) (expr_subst x v e1) (expr_subst x v e2)
+    | Case e0 y e1 e2 =>
+        if decide (BNamed x ≠ y)
+        then Case (expr_subst x v e0) y (expr_subst x v e1) (expr_subst x v e2)
+        else e
     | Loc δ l => Loc δ l
     | Halloc e => Halloc (expr_subst x v e)
     | Salloc e => Salloc (expr_subst x v e)
@@ -307,25 +313,28 @@ Module lang.
          | SndCtx => SndCtx
          | InjLCtx => InjLCtx
          | InjRCtx => InjRCtx
-         | CaseCtx e1 e2 => CaseCtx (expr_subst x v e1) (expr_subst x v e2)
+         | CaseCtx y e1 e2 =>
+             if decide (BNamed x ≠ y)
+             then CaseCtx y (expr_subst x v e1) (expr_subst x v e2)
+             else K
          | IfCtx e1 e2 => IfCtx (expr_subst x v e1) (expr_subst x v e2)
          end
-  with val_subst (x : string) (v' : val) (v : val) : val :=
-         match v with
-         | RecV δ k f y e =>
-             RecV δ k f y $
-             if decide (BNamed x ≠ k ∧ BNamed x ≠ f ∧ BNamed x ≠ y)
-             then expr_subst x v e
-             else e
-         | NatV n => NatV n
-         | BoolV b => BoolV b
-         | UnitV => UnitV
-         | LocV δ l => LocV δ l
-         | ContV i K => ContV i (map (ectx_item_subst x v) K)
-         | PairV v1 v2 => PairV (val_subst x v v1) (val_subst x v v2)
-         | InjLV v1 => InjLV (val_subst x v v1)
-         | InjRV v1 => InjRV (val_subst x v v1)
-         end.
+  with val_subst (x : string) (v' : val) (v : val) : val := v
+         (* match v with *)
+         (* | RecV δ k f y e => *)
+         (*     RecV δ k f y $ *)
+         (*     if decide (BNamed x ≠ k ∧ BNamed x ≠ f ∧ BNamed x ≠ y) *)
+         (*     then expr_subst x v e *)
+         (*     else e *)
+         (* | NatV n => NatV n *)
+         (* | BoolV b => BoolV b *)
+         (* | UnitV => UnitV *)
+         (* | LocV δ l => LocV δ l *)
+         (* | ContV i K => ContV i (map (ectx_item_subst x v) K) *)
+         (* | PairV v1 v2 => PairV (val_subst x v v1) (val_subst x v v2) *)
+         (* | InjLV v1 => InjLV (val_subst x v v1) *)
+         (* | InjRV v1 => InjRV (val_subst x v v1) *)
+         (* end *).
 
   Notation ectx := (list ectx_item).
   
@@ -339,7 +348,7 @@ Module lang.
     → (∀ b : bool, P (#♭ b))
     → (∀ (op : binop) (e1 : expr), P e1 → ∀ e2 : expr, P e2 → P (BinOp op e1 e2))
     → (∀ e0 : expr, P e0 → ∀ e1 : expr, P e1 → ∀ e2 : expr, P e2 → P (If e0 e1 e2))
-    → (∀ e0 : expr, P e0 → ∀ e1 : expr, P e1 → ∀ e2 : expr, P e2 → P (Case e0 e1 e2))
+    → (∀ (e0 : expr) x, P e0 → ∀ e1 : expr, P e1 → ∀ e2 : expr, P e2 → P (Case e0 x e1 e2))
     → (∀ e1 : expr, P e1 → ∀ e2 : expr, P e2 → P (Pair e1 e2))
     → (∀ e : expr, P e → P (Fst e))
     → (∀ e : expr, P e → P (Snd e))
@@ -358,7 +367,7 @@ Module lang.
     → (∀ K e2 i x, P (Cont i K) → P e2 → P (Cont i (LetInCtx x e2 :: K)))
     → (∀ K e2 i, P (Cont i K) → P e2 → P (Cont i (PairLCtx e2 :: K)))
     → (∀ K v1 i, P (Cont i K) → Q v1 → P (Cont i (PairRCtx v1 :: K)))
-    → (∀ K e1 e2 i, P (Cont i K) → P e1 → P e2 → P (Cont i (CaseCtx e1 e2 :: K)))
+    → (∀ K e1 e2 i x, P (Cont i K) → P e1 → P e2 → P (Cont i (CaseCtx x e1 e2 :: K)))
     → (∀ K op e2 i, P (Cont i K) → P e2 → P (Cont i (BinOpLCtx op e2 :: K)))
     → (∀ K op v1 i, P (Cont i K) → Q v1 → P (Cont i (BinOpRCtx op v1 :: K)))
     → (∀ K i, P (Cont i K) → P (Cont i (FstCtx :: K)))
@@ -396,7 +405,7 @@ Module lang.
     → (∀ K i, Q (ContV i K) → Q (ContV i (InjLCtx :: K)))
     → (∀ K i, Q (ContV i K) → Q (ContV i (InjRCtx :: K)))
     → (∀ K e1 e2 i, Q (ContV i K) → P e1 → P e2 → Q (ContV i (IfCtx e1 e2 :: K)))
-    → (∀ K e1 e2 i, Q (ContV i K) → P e1 → P e2 → Q (ContV i (CaseCtx e1 e2 :: K)))
+    → (∀ K e1 e2 i x, Q (ContV i K) → P e1 → P e2 → Q (ContV i (CaseCtx x e1 e2 :: K)))
     → (∀ K i, Q (ContV i K) → Q (ContV i (HallocCtx :: K)))
     → (∀ K i, Q (ContV i K) → Q (ContV i (SallocCtx :: K)))
     → (∀ K i, Q (ContV i K) → Q (ContV i (LoadCtx :: K)))
@@ -438,7 +447,7 @@ Module lang.
            | Pair e1 e2 => Hpair _ (fx e1) _ (fx e2)
            | Fst e => Hfst _ (fx e)
            | Snd e => Hsnd _ (fx e)
-           | Case e0 e1 e2 => Hcase _ (fx e0) _ (fx e1) _ (fx e2)
+           | Case e0 x e1 e2 => Hcase _ _ (fx e0) _ (fx e1) _ (fx e2)
            | InjL e => Hinjl _ (fx e)
            | InjR e => Hinjr _ (fx e)
            | Loc δ l => Hloc _ _
@@ -476,7 +485,7 @@ Module lang.
                              | (InjLCtx) :: K' => HInjLCtxV _ _ (gx' K')
                              | (InjRCtx) :: K' => HInjRCtxV _ _ (gx' K')
                              | (IfCtx e1 e2) :: K' => HIfCtxV _ _ _ _ (gx' K') (fx e1) (fx e2)
-                             | (CaseCtx e1 e2) :: K' => HCaseCtxV _ _ _ _ (gx' K') (fx e1) (fx e2)
+                             | (CaseCtx x e1 e2) :: K' => HCaseCtxV _ _ _ _ _ (gx' K') (fx e1) (fx e2)
                              | (HallocCtx) :: K' => HHallocCtxV _ _ (gx' K')
                              | (SallocCtx) :: K' => HSallocCtxV _ _ (gx' K')
                              | (LoadCtx) :: K' => HLoadCtxV _ _ (gx' K')
@@ -502,7 +511,7 @@ Module lang.
                   | (InjLCtx) :: K' => HInjLCtx _ _ (gx K')
                   | (InjRCtx) :: K' => HInjRCtx _ _ (gx K')
                   | (IfCtx e1 e2) :: K' => HIfCtx _ _ _ _ (gx K') (fx e1) (fx e2)
-                  | (CaseCtx e1 e2) :: K' => HCaseCtx _ _ _ _ (gx K') (fx e1) (fx e2)
+                  | (CaseCtx x e1 e2) :: K' => HCaseCtx _ _ _ _ _ (gx K') (fx e1) (fx e2)
                   | (HallocCtx) :: K' => HHallocCtx _ _ (gx K')
                   | (SallocCtx) :: K' => HSallocCtx _ _ (gx K')
                   | (LoadCtx) :: K' => HLoadCtx _ _ (gx K')
@@ -581,6 +590,14 @@ Module lang.
                destruct (decide (B1 = C1)); [| right; inversion 1; tauto];
                destruct (decide (B2 = C2)); [| right; inversion 1; tauto];
                subst; left; eauto
+           | |- Decision (Cont ?i (?A ?B1 ?B2 ?B3 :: ?K1) = Cont ?i0 (?A ?C1 ?C2 ?C3 :: ?K2)) =>
+               let Hf := fresh "H" in
+               destruct (decide (Cont i K1 = Cont i0 K2)) as [Hf|];
+               [inversion Hf| right; inversion 1; subst; tauto];
+               destruct (decide (B1 = C1)); [| right; inversion 1; tauto];
+               destruct (decide (B2 = C2)); [| right; inversion 1; tauto];
+               destruct (decide (B3 = C3)); [| right; inversion 1; tauto];
+               subst; left; eauto
            end.
     all: try match goal with
            | |- Decision (ContV ?i (?A :: ?K1) = ContV ?i0 (?A :: ?K2)) =>
@@ -599,6 +616,14 @@ Module lang.
                [inversion Hf| right; inversion 1; subst; tauto];
                destruct (decide (B1 = C1)); [| right; inversion 1; tauto];
                destruct (decide (B2 = C2)); [| right; inversion 1; tauto];
+               subst; left; eauto
+           | |- Decision (ContV ?i (?A ?B1 ?B2 ?B3 :: ?K1) = ContV ?i0 (?A ?C1 ?C2 ?C3 :: ?K2)) =>
+               let Hf := fresh "H" in
+               destruct (decide (ContV i K1 = ContV i0 K2)) as [Hf|];
+               [inversion Hf| right; inversion 1; subst; tauto];
+               destruct (decide (B1 = C1)); [| right; inversion 1; tauto];
+               destruct (decide (B2 = C2)); [| right; inversion 1; tauto];
+               destruct (decide (B3 = C3)); [| right; inversion 1; tauto];
                subst; left; eauto
            end.
     match goal with
@@ -670,11 +695,11 @@ Module lang.
         e1' ← shift_expr e1 off;
         e2' ← shift_expr e2 off;
         Some (If e0' e1' e2')
-    | Case e0 e1 e2 =>
+    | Case e0 x e1 e2 =>
         e0' ← shift_expr e0 off;
         e1' ← shift_expr e1 off;
         e2' ← shift_expr e2 off;
-        Some (Case e0' e1' e2')
+        Some (Case e0' x e1' e2')
     | Pair e1 e2 =>
         e1' ← shift_expr e1 off;
         e2' ← shift_expr e2 off;
@@ -954,10 +979,10 @@ Module lang.
     head_step K (n,Snd (Pair e1 e2)) σ [] (n,e2) σ [] NormalMode
 
   (** Sums *)
-  | CaseInjL n K v e1 e2 σ :
-    head_step K (n, Case (InjL (of_val v)) e1 e2) σ [] (n, Call e1 (of_val v)) σ [] NormalMode
-  | CaseInjR n K v e1 e2 σ :
-    head_step K (n, Case (InjR (of_val v)) e1 e2) σ [] (n, Call e2 (of_val v)) σ [] NormalMode
+  | CaseInjL n K v x e1 e2 σ :
+    head_step K (n, Case (InjL (of_val v)) x e1 e2) σ [] (n, subst' x v e1) σ [] NormalMode
+  | CaseInjR n K v x e1 e2 σ :
+    head_step K (n, Case (InjR (of_val v)) x e1 e2) σ [] (n, subst' x v e2) σ [] NormalMode
 
   (** BinOp *)
   | BinOpS n K op e1 e2 v1 v2 w σ :
@@ -1249,7 +1274,7 @@ Proof.
   - simpl_throw_red_solve IHe SndCtx K.
   - simpl_throw_red_solve IHe InjLCtx K.
   - simpl_throw_red_solve IHe InjRCtx K.
-  - simpl_throw_red_solve IHe1 (CaseCtx e2 e3) K.
+  - simpl_throw_red_solve IHe1 (CaseCtx x e2 e3) K.
   - simpl_throw_red_solve IHe1 (IfCtx e2 e3) K.
 Qed.
 
@@ -1307,7 +1332,7 @@ Fixpoint construct_ctx (e : expr) : (ectx * expr) :=
               | Some v1 => ([],e)
               | None => let '(Ks,e') := construct_ctx e1 in (Ks ++ [InjRCtx],e')
               end
-  | Case e1 e2 e3 => let '(Ks,e') := construct_ctx e1 in (Ks ++ [CaseCtx e2 e3],e')
+  | Case e1 x e2 e3 => let '(Ks,e') := construct_ctx e1 in (Ks ++ [CaseCtx x e2 e3],e')
   end.
 
 Definition stack_construct_ctx (e : stack_expr) : (ectx * stack_expr) :=

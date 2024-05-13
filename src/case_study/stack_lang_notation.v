@@ -138,15 +138,16 @@ Notation "e1 ;; e2" := (Seq e1%E e2%E)
     format "'[' '[hv' '[' e1 ']' ;;  ']' '/' e2 ']'") : expr_scope.
 
 (** Defived form: match and option type *)
-Notation Match e0 x1 e1 x2 e2 := (Case e0 (Lam (local 0) BAnon x1 e1) (Lam (local 0) BAnon x2 e2)) (only parsing).
+Notation Match e0 x1 e1 e2 := (Case e0 x1 e1 e2) (only parsing).
 
-Notation "'match:' e0 'with' 'InjL' x1 => e1 | 'InjR' x2 => e2 'end'" :=
-  (Match e0 x1%binder e1 x2%binder e2)
-  (e0, x1, e1, x2, e2 at level 200,
-   format "'[hv' 'match:'  e0  'with'  '/  ' '[' 'InjL'  x1  =>  '/  ' e1 ']'  '/' '[' |  'InjR'  x2  =>  '/  ' e2 ']'  '/' 'end' ']'") : expr_scope.
-Notation "'match:' e0 'with' 'InjR' x1 => e1 | 'InjL' x2 => e2 'end'" :=
-  (Match e0 x2%binder e2 x1%binder e1)
-    (e0, x1, e1, x2, e2 at level 200, only parsing) : expr_scope.
+Notation "'match:' e0 'with' x1 => 'InjL' e1 | 'InjR' e2 'end'" :=
+  (Match e0 x1%binder e1 e2)
+  (e0, x1, e1, e2 at level 200,
+   format "'[hv' 'match:'  e0  'with'  x1  '=>' '/  ' '[' 'InjL'  '/  ' e1 ']'  '/' '[' |  'InjR'  '/  ' e2 ']'  '/' 'end' ']'") : expr_scope.
+Notation "'match:' e0 'with' x1 => 'InjR' e1 | 'InjL' e2 'end'" :=
+  (Match e0 x1%binder e2 e1)
+  (e0, x1, e1, e2 at level 200,
+   format "'[hv' 'match:'  e0  'with'  x1  '=>' '/  ' '[' 'InjR'  '/  ' e1 ']'  '/' '[' |  'InjL'  '/  ' e2 ']'  '/' 'end' ']'") : expr_scope.
 
 Notation NONE := (InjL Unit) (only parsing).
 Notation NONEV := (InjLV UnitV) (only parsing).
@@ -154,10 +155,10 @@ Notation SOME x := (InjR x) (only parsing).
 Notation SOMEV x := (InjRV x) (only parsing).
 
 Notation "'match:' e0 'with' 'NONE' => e1 | 'SOME' x => e2 'end'" :=
-  (Match e0 BAnon e1 x%binder e2)
+  (Match e0 x%binder e1 e2)
   (e0, e1, x, e2 at level 200, only parsing) : expr_scope.
 Notation "'match:' e0 'with' 'SOME' x => e2 | 'NONE' => e1 'end'" :=
-  (Match e0 BAnon e1 x%binder e2)
+  (Match e0 x%binder e1 e2)
   (e0, e1, x, e2 at level 200, only parsing) : expr_scope.
   
 

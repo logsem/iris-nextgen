@@ -156,12 +156,12 @@ Section stack_lang_examples.
     prepare_ctx. rewrite Hfree. iApply fupd_wp.
     iMod (@inv_alloc _ _ _ _ locality_lifetime_pick _ (logN .@ l) _
             (lifetime_stack 1) (∃ v, 0 @@ l ↦ v ∗ ∃ m, ⌜v = NatV m⌝) with "[Hl]") as "#Hinv".
-    { intros c' Hle. iIntros "(%v & Hl & (%m & ->))".
+    { apply bnextgen_bounded_ind_GenIndependent_intro.
+      intros c' Hle. iIntros "(%v & Hl & (%m & ->))".
       inversion Hle;subst.
       - inversion H0;subst.
-        + rewrite -next_state_eq. iModIntro;eauto.
-        + iDestruct (stack_stack_pop_intro _ _ _ _ f2 with "Hl") as "Hl";[lia|].
-          rewrite -next_state_eq. iModIntro. eauto.
+        iDestruct (stack_stack_pop_intro _ _ _ _ f2 with "Hl") as "Hl";[lia|].
+        rewrite -next_state_eq. iModIntro. eauto.
       - iDestruct (stack_stack_pop_intro _ _ _ _ 1 with "Hl") as "Hl";[lia|].
           rewrite -next_state_eq. iModIntro. eauto. }
     { eauto. }

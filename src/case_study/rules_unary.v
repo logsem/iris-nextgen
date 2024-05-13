@@ -29,7 +29,7 @@ Global Instance locality_lifetime_eq_dec : EqDecision locality_lifetime.
 Proof. solve_decision. Qed.
 
 Inductive locality_lifetime_rel : relation locality_lifetime :=
-| rel_heap c : locality_lifetime_rel c lifetime_heap
+| rel_heap c : locality_lifetime_rel lifetime_heap c
 | rel_stack f1 f2 : f1 < f2 -> locality_lifetime_rel (lifetime_stack f1) (lifetime_stack f2).
 
 Notation "c1 ≤ c2" := (rc locality_lifetime_rel c1 c2) (at level 70).
@@ -38,7 +38,7 @@ Definition state_trans (n : nat) := (map_entry_lift_gmap_view (stack_location_cu
 
 Definition locality_pick (l : locality_lifetime) :=
   match l with
-  | lifetime_heap => id
+  | lifetime_heap => state_trans 0
   | lifetime_stack n => state_trans n
   end.
 
@@ -56,24 +56,23 @@ Qed.
 
 Global Instance locality_lifetime_cmra_morphism : ∀ l, CmraMorphism (locality_pick l) :=
   λ l, match l with
-       | lifetime_heap => cmra_morphism_id
+       | lifetime_heap => gMapTrans_lift_CmraMorphism (stack_location_cut 0)
        | lifetime_stack n => gMapTrans_lift_CmraMorphism (stack_location_cut n)
        end.
 
 Global Instance locality_lifetime_rel_dec : ∀ l1 l2, Decision (locality_lifetime_rel l1 l2).
 Proof.
-  intros l1 l2. destruct l1,l2;simpl;[|left;constructor|
-                                       right;intros Hcontr;inversion Hcontr|
-                                       left;constructor].
-  destruct (decide (n < n0));[left;by constructor|right].
-  intros Hcontr. inversion Hcontr;subst. inversion Hcontr;subst. lia.
+  intros l1 l2. destruct l1,l2;simpl; try by (left;constructor).
+  - destruct (decide (n < n0));[left;by constructor|right].
+    intros Hcontr. inversion Hcontr;subst. inversion Hcontr;subst. lia.
+  - right. intros Hcontr. inversion Hcontr.
 Qed.
 
 Global Instance id_stack_idemp : Idemp equiv (id : gmap_view.gmap_viewR (nat * loc) (leibnizO val) -> gmap_view.gmap_viewR (nat * loc) (leibnizO val)).
 Proof. intros c. simpl. auto. Qed.
 Global Instance locality_pick_idemp (c : locality_lifetime) : Idemp equiv (locality_pick c) :=
   match c with
-  | lifetime_heap => id_stack_idemp
+  | lifetime_heap => gMapTrans_lift_IdemP (stack_location_cut 0)
   | lifetime_stack n => gMapTrans_lift_IdemP (stack_location_cut n)
   end.
 Global Instance locality_pick_trichotomy : Trichotomy locality_lifetime_rel.
@@ -84,21 +83,35 @@ Proof.
     + left. by constructor.
     + subst. by right;left.
     + right;right. constructor. lia.
-  - left. constructor.
   - right;right. constructor.
+  - left;constructor.
 Qed.
 Global Instance locality_pick_indep (c1 c2 : locality_lifetime) : Indep equiv (locality_pick c1) (locality_pick c2).
 Proof.
   rewrite /locality_pick.
   destruct c1,c2;simpl;[|intros ?;simpl;auto..].
-  rewrite /state_trans.
-  apply gMapTrans_lift_Indep;try apply _.
-  intros [??]. intros ?.
-  rewrite /stack_location_cut.
-  case_match;case_match;simpl;auto.
-  - by rewrite H H0.
-  - by rewrite H0.
-  - by rewrite H.
+  - rewrite /state_trans.
+    apply gMapTrans_lift_Indep;try apply _.
+    intros [??]. intros ?.
+    rewrite /stack_location_cut.
+    case_match;case_match;simpl;auto.
+    + by rewrite H H0.
+    + by rewrite H0.
+    + by rewrite H.
+  - rewrite /state_trans.
+    apply gMapTrans_lift_Indep;try apply _.
+    intros [??]. intros ?.
+    rewrite /stack_location_cut /stack_cond /=.
+    rewrite !bool_decide_decide /=.
+    destruct (decide (n0 < n)),(decide (n0 < 0)),(decide (n0 < n));simpl;auto;try lia.
+    rewrite !bool_decide_decide /= decide_False//.
+  - rewrite /state_trans.
+    apply gMapTrans_lift_Indep;try apply _.
+    intros [??]. intros ?.
+    rewrite /stack_location_cut /stack_cond /=.
+    rewrite !bool_decide_decide /=.
+    destruct (decide (n0 < n)),(decide (n0 < 0)),(decide (n0 < n));simpl;auto;try lia.
+    rewrite !bool_decide_decide /= decide_False//.
 Qed.
 Global Instance stack_location_cut_oindep n0 n l : OIndep eq (stack_location_cut n0 l) (stack_location_cut n l).
 Proof.
@@ -114,25 +127,44 @@ Proof.
   intros c1 c2 m Hcr.
   rewrite /locality_pick.
   destruct c1,c2;simpl;auto;inversion Hcr;subst.
-  rewrite /state_trans.
-  pose proof (map_entry_lift_gmap_view_compose (stack_location_cut n)) as Heq.
-  simpl in Heq. rewrite Heq.
-  apply map_entry_lift_gmap_equiv;try apply _.
-  intros [n1 l] v.
-  rewrite /stack_location_cut.
-  rewrite /stack_cond /=.
-  case_match;case_match;simpl;auto.
-  - by rewrite H0.
-  - by rewrite H0.
-  - apply bool_decide_eq_false in H.
-    apply bool_decide_eq_true in H0.
-    lia.
+  - rewrite /state_trans.
+    pose proof (map_entry_lift_gmap_view_compose (stack_location_cut n)) as Heq.
+    simpl in Heq. rewrite Heq.
+    apply map_entry_lift_gmap_equiv;try apply _.
+    intros [n1 l] v.
+    rewrite /stack_location_cut.
+    rewrite /stack_cond /=.
+    case_match;case_match;simpl;auto.
+    + by rewrite H0.
+    + by rewrite H0.
+    + apply bool_decide_eq_false in H.
+      apply bool_decide_eq_true in H0.
+      lia.
+  - rewrite /state_trans.
+    pose proof (map_entry_lift_gmap_view_compose (stack_location_cut 0)) as Heq.
+    simpl in Heq. rewrite Heq.
+    apply map_entry_lift_gmap_equiv;try apply _.
+    intros [n1 l] v.
+    rewrite /stack_location_cut.
+    rewrite /stack_cond /=.
+    rewrite !bool_decide_decide /=.
+    destruct (decide (n1 < n));simpl;auto.
+    rewrite decide_False;auto;lia.
+  - rewrite /state_trans.
+    pose proof (map_entry_lift_gmap_view_compose (stack_location_cut 0)) as Heq.
+    simpl in Heq. rewrite Heq.
+    apply map_entry_lift_gmap_equiv;try apply _.
+    intros [n1 l] v.
+    rewrite /stack_location_cut.
+    rewrite /stack_cond /=.
+    rewrite !bool_decide_decide /=.
+    rewrite decide_False;auto;lia.
 Qed.
 
 Global Instance locality_lifetime_pick
   : pick_transform_rel (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) :=
   { C := locality_lifetime;
-    C_bot := lifetime_stack 0;
+    C_bot := lifetime_heap;
     CR := locality_lifetime_rel;
     C_pick := locality_pick;
   }.
@@ -409,6 +441,13 @@ Section heapG_nextgen_updates.
     iModIntro. iFrame.
   Qed.
 
+  Lemma stack_size_frag_ind_intro (s : nat) c :
+    [size] s ⊢ ⚡◻{Ω ↑ c} [size] s.
+  Proof.
+    apply bnextgen_bounded_ind_GenIndependent_intro.
+    intros. rewrite -next_state_eq. apply stack_size_frag_intro.
+  Qed.
+
   Lemma heap_stack_intro (l : loc) (q : dfrac) (v : val) n :
     l ↦{q} v ⊢ ⚡={next_state Ω n}=> l ↦{q} v.
   Proof.
@@ -418,6 +457,13 @@ Section heapG_nextgen_updates.
       next_state_unseal /next_state_def.
     iDestruct (transmap_own_insert_two_other with "Hl") as "Hl".
     iModIntro. iFrame.
+  Qed.
+
+  Lemma heap_stack_ind_intro l q v c :
+    l ↦{q} v ⊢ ⚡◻{Ω ↑ c} l ↦{q} v.
+  Proof.
+    apply bnextgen_bounded_ind_GenIndependent_intro.
+    intros. rewrite -next_state_eq. apply heap_stack_intro.
   Qed.
 
   Lemma gen_heap_interp_stack_pop (h1 : heap) n :
@@ -441,6 +487,13 @@ Section heapG_nextgen_updates.
     iApply (bnextgen_mono with "Hm"). iIntros "$". 
   Qed.
 
+  Lemma later_credits_ind_intro m c :
+    £ m ⊢ ⚡◻{Ω ↑ c} £ m.
+  Proof.
+    apply bnextgen_bounded_ind_GenIndependent_intro.
+    intros. rewrite -next_state_eq. apply later_credits_intro.
+  Qed.
+
   Lemma stack_stack_pop_intro i l q v n
     (Hlt : i < n) :
     i @@ l ↦{q} v ⊢ ⚡={next_state Ω (lifetime_stack n)}=> i @@ l ↦{q} v.
@@ -459,24 +512,20 @@ Section heapG_nextgen_updates.
     rewrite /stack_location_cut bool_decide_true // /=.
   Qed.
 
-  Lemma stack_heap_intro i l q v :
-    i @@ l ↦{q} v ⊢ ⚡={next_state Ω lifetime_heap}=> i @@ l ↦{q} v.
-  Proof.
-    iIntros "Hl".
-    rewrite /mapsto seal_eq /gen_heap.mapsto_def
-      /ghost_map.ghost_map_elem seal_eq /ghost_map.ghost_map_elem_def
-      next_state_unseal /next_state_def.
-    iDestruct (transmap_own_insert_two_right with "Hl") as "Hl".
-    iModIntro. iFrame.
-  Qed.
-
-  Lemma next_state_heap_inv_intro N c P :
-    inv N c P ⊢ ⚡={next_state Ω lifetime_heap}=> inv N c P.
+  Lemma next_state_heap_inv_intro c N P :
+    inv N lifetime_heap P ⊢ ⚡={next_state Ω c}=> inv N lifetime_heap P.
   Proof.
     rewrite next_state_unseal /next_state_def.
     iIntros "#Hinv".
     iApply inv_mod_intro;auto.
-    simpl. do 2 constructor.
+    constructor. constructor.
+  Qed.
+
+  Lemma next_state_heap_inv_ind_intro c N P :
+    inv N lifetime_heap P ⊢ ⚡◻{Ω ↑ c} inv N lifetime_heap P.
+  Proof.
+     apply bnextgen_bounded_ind_GenIndependent_intro.
+     intros. rewrite -next_state_eq. apply next_state_heap_inv_intro.
   Qed.
 
   Lemma next_state_stack_inv_intro N n1 n2 P :
@@ -503,23 +552,30 @@ Section heapG_nextgen_updates.
     iIntros "Hp". iApply bnextgen_intro_plainly. eauto.
   Qed.
 
-  (* #[global] Instance gen_stack_interp_stack_pop' s1 i (Hlen: length s1 >= i) *)
-  (*   : IntoPnextgen _ _ _ := gen_stack_interp_stack_pop s1 i Hlen. *)
-  (* #[global] Instance stack_size_auth_intro' s n *)
-  (*   : IntoPnextgen _ _ _ := stack_size_auth_intro s n. *)
+  (* typeclass instances for next state modality *)
   #[global] Instance stack_size_frag_intro' s n
     : IntoPnextgen _ _ _ := stack_size_frag_intro s n.
   #[global] Instance heap_stack_intro' (l : loc) (q : dfrac) (v : val) n
     : IntoPnextgen _ _ _ := heap_stack_intro l q v n.
-  #[global] Instance stack_heap_intro' i l q v
-    : IntoPnextgen _ _ _ := stack_heap_intro i l q v.
-  (* #[global] Instance gen_heap_interp_stack_pop' (h1 : heap) n *)
-  (*   : IntoPnextgen _ _ _ := gen_heap_interp_stack_pop h1 n. *)
-  (* #[global] Instance stack_stack_pop_intro' i l q v n Hlt *)
-  (*   : IntoPnextgen _ _ _ := stack_stack_pop_intro i l q v n Hlt. *)
+  #[global] Instance heap_inv_intro c N P
+    : IntoPnextgen _ _ _ := next_state_heap_inv_intro c N P.
+  
   #[global] Instance later_credits_intro' m n
     : IntoPnextgen _ _ _ := later_credits_intro m n.
 
+  (* typeclass instances for next state independence modality *)
+  #[global] Instance stack_size_frag_ind_intro' s n
+    : IntoInextgen _ _ _ _ := stack_size_frag_ind_intro s n.
+  #[global] Instance heap_stack_ind_intro' (l : loc) (q : dfrac) (v : val) n
+    : IntoInextgen _ _ _ _ := heap_stack_ind_intro l q v n.
+  #[global] Instance heap_inv_ind_intro c N P
+    : IntoInextgen _ _ _ _ := next_state_heap_inv_ind_intro c N P.
+  
+  #[global] Instance later_credits_ind_intro' m n
+    : IntoInextgen _ _ _ _ := later_credits_ind_intro m n.
+
+  
+  (* The following are declared again to speed up typeclass search *)
   #[global] Instance next_state_id' n P
     : IntoPnextgen _ _ _ := next_state_id n P.
   #[global] Instance next_state_pure_intro' P n
@@ -663,22 +719,22 @@ Section lifting.
     intros; inv_head_step;eauto. by resolve_next_state.
   Qed.
 
-  Lemma wp_case_injl K c E e v e1 e2 n m Φ `{!IntoVal (n,e) (m,InjLV v)} :
-    ▷ (WP fill K (n,Call e1 (of_val v)) @ ↑c; E {{ Φ }}) ⊢ WP fill K (n,Case e e1 e2) @ ↑c; E {{ Φ }}.
+  Lemma wp_case_injl K c E e x v e1 e2 n m Φ `{!IntoVal (n,e) (m,InjLV v)} :
+    ▷ (WP fill K (n,subst' x v e1) @ ↑c; E {{ Φ }}) ⊢ WP fill K (n,Case e x e1 e2) @ ↑c; E {{ Φ }}.
   Proof.
     iIntros "H".
     eassert (e = InjL _) as ->;[by inv_head_step|].
-    iApply (wp_lift_nonthrow_pure_det_head_step_no_fork' K (n,Case _ _ _) _);eauto.
+    iApply (wp_lift_nonthrow_pure_det_head_step_no_fork' K (n,Case _ _ _ _) _);eauto.
     intros; inv_head_step;eauto. all: try resolve_next_state;auto.
     intros. resolve_next_state. auto.
   Qed.
 
-  Lemma wp_case_injr K c E e v e1 e2 n m Φ `{!IntoVal (n,e) (m,InjRV v)} :
-    ▷ (WP fill K (n,Call e2 (of_val v)) @ ↑c; E {{ Φ }}) ⊢ WP fill K (n,Case e e1 e2) @ ↑c; E {{ Φ }}.
+  Lemma wp_case_injr K c E e x v e1 e2 n m Φ `{!IntoVal (n,e) (m,InjRV v)} :
+    ▷ (WP fill K (n,subst' x v e2) @ ↑c; E {{ Φ }}) ⊢ WP fill K (n,Case e x e1 e2) @ ↑c; E {{ Φ }}.
   Proof.
     iIntros "H".
     eassert (e = InjR _) as ->;[by inv_head_step|].
-    iApply (wp_lift_nonthrow_pure_det_head_step_no_fork' K (n,Case _ _ _) _);eauto.
+    iApply (wp_lift_nonthrow_pure_det_head_step_no_fork' K (n,Case _ _ _ _) _);eauto.
     intros; inv_head_step;eauto. all: try resolve_next_state;auto.
     intros. resolve_next_state. auto.
   Qed.
