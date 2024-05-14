@@ -72,7 +72,7 @@ Notation "! e" := (Load e%E) (at level 9, right associativity) : expr_scope.
 Notation "'href' e" := (Halloc e%E) (at level 10) : expr_scope.
 Notation "'sref' e" := (Salloc e%E) (at level 10) : expr_scope.
 
-Notation "e1 + e2" := (BinOp Add e1%E e2%E) : expr_scope.
+Notation "e1 + e2" := (BinOp stack_lang.Add e1%E e2%E) : expr_scope.
 Notation "e1 - e2" := (BinOp Sub e1%E e2%E) : expr_scope.
 
 Notation "e1 ≤ e2" := (BinOp Le e1%E e2%E) : expr_scope.

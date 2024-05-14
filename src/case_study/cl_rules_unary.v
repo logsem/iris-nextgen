@@ -213,6 +213,24 @@ Section lifting.
     iSpecialize ("HK" $! (_,_)). iApply "HK". iApply "Hwand". iFrame.
   Qed.
 
+  (* derived version with a restricted shape for the post condition *)
+  Lemma clwp_call_global_alt E n c f x e1 e2 v2' v2 Φ `{!IntoVal (n,e2) (n,v2)} `{Hindep:!∀ v, GenIndependent2Ω Ω c (Φ v)} :
+    c ≤ (^n) ->
+    shift_val v2 (1) = Some v2' ->
+    ▷ ([size] S n -∗ CLWP (S n,(subst' f (RecV global BAnon f x e1) (subst' x v2' e1)))
+                     @ ↑c; E {{ λ v, [size] v.1 ∗ ∃ v', ⌜v.1 = S n⌝ ∗ ⌜shift_val v.2 (- 1%nat) = Some v'⌝ ∗ Φ (n, v') }})
+      ∗ ▷ [size] n
+      ⊢ CLWP (n,Call (Rec global BAnon f x e1) e2) @ ↑c; E {{ λ v, [size] v.1 ∗ Φ v }}.
+  Proof.
+    iIntros (Hc Hshift) "[Hcont Hsize]".
+    iApply clwp_call_global;[eauto..|].
+    iFrame. iSplitR.
+    { iIntros "!>!> %v". auto. }
+    iIntros "!> Hsize". iSpecialize ("Hcont" with "Hsize").
+    iApply (clwp_wand with "Hcont").
+    iIntros "!> %v [Hsize HH]". iFrame. auto.
+  Qed.
+
   Lemma clwp_call_local Φ' E n c (i : nat) f x e1 e2 e1' v2' v2 Φ `{!IntoVal (n,e2) (n,v2)} `{Hindep:!∀ v, GenIndependent2Ω Ω c (Φ' v)} :
     c ≤ (^n) ->
     shift_expr e1 (i + 1) = Some e1' ->
@@ -248,4 +266,24 @@ Section lifting.
     iSpecialize ("HK" $! (_,_)). iApply "HK". iApply "Hwand". iFrame.
   Qed.
 
+  (* derived version with a restricted shape for the post condition *)
+  Lemma clwp_call_local_alt E n c (i : nat) f x e1 e2 e1' v2' v2 Φ `{!IntoVal (n,e2) (n,v2)} `{Hindep:!∀ v, GenIndependent2Ω Ω c (Φ v)} :
+    c ≤ (^n) ->
+    shift_expr e1 (i + 1) = Some e1' ->
+    shift_val v2 (1) = Some v2' ->
+    ▷ ([size] S n -∗ CLWP (S n,(subst' f (RecV (local i) BAnon f x e1) (subst' x v2' e1')))
+                     @ ↑c; E {{ λ v, [size] v.1 ∗ ∃ v', ⌜v.1 = S n⌝ ∗ ⌜shift_val v.2 (- 1%nat) = Some v'⌝ ∗ Φ (n, v') }})
+      ∗ ▷ [size] n
+      ⊢ CLWP (n,Call (Rec (local i) BAnon f x e1) e2) @ ↑c; E {{ λ v, [size] v.1 ∗ Φ v }}.
+  Proof.
+    iIntros (Hc Hshift Hshift') "[Hcont Hsize]".
+    iApply clwp_call_local;[eauto..|].
+    iFrame. iSplitR.
+    { iIntros "!>!> %v". auto. }
+    iIntros "!> Hsize". iSpecialize ("Hcont" with "Hsize").
+    iApply (clwp_wand with "Hcont").
+    iIntros "!> %v [Hsize HH]". iFrame. auto.
+  Qed.
+
+  
 End lifting.

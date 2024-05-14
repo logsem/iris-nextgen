@@ -188,6 +188,11 @@ Section proofmode_classes.
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : val → iProp Σ.
 
+  Global Instance frame_clwp' p c E e R Φ Ψ `{ind: !GenIndependent2Ω Ω c R} :
+    (∀ v, Frame p R (Φ v) (Ψ v)) →
+    Frame p (R) (CLWP e @ ↑c; E {{ Φ }}) (CLWP e @ ↑c; E {{ Ψ }}).
+  Proof. rewrite /Frame=> HR. rewrite ind. rewrite bnextgen_bounded_ind_if_always. rewrite clwp_frame_l. apply clwp_mono, HR. Qed.
+  
   Global Instance frame_clwp p c E e R Φ Ψ :
     (∀ v, Frame p R (Φ v) (Ψ v)) →
     Frame p (⚡◻{ Ω ↑ c } R) (CLWP e @ ↑c; E {{ Φ }}) (CLWP e @ ↑c; E {{ Ψ }}).

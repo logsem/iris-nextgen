@@ -112,13 +112,23 @@ Section list_prec.
       iPureIntro. repeat constructor.
   Qed.
 
+  Lemma is_heap_list_subst hd xs :
+    is_heap_list_nat hd xs -∗ ⌜∀ x v, expr_subst x v hd = hd⌝.
+  Proof.
+    iIntros "Hlist".
+    destruct xs.
+    - simpl. iDestruct "Hlist" as %->. iPureIntro. intros. auto.
+    - simpl. iDestruct "Hlist" as "(%l & %hd' & -> & Hl & Hlist)".
+      iPureIntro. auto.
+  Qed.
+
 End list_prec.
 
 Section list_spec.
   Context `{!heapGS Σ Ω}.
 
   (* TODO: need to repeat the instance declaration for some reason *)
-  #[global] Instance heap_stack_ind_intro' l q v n
+  #[local] Instance heap_stack_ind_intro' l q v n
     : IntoInextgen _ _ _ _ := heap_stack_ind_intro' l q v n.
 
   Notation "c1 ≤ c2" := (rc locality_lifetime_rel c1 c2) (at level 70).
@@ -231,3 +241,93 @@ Section list_spec.
   Qed.
     
 End list_spec.
+
+Section list_client.
+  Context `{!heapGS Σ Ω}.
+
+
+  Definition heap_map_client1 : val :=
+    λ: global, <>, "l1" "l2" :=
+      ⟪ heap_map_list (λ: global, <>, "x" := "x")%V "l1",
+        heap_map_list (λ: global, <>, "x" := "x" + 1)%V "l2" ⟫.
+
+  Lemma Forall2_eq {A : Type} (l1 l2 : list A) :
+    Forall2 (λ n1 n2, n1 = n2) l1 l2 -> l1 = l2.
+  Proof.
+    revert l1;induction l2=>l1 Hforall;
+     apply Forall2_length in Hforall as Hlen.
+    - destruct l1;done.
+    - destruct l1;[done|].
+      apply Forall2_cons in Hforall as [->Hforall].
+      f_equiv. naive_solver.
+  Qed.
+
+  Lemma Forall2_incr (l1 l2 : list nat) :
+    Forall2 (λ n1 n2, n2 = n1 + 1) l1 l2 -> l2 = map (λ n, n + 1) l1.
+  Proof.
+    revert l1;induction l2=>l1 Hforall;
+     apply Forall2_length in Hforall as Hlen.
+    - destruct l1;done.
+    - destruct l1;[done|].
+      apply Forall2_cons in Hforall as [->Hforall].
+      simpl. f_equiv. naive_solver.
+  Qed.
+
+  Lemma list_client_example1 m l1 l2 xs1 xs2 :
+    [size] m -∗
+    is_heap_list_nat l1 xs1 -∗
+    is_heap_list_nat l2 xs2 -∗
+    CLWP (m,heap_map_client1 l1 l2) @ ↑^m {{ λ v, [size] m ∗ ∃ l1' l2', ⌜v = (m,⟪l1',l2'⟫%V)⌝ ∗ is_heap_list_nat l1' xs1 ∗ is_heap_list_nat l2' (map (λ n, n + 1) xs2) }}.
+  Proof.
+    iIntros "Hsize Hlist1 Hlist2 /=". prepare_ctx.
+    iApply clwp_bind.
+    iDestruct (is_heap_list_shift with "Hlist1") as %Hshift1.
+    iDestruct (is_heap_list_shift with "Hlist2") as %Hshift2.
+    iDestruct (is_heap_list_subst with "Hlist1") as %Hsubst1.
+    iDestruct (is_heap_list_subst with "Hlist2") as %Hsubst2.
+    iApply (clwp_call_global (λ v, ⌜v.2 = _⌝)%I);[eauto|apply rc_l|eauto|iFrame]. iSplitL;cycle 1.
+    { iNext. iIntros "Hsize/=". iApply clwp_value;simpl;eauto. }
+    iIntros "/= !> !> %v (Hsize & ->)". prepare_ctx. simpl. rewrite -!/(heap_map_list _ _).
+    iApply (clwp_call_global (λ v, ∃ l1' l2', ⌜v = (m,⟪l1',l2'⟫%V)⌝ ∗ is_heap_list_nat l1' xs1 ∗ is_heap_list_nat l2' (map (λ n, n + 1) xs2))%I);
+      [eauto|apply rc_l|eauto|iFrame]. iSplitR.
+    { iIntros "!> !> %v (Hsize & %l1' & %l2' & -> & Hlist1 & Hlist2)". iFrame. iExists _,_. iFrame. auto. }
+    iIntros "!> /= Hsize". rewrite Hsubst1. prepare_ctx. peel_ctx. rewrite -!/(heap_map_list _ _).
+    iApply clwp_bind.
+    iApply (clwp_wand with "[Hlist1 Hsize]").
+    { rewrite -!/(heap_map_list _ _).
+      assert ((λ: global, <>, "x":= "x")%E = (λ: global, <>, "x":= "x")%V) as ->;[auto|].
+      iApply (heap_list_map_list_spec with "[] Hsize Hlist1");[do 2 constructor;lia|auto| |].
+      { intros. simpl. case_match;auto. destruct a as [? [? ?] ].
+        rewrite decide_False//. intros Hcontr;subst;auto. }
+      iIntros "!>!> %m' %c %n %Hrc Hsize".
+      iApply (clwp_call_global (λ v, ⌜v.2 = #nv n⌝)%I);[auto|eauto|iFrame]. iSplitL;cycle 1.
+      { iNext. iIntros "Hsize/=". iApply clwp_value;simpl;eauto. }
+      instantiate (1:=(λ n1 n2, n1 = n2)).
+      iIntros "/= !>!> %v [Hsize ->]". iExists n. iFrame. auto. }
+    iIntros "!> %v (%Heq & Hsize & %l1' & Hlist & %Hlspec1)".
+    apply Forall2_eq in Hlspec1 as ->. destruct v;simpl in *;subst;simpl. prepare_ctx. peel_ctx.
+    iApply clwp_bind.
+    iApply (clwp_wand with "[Hlist2 Hsize]").
+    { rewrite -!/(heap_map_list _ _).
+      assert ((λ: global, <>, "x":= "x" + #n 1)%E = (λ: global, <>, "x":= "x" + #n 1)%V) as ->;[auto|].
+      iApply (heap_list_map_list_spec with "[] Hsize Hlist2");[do 2 constructor;lia|auto| |].
+      { intros. simpl. case_match;auto. destruct a as [? [? ?] ].
+        rewrite decide_False//. intros Hcontr;subst;auto. }
+      iIntros "!>!> %m' %c %n %Hcr Hsize".
+      iApply (clwp_call_global (λ v, ⌜v.2 = #nv (n + 1)⌝)%I);[auto|eauto|iFrame]. iSplitL;cycle 1.
+      { iNext. iIntros "Hsize/=".
+        iApply clwp_bin_op;[eauto|]. iIntros "!>".
+        iApply clwp_value;simpl;eauto. }
+      instantiate (1:=(λ n1 n2, n2 = n1 + 1)).
+      iIntros "/= !>!> %v' [Hsize ->]". iExists (n + 1). iFrame. auto. }
+    iIntros "!> %v' (%Heq & Hsize & %l2' & Hlist2 & %Hlspec2)".
+    apply Forall2_incr in Hlspec2 as ->. destruct v';simpl in *;subst;simpl.
+    rewrite /stack_fill_item/=.
+    iApply clwp_value;[instantiate (1:=(_,⟪_,_⟫%V));eauto|].
+    iExists _. simpl.
+    iDestruct (is_heap_list_shift with "Hlist") as %->;simpl.
+    iDestruct (is_heap_list_shift with "Hlist2") as %->;simpl.
+    do 2 (iSplitR;[eauto|]). iFrame. iExists _,_. iFrame. auto.
+  Qed.
+  
+End list_client.

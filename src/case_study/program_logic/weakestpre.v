@@ -600,6 +600,16 @@ Section proofmode_classes.
   Implicit Types v : val Λ.
   Implicit Types e : expr Λ.
 
+  Global Instance frame_wp' p s c E e R Φ Ψ `{ind: !GenIndependent2Ω Ω c R} :
+    (∀ v, Frame p (R) (Φ v) (Ψ v)) →
+    Frame p (R) (WP e @ s; ↑c; E {{ Φ }}) (WP e @ s; ↑c; E {{ Ψ }}) | 2.
+  Proof.
+    rewrite /Frame=> HR.
+    rewrite ind.
+    rewrite bnextgen_bounded_ind_if_always.
+    rewrite wp_frame_l. apply wp_mono,HR.
+  Qed.
+
   Global Instance frame_wp p s c E e R Φ Ψ :
     (∀ v, Frame p (R) (Φ v) (Ψ v)) →
     Frame p (⚡◻{Ω ↑ c} R) (WP e @ s; ↑c; E {{ Φ }}) (WP e @ s; ↑c; E {{ Ψ }}) | 2.
