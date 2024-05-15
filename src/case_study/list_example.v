@@ -88,7 +88,7 @@ Section list_prec.
     simpl. iIntros (c Hc) "HP".
     rewrite -next_state_eq. iModIntro. auto.
   Qed.
-
+  
   #[global] Instance is_heap_list_nat_ind_intro' hd xs c
     : IntoInextgen Ω c _ _ := is_heap_list_nat_ind_intro hd xs c.
 
@@ -271,7 +271,7 @@ Section list_client.
     - destruct l1;[done|].
       apply Forall2_cons in Hforall as [->Hforall].
       simpl. f_equiv. naive_solver.
-  Qed.
+  Qed.            
 
   Lemma list_client_example1 m l1 l2 xs1 xs2 :
     [size] m -∗

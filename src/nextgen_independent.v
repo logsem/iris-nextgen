@@ -9,26 +9,10 @@ Import uPred.
 
 (** * Independence modality *)
 
-(** When working in the model, it is convenient to be able to treat [uPred] as
-[nat → M → Prop]. But we only want to locally break the [uPred] abstraction
-this way. *)
-Local Coercion uPred_holds : uPred >-> Funclass.
-
 (* The next-gen independence modality. *)
-Local Program Definition uPred_bnextgen_ind_def {M : ucmra}
-  {C : Type} (R : relation C) (pick : C -> M -> M)
-  `{!∀ c, GenTrans (pick c)} (c : C) (P : uPred M) : uPred M :=
-  {| uPred_holds n x := P n x ∧ ((* ∀ n x, ✓{n} x -> P n x -> *) ∀ c', rc R c c' -> P n (pick c' x)) |}.
-Next Obligation.
-  intros ???????????[HP Hiff]??.
-  specialize (gen_trans_monoN (pick c) n2) as monoN.
-  split; [naive_solver eauto using uPred_mono, monoN|].
-  intros c' Hc'.
-  eapply uPred_mono;[by apply Hiff|auto..].
-  apply gen_trans_monoN;auto.
-  (* eapply Hiff;eauto. *) (* ;[etrans;eauto|]. *)
-  (* eapply cmra_includedN_le in H0;eauto. etrans;eauto. *)
-Qed.
+(* Defined on top of the nextgen base logic *)
+Local Definition uPred_bnextgen_ind_def {M : ucmra} {C : Type} (R : relation C)
+  (pick : C -> M -> M) `{!∀ c, GenTrans (pick c)} (c : C) (P : uPred M) : uPred M := (P ∧ (∀ c', ⌜rc R c c'⌝ → ⚡={ pick c' }=> P)).
 
 Local Definition uPred_bnextgen_ind_aux : seal (@uPred_bnextgen_ind_def).
 Proof. by eexists. Qed.
@@ -52,36 +36,41 @@ Section bnextgen_ind_rules.
 
   Local Arguments uPred_holds {_} !_ _ _ /.
 
-  Ltac unseal := try uPred.unseal; try rewrite !nextgen_basic.uPred_bnextgen_unseal; rewrite !uPred_bnextgen_ind_unseal !/uPred_holds /=.
+  (* Ltac unseal := try uPred.unseal; try rewrite !nextgen_basic.uPred_bnextgen_unseal; rewrite !uPred_bnextgen_ind_unseal !/uPred_holds /=. *)
+  Ltac unseal := rewrite !uPred_bnextgen_ind_unseal /= /uPred_bnextgen_ind_def.
 
   Lemma bnextgen_ind_elim c P :
     (⚡◻{ (R,pick) ↑ c } P) ⊢ P.
   Proof.
-    unseal. rewrite /uPred_bnextgen_ind_def.
-    by split;intros ???[HP Hcond].
+    unseal.
+    iIntros "HP". rewrite and_elim_l. auto.
   Qed.
 
   Lemma bnextgen_ind_mono P Q c :
     (P ⊢ Q) ->
     (⚡◻{ (R,pick) ↑ c } P) ⊢ ⚡◻{ (R,pick) ↑ c } Q.
   Proof.
-    unseal. rewrite /uPred_bnextgen_ind_def /nextgen_basic.uPred_bnextgen_def.
-    split; simpl; intros ???[HP Hcond].
-    apply H0 in HP as HQ;auto.
-    split;auto.
-    intros c' Hc'. apply H0;eauto.
-    by apply gen_trans_validN.
+    unseal.
+    iIntros (HP) "HP".
+    iSplit.
+    - rewrite and_elim_l HP//.
+    - rewrite and_elim_r.
+      iIntros (c' Hc).
+      iSpecialize ("HP" $! c' Hc).
+      iApply (bnextgen_mono with "HP");auto.
   Qed.
 
   Lemma bnextgen_ind_weaken `{!Transitive R} c' c P :
     rc R c c' ->
     (⚡◻{ (R,pick) ↑ c } P) ⊢ (⚡◻{ (R,pick) ↑ c' } P).
   Proof.
-    unseal. rewrite /uPred_bnextgen_ind_def/=.
-    split;simpl;intros???[HP Hcond].
-    split;auto.
-    intros c'' Hc'. apply Hcond.
-    etrans;eauto.
+    unseal.
+    iIntros (Hc) "HP".
+    iSplit;[rewrite and_elim_l//|].
+    rewrite and_elim_r.
+    iIntros (c'' Hc').
+    iSpecialize ("HP" $! c'' with "[%]");[etrans;eauto|].
+    auto.
   Qed.
 
   Lemma bnextgen_ind_bnextgen `{!∀ c1 c2, Decision (R c1 c2)} `{!Trichotomy R}
@@ -92,33 +81,47 @@ Section bnextgen_ind_rules.
     rc R c c' ->
     (⚡◻{ (R,pick) ↑ c } P) ⊢ ⚡={ pick c' }=> ⚡◻{ (R,pick) ↑ c } P.
   Proof.
-    unseal. rewrite /uPred_bnextgen_ind_def /nextgen_basic.uPred_bnextgen_def.
-    split; simpl; intros ???[HP Hcond].
-    split;auto. intros c'' Hc''.
-    pose proof (Trichotomy0 c' c'') as Hcases.
-    destruct Hcases as [Hc|[->|Hc]].
-    - rewrite compose_R_cond;auto.
-    - rewrite Hidemp. auto.
-    - rewrite compose_commute compose_R_cond;auto.
+    unseal. 
+    iIntros (Hc) "HP".
+    rewrite -bnextgen_and.
+    iSplit.
+    - rewrite and_elim_r.
+      iSpecialize ("HP" $! c' Hc). auto.
+    - iApply bnextgen_forall. iIntros (c'').
+      rewrite bnextgen_impl_plain.
+      iIntros (Hc').
+      rewrite bnextgen_compose and_elim_r.
+      pose proof (Trichotomy0 c' c'') as Hcases.
+      destruct Hcases as [Hc''|[->|Hc'']].
+      + iSpecialize ("HP" $! c' Hc).
+        iApply bnextgen_extensional_equiv;[|iFrame].
+        intros;simpl. rewrite compose_R_cond;auto.
+      + iSpecialize ("HP" $! c'' Hc).
+        iApply bnextgen_extensional_equiv;[|iFrame].
+        intros;simpl. rewrite Hidemp. auto.
+      + iSpecialize ("HP" $! c'' Hc').
+        iApply bnextgen_extensional_equiv;[|iFrame].
+        intros;simpl. rewrite compose_commute compose_R_cond;auto.
   Qed.
 
   Lemma bnextgen_ind_intro P c :
     (∀ c', rc R c c' -> P ⊢ ⚡={ pick c' }=> P) ->
     P ⊢ ⚡◻{ (R,pick) ↑ c } P.
   Proof.
-    unseal. rewrite /uPred_bnextgen_ind_def /nextgen_basic.uPred_bnextgen_def.
-    split;simpl;intros ??? HP.
-    split;auto.
-    intros c' Hrc.
-    apply H0 in Hrc. apply Hrc;auto.
+    unseal.
+    iIntros (Hcond) "HP".
+    iSplit;auto.
+    iIntros (c' Hc).
+    rewrite {1}Hcond;eauto.
   Qed.
           
   Lemma bnextgen_ind_plainly P c :
     ■ P ⊢ ⚡◻{ (R,pick) ↑ c } ■ P.
   Proof.
-    unseal. rewrite /uPred_bnextgen_ind_def /nextgen_basic.uPred_bnextgen_def.
-    split;simpl;intros ??? HP.
-    split;auto.
+    unseal.
+    iIntros "#HP". iSplit;auto.
+    iIntros (c' Hc).
+    by iApply bnextgen_intro_plainly.
   Qed.
 
   Lemma bnextgen_ind_from_plainly P c :
@@ -134,26 +137,48 @@ Section bnextgen_ind_rules.
   Lemma bnextgen_ind_and P Q c :
     (⚡◻{ (R,pick) ↑ c } P) ∧ (⚡◻{ (R,pick) ↑ c } Q) ⊢ ⚡◻{ (R,pick) ↑ c } P ∧ Q.
   Proof.
-    unseal. rewrite /uPred_bnextgen_ind_def /nextgen_basic.uPred_bnextgen_def.
-    split;simpl; intros ??? [[HP HPc][HQ HQc]].
-    split;auto.
+    unseal.
+    iIntros "HP".
+    iSplit.
+    - iSplit;[rewrite !and_elim_l//|rewrite and_elim_r and_elim_l//].
+    - iIntros (c' Hc).
+      rewrite -bnextgen_and.
+      iSplit.
+      + rewrite and_elim_l and_elim_r.
+        iApply "HP". auto.
+      + rewrite !and_elim_r.
+        iApply "HP";auto.
   Qed.
     
   Lemma bnextgen_ind_forall {A : Type} (P : A -> uPred M) c :
     (∀ x, ⚡◻{ (R,pick) ↑ c } P x) ⊢ ⚡◻{ (R,pick) ↑ c } ∀ x, P x.
   Proof.
-    unseal. rewrite /uPred_bnextgen_ind_def.
-    split;simpl;intros ??? HP.
-    split;[intros a;naive_solver|].
-    intros c' Hcr a'. naive_solver.
+    unseal.
+    iIntros "HP".
+    iSplit.
+    - iIntros (x).
+      iSpecialize ("HP" $! x).
+      rewrite and_elim_l;auto.
+    - iIntros (c' Hc).
+      iApply bnextgen_forall. iIntros (x).
+      iSpecialize ("HP" $! x).
+      rewrite and_elim_r.
+      iApply "HP";auto.
   Qed.
 
   Lemma bnextgen_ind_later (P : uPred M) c :
     (▷ ⚡◻{ (R,pick) ↑ c } P) ⊣⊢ (⚡◻{ (R,pick) ↑ c } ▷ P).
   Proof.
-    unseal. rewrite /uPred_bnextgen_ind_def.
-    split;simpl;intros ?? HP.
-    destruct n;auto. naive_solver.
+    unseal.
+    iSplit; iIntros "HP".
+    - iSplit;[rewrite and_elim_l//|].
+      iIntros (c' Hc). iApply bnextgen_later.
+      rewrite and_elim_r. iNext.
+      iApply "HP";auto.
+    - iSplit;[rewrite and_elim_l//|].
+      rewrite and_elim_r.
+      iIntros (c' Hc). iApply bnextgen_later.
+      iApply "HP";auto.
   Qed.
 
   Lemma bnextgen_ind_idemp (P : uPred M) c
@@ -163,18 +188,32 @@ Section bnextgen_ind_rules.
     `{compose_commute: !∀ c1 c2 x, pick c1 (pick c2 x) ≡ pick c2 (pick c1 x) } :
     (⚡◻{ (R,pick) ↑ c } P) ⊣⊢ (⚡◻{ (R,pick) ↑ c } ⚡◻{ (R,pick) ↑ c } P).
   Proof.
-    unseal. rewrite /uPred_bnextgen_ind_def.
-    split;simpl;intros ???.
-    split;intros [HP Hc].
-    - split;auto. intros.
-      split;auto. intros.
-      pose proof (Trichotomy0 c' c'0) as Hcases.
-      destruct Hcases as [Hc'|[->|Hc']].
-      + rewrite compose_R_cond;auto.
-      + rewrite Hidemp;auto.
-      + rewrite compose_commute compose_R_cond;auto.
-    - destruct HP as [HP Hc'].
-      split;auto.
+    unseal.
+    iSplit.
+    - iIntros "HP".
+      iSplit;auto.
+      iIntros (c' Hc).
+      rewrite {1}and_elim_r.
+      iApply bnextgen_and.
+      iSplit;[iApply "HP";auto|].
+      rewrite bnextgen_forall.
+      iIntros (c'').
+      rewrite bnextgen_impl_plain.
+      iIntros (Hc').
+      iApply bnextgen_compose.
+      pose proof (Trichotomy0 c' c'') as Hcases.
+      destruct Hcases as [Hc''|[->|Hc'']].
+      + iSpecialize ("HP" $! c' Hc).
+        iApply bnextgen_extensional_equiv;[|iFrame].
+        intros;simpl. rewrite compose_R_cond;auto.
+      + iSpecialize ("HP" $! c'' Hc).
+        iApply bnextgen_extensional_equiv;[|iFrame].
+        intros;simpl. rewrite Hidemp. auto.
+      + iSpecialize ("HP" $! c'' Hc').
+        iApply bnextgen_extensional_equiv;[|iFrame].
+        intros;simpl. rewrite compose_commute compose_R_cond;auto.
+    - iIntros "HP".
+      rewrite and_elim_l. auto.
   Qed.
 
   Global Instance bnextgen_ind_mono' c :
@@ -185,17 +224,10 @@ Section bnextgen_ind_rules.
     NonExpansive (uPred_bnextgen_ind R pick c).
   Proof.
     intros ??? Hne.
-    unseal.
-    split;intros.
-    apply Hne in H1 as Hne';auto.
-    rewrite /uPred_bnextgen_ind_def /=.
-    split;intros;split;try naive_solver;intros ??.
-    - apply (gen_trans_validN (pick c')) in H1.
-      apply Hne in H1;auto. apply H1.
-      apply H2. auto.
-    - apply (gen_trans_validN (pick c')) in H1.
-      apply Hne in H1;auto. apply H1.
-      apply H2. auto.
+    unseal. f_equiv;auto.
+    apply forall_ne;rewrite /pointwise_relation=>a.
+    apply impl_ne;auto.
+    f_equiv. auto.
   Qed.
 
   Global Instance bnextgen_ind_proper c :
@@ -213,78 +245,68 @@ Section bnextgen_ind_rules.
 
   Local Arguments uPred_holds {_} !_ _ _ /.
 
-  Ltac unseal := try uPred.unseal; try rewrite !nextgen_basic.uPred_bnextgen_unseal; rewrite !uPred_bnextgen_ind_unseal !/uPred_holds /=.
+  Ltac unseal := rewrite !uPred_bnextgen_ind_unseal /= /uPred_bnextgen_ind_def.
 
   Global Instance bnextgen_ind_mod_persistent P c : Persistent P -> Persistent (⚡◻{ (R,pick) ↑ c } P).
-  Proof.
-    rewrite /Persistent.
-    unseal.
-    rewrite /uPred_bnextgen_ind_def /upred.uPred_persistently_def /=.
-    inversion 1. split. simpl in *.
-    intros n x Hx [Hp Hcond].
-    apply uPred_in_entails in Hp as Hpcore;auto.
-    split;auto. intros c' Hc'.
-    apply Hcond in Hc' as Hcond'.
-    apply uPred_in_entails in Hcond';[|apply gen_trans_validN;auto;apply _].
-    pose proof (cmra_morphism_pcore (pick c') x) as Hcore.
-    rewrite !cmra_pcore_core in Hcore. simpl in Hcore.
-    inversion Hcore;subst. rewrite H3. auto.
-  Qed.
+  Proof. unseal. apply _. Qed.
 
   Lemma bnextgen_ind_always (P : uPred M) c :
     (□ ⚡◻{ (R,pick) ↑ c } P) ⊣⊢ (⚡◻{ (R,pick) ↑ c } □ P).
   Proof.
-    rewrite /bi_intuitionistically /bi_affinely.
-    unseal. rewrite /uPred_bnextgen_ind_def. simpl.
-    split;simpl;intros ???.
-    split;simpl.
-    - intros [?[HP Hc]].
-      split;auto. intros c' Hc'.
-      pose proof (cmra_morphism_pcore (pick c') x) as Hcore.
-      rewrite !cmra_pcore_core in Hcore. simpl in Hcore.
-      inversion Hcore;subst. rewrite -H4. auto.
-    - intros [[_ HP]Hc].
-      do 2 (split;auto). intros c' Hc'.
-      pose proof (cmra_morphism_pcore (pick c') x) as Hcore.
-      rewrite !cmra_pcore_core in Hcore. simpl in Hcore.
-      inversion Hcore;subst. rewrite H3. naive_solver.
+    unseal.
+    iSplit.
+    - iIntros "#HP".
+      iSplit.
+      + rewrite and_elim_l//.
+      + rewrite and_elim_r.
+        iIntros (c' Hc).
+        iApply bnextgen_persistently.
+        iModIntro. iApply "HP";auto.
+    - iIntros "HP". rewrite intuitionistically_and.
+      iSplit.
+      + rewrite and_elim_l//.
+      + rewrite and_elim_r.
+        iIntros (c' Hc).
+        iSpecialize ("HP" $! c' Hc).
+        by iApply bnextgen_persistently.
   Qed.
 
   Lemma bnextgen_ind_sep P Q c :
     (⚡◻{ (R,pick) ↑ c } P) ∗ (⚡◻{ (R,pick) ↑ c } Q) ⊢ ⚡◻{ (R,pick) ↑ c } P ∗ Q.
   Proof.
-    unseal. rewrite /uPred_bnextgen_ind_def /nextgen_basic.uPred_bnextgen_def.
-    split;simpl; intros ??? [x1 [x2 [Heq [[HP HPx] [HQ HQx]]]]].
-    split;[naive_solver|].
-    (* intros ?? Hx0 [x1' [x2' [Heq' [HP' HQ']]]]. *)
-    intros c' Hrc.
-    exists (pick c' x1),(pick c' x2). rewrite -cmra_morphism_op.
-    rewrite Heq. split;[|naive_solver]. auto.
+    unseal.
+    iIntros "[HP HQ]".
+    iSplit;[rewrite !and_elim_l;iFrame|].
+    rewrite !and_elim_r.
+    iIntros (c' Hc).
+    iSpecialize ("HP" $! c' Hc).
+    iSpecialize ("HQ" $! c' Hc).
+    iModIntro. iFrame.
   Qed.
 
   Lemma bnextgen_ind_wand_plainly (P Q : uPred M) c :
     (⚡◻{ (R,pick) ↑ c } ■ P -∗ Q) ⊣⊢ (■ P -∗ ⚡◻{ (R,pick) ↑ c } Q).
   Proof.
-    unseal. rewrite /uPred_bnextgen_ind_def.
-    split;simpl;intros ?? Hx.
-    split.
-    - intros Hcond ?? Hle Hv HP.
-      edestruct Hcond as [HQ Hng].
-      split;[naive_solver|].
-      intros c' Hc.
-      apply (gen_trans_validN (pick c')) in Hv as Hvg.
-      rewrite cmra_morphism_op in Hvg.
-      apply Hng in Hvg;auto.
-      by rewrite cmra_morphism_op.
-    - intros Hcond. split.
-      + intros n' x' Hle Hv HP. naive_solver.
-      + intros c' Hc n' x' Hle Hvg HP.
-        assert (✓{n'} (x ⋅ ε)) as Hv';
-          [rewrite right_id;eapply cmra_validN_le;eauto|].
-        specialize (Hcond n' ε Hle Hv' HP) as [HQ Hcond].
-        apply Hcond in Hc. rewrite right_id in Hc.
-        eapply uPred_mono;[apply Hc|..|lia].
-        exists x';auto.
+    unseal.
+    iSplit.
+    - iIntros "HP".
+      iIntros "#HP'".
+      iSplit.
+      + rewrite and_elim_l.
+        iApply "HP";auto.
+      + iIntros (c' Hc). rewrite and_elim_r.
+        iSpecialize ("HP" $! c' Hc).
+        iModIntro. iApply "HP";auto.
+    - iIntros "HP". iSplit.
+      + iIntros "#HP'".
+        iSpecialize ("HP" with "HP'").
+        rewrite and_elim_l//.
+      + iIntros (c' Hc).
+        iApply bnextgen_wand_plainly.
+        iIntros "HP'".
+        iSpecialize ("HP" with "HP'").
+        rewrite and_elim_r.
+        iApply "HP";auto.
   Qed.
 
   Lemma bnextgen_ind_impl (P Q : uPred M) c :

@@ -248,6 +248,21 @@ Section bnextgen_rules.
   Global Instance bnextgen_proper :
     Proper ((≡) ==> (≡)) (uPred_bnextgen f) := ne_proper _.
 
+  Lemma bnextgen_wand_plain P `{!Plain P, !Absorbing P} Q :
+    (⚡={f}=> (P -∗ Q)) ⊣⊢ (P -∗ ⚡={f}=> Q).
+  Proof.
+    rewrite -(plain_plainly P).
+    iApply bnextgen_wand_plainly.
+  Qed.
+
+  Lemma bnextgen_impl_plain P `{!Plain P, !Absorbing P} Q :
+    (⚡={f}=> (P → Q)) ⊣⊢ (P → ⚡={f}=> Q).
+  Proof.
+    rewrite -(plain_plainly P).
+    rewrite !impl_wand_plainly.
+    iApply bnextgen_wand_plainly. 
+  Qed.
+
   Lemma bnextgen_later P :
     ▷ (⚡={f}=> P) ⊣⊢ ⚡={f}=> (▷ P).
   Proof. unseal. done. Qed.
@@ -587,21 +602,6 @@ Section into_bnextgen.
     iApply bnextgen_wand_plainly.
     rewrite H.
     done.
-  Qed.
-
-  Lemma bnextgen_wand_plain P `{!Plain P, !Absorbing P} Q :
-    (⚡={f}=> (P -∗ Q)) ⊣⊢ (P -∗ ⚡={f}=> Q).
-  Proof.
-    rewrite -(plain_plainly P).
-    iApply bnextgen_wand_plainly.
-  Qed.
-
-  Lemma bnextgen_impl_plain P `{!Plain P, !Absorbing P} Q :
-    (⚡={f}=> (P → Q)) ⊣⊢ (P → ⚡={f}=> Q).
-  Proof.
-    rewrite -(plain_plainly P).
-    rewrite !impl_wand_plainly.
-    iApply bnextgen_wand_plainly. 
   Qed.
 
   (* Lemma bnextgen_wand_plain_2 P `{!Plain P, !Absorbing P} Q : *)
