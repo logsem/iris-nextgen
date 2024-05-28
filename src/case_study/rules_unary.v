@@ -494,11 +494,11 @@ Section heapG_nextgen_updates.
     intros. rewrite -next_state_eq. apply later_credits_intro.
   Qed.
 
-  Lemma stack_stack_pop_intro i l q v n
-    (Hlt : i < n) :
+  Lemma stack_stack_pop_intro i l q v n :
+    i < n ->
     i @@ l ↦{q} v ⊢ ⚡={next_state Ω (lifetime_stack n)}=> i @@ l ↦{q} v.
   Proof.
-    iIntros "Hl".
+    iIntros (Hlt) "Hl".
     rewrite /mapsto seal_eq /gen_heap.mapsto_def
       /ghost_map.ghost_map_elem seal_eq /ghost_map.ghost_map_elem_def
       next_state_unseal /next_state_def.
@@ -510,6 +510,19 @@ Section heapG_nextgen_updates.
     rewrite /gMapTrans_frag_lift /=.
     rewrite map_imap_insert /= agree_option_map_to_agree /=.
     rewrite /stack_location_cut bool_decide_true // /=.
+  Qed.
+
+  Lemma stack_stack_ind_intro i l q v :
+    i @@ l ↦{q} v ⊢ ⚡◻{Ω ↑ ^(S i)} i @@ l ↦{q} v.
+  Proof.
+    apply bnextgen_bounded_ind_GenIndependent_intro.
+    iIntros (i' Hi) "Hi".
+    inversion Hi;subst.
+    - inversion H0;subst.
+      rewrite -(next_state_eq _).
+      by iApply stack_stack_pop_intro;[lia|].
+    - rewrite -(next_state_eq _).
+      by iApply stack_stack_pop_intro;[lia|].
   Qed.
 
   Lemma next_state_heap_inv_intro c N P :
@@ -541,6 +554,17 @@ Section heapG_nextgen_updates.
     - simpl. do 2 constructor. lia.
   Qed.
 
+  Lemma next_state_stack_inv_ind_intro N n1 P :
+    inv N (^n1) P ⊢ ⚡◻{Ω ↑ ^n1} inv N (^n1) P.
+  Proof.
+    apply bnextgen_bounded_ind_GenIndependent_intro.
+    intros ? Hcr. rewrite -next_state_eq.
+    inversion Hcr;subst.
+    - inversion H0;subst.
+      apply next_state_stack_inv_intro. lia.
+    - apply next_state_stack_inv_intro. lia.
+  Qed.
+
   (* Repeating the following two instances here make typeclass resolution much faster *)
   Lemma next_state_id n P :
     ((⚡={next_state Ω n}=> P) ⊢ ⚡={next_state Ω n}=> P).
@@ -570,7 +594,10 @@ Section heapG_nextgen_updates.
     : IntoInextgen _ _ _ _ := heap_stack_ind_intro l q v n.
   #[global] Instance heap_inv_ind_intro c N P
     : IntoInextgen _ _ _ _ := next_state_heap_inv_ind_intro c N P.
-  
+  #[global] Instance stack_stack_ind_intro' l q v n
+    : IntoInextgen _ _ _ _ := stack_stack_ind_intro l q v n.
+  #[global] Instance stack_inv_ind_intro c N P
+    : IntoInextgen _ _ _ _ := next_state_stack_inv_ind_intro c N P.
   #[global] Instance later_credits_ind_intro' m n
     : IntoInextgen _ _ _ _ := later_credits_ind_intro m n.
 
