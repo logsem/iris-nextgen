@@ -4,7 +4,7 @@ Next generation modality for Iris.
 
 ## Development
 
-The `main` branch is currently developed using Coq version 8.17.1.
+The `main` branch is currently developed using Coq version 8.17.1. and coq-equations version 1.3+8.17
 
 ### Clone
 
