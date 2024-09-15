@@ -189,22 +189,4 @@ Section ucore.
     intros [= <-]. done.
   Qed.
 
-  Lemma ucore_idemp (x cx : A) :
-    ucore x = Some cx → ucore cx ≡ Some cx.
-  Proof.
-    unfold ucore.
-    destruct (has_largest_core x) as [(pa & ? & ? & ?)|]; last done.
-    intros [= <-].
-    destruct (has_largest_core pa) as [(ppa & ? & ? & ?)|]; simpl.
-    - f_equiv.
-      assert (ppa ⋅ x ≡ x) as eq.
-      { rewrite -{1}H0. rewrite assoc. rewrite H3. done. }
-      (* rewrite -H3 in H0. *)
-      destruct (H1 ppa); [ |done| | ].
-      { rewrite comm. rewrite eq. rewrite -H0. rewrite comm. done. }
-      + done.
-      + admit.
-    - 
-  Admitted.
-
 End ucore.
