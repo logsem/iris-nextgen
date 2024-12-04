@@ -29,7 +29,21 @@ git submodule update --remote --merge
 
 ### Organization 
 
-Below is a lookup table for the definitions in the paper.
+# Below is a high level description of the file structure, and select files.
+
+- `case_study`: contains files specific to StackLang (definition, program logic, and examples).
+
+- `case_study/program_logic`: contains language generic files related to the construction of a program logics that use the nextgen modality.
+
+- `lib`: contains the construction of invariants in the presence of the nextgen modality.
+
+- `gmap_view_transformation.v`: provides a generic methodology to define transformations over the map resource algebra.
+
+- `nextgen_soundness.v`: proves soundness of the nextgen modality as it occurs in the weakest precondition.
+
+- `nextgen_independent.v`: defines the independence modality
+
+# Below is a lookup table for the definitions in the paper.
 
 | Paper                                            | File or Folder                                                  | Name                                                     |
 |--------------------------------------------------|-----------------------------------------------------------------|----------------------------------------------------------|
