@@ -26,6 +26,14 @@ The following git command updates all the submodules:
 ```
 git submodule update --remote --merge
 ```
+### Building the proofs 
+
+We recommend installing the dependencies using [opam](https://opam.ocaml.org/)
+
+Once you have installed `Coq 8.17.1` and `coq-equations 1.3+8.17`, you can build the project by running:
+```
+make -jN  # replace N with the number of CPU cores of your machine
+```
 
 ### Organization 
 
