@@ -29,7 +29,7 @@ git submodule update --remote --merge
 
 ### Organization 
 
-# Below is a high level description of the file structure, and select files.
+#### Below is a high level description of the file structure, and select files.
 
 - `case_study`: contains files specific to StackLang (definition, program logic, and examples).
 
@@ -43,7 +43,7 @@ git submodule update --remote --merge
 
 - `nextgen_independent.v`: defines the independence modality
 
-# Below is a lookup table for the definitions in the paper.
+#### Below is a lookup table for the definitions in the paper.
 
 | Paper                                            | File or Folder                                                  | Name                                                     |
 |--------------------------------------------------|-----------------------------------------------------------------|----------------------------------------------------------|
