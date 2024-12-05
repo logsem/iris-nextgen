@@ -58,12 +58,26 @@ make -jN  # replace N with the number of CPU cores of your machine
 | StackLang syntax (Fig 3)                         | `case_study/stack_lang.v`                                       | `expr`                                                   |
 | StackLang step relation (Page 9, Fig 4)          | `case_study/stack_lang.v`                                       | `head_step`                                              |
 | Points-to predicates (Page 9)                    | `case_study/rules_unary.v`                                      | `l ↦ v`, `i @@ l ↦ v`, `[size] n`                       |
-| Nextgen modality for stack (Page 9)              | `case_study/rules_unary.v`                                      | `next_state`                                             |
-| Rules about stack nextgen (Page 9)               | `case_study/rules_unary.v`                                      | Section `heapG_nextgen_updates`                          |
-| Weakest Precondition definition (Page 10, Fig 5) | `case_study/program_logic/weakestpre.v`                         | `wp_pre`                                                 |
+| Nextgen modality for stack (Page 10)             | `case_study/rules_unary.v`                                      | `next_state`                                             |
+| Rules about stack nextgen (Page 10)              | `case_study/rules_unary.v`                                      | `Section heapG_nextgen_updates`                          |
+| cut-heap-intro | `case_study/rules_unary.v` | `heap_stack_intro` |
+| cut-stack-intro | `case_study/rules_unary.v` | `stack_stack_pop_intro` |
+| cut-size-intro | `case_study/rules_unary.v` | `stack_size_frag_intro` |
+| Weakest Precondition definition (Fig 5)          | `case_study/program_logic/weakestpre.v`                         | `wp_pre`                                                 |
 | Adequacy (Theorem 4.1)                           | `case_study/program_logic/adequacy.v` and `nextgen_soundness.v` | `wp_adequacy_no_lc_single_thread`                        |
-| Independence modality (Page 10)                  | `nextgen_independent` and `case_study/rules_unary.v`            | `uPred_bnextgen_ind` and Section `heapG_nextgen_updates` |
-| Frame rule (Page 10)                             | `case_study/program_logic/weakestpre.v`                         | `wp_frame_l`                                             |
+| Independence modality (Page 11)                  | `nextgen_independent.v`            | `uPred_bnextgen_ind` |
+| ind-intro | `nextgen_independent.v` | `bnextgen_bounded_ind_GenIndependent_intro` |
+| cut-ind-intro | `nextgen_independent.v` | `bnextgen_bounded_ind_bnextgen_intro` |
+| ind-elim | `nextgen_independent.v` | `bnextgen_bounded_ind_elim` |
+| ind-weaken | `nextgen_independent.v` | `bnextgen_bounded_ind_weaken` |
+| ind-heap-intro | `case_study/rules_unary.v` | `heap_stack_ind_intro` |
+| ind-stack-intro | `case_study/rules_unary.v` | `stack_stack_ind_intro` |
+| ind-size-intro | `case_study/rules_unary.v` | `stack_size_frag_ind_intro` |
+| Frame rule (Page 11)                             | `case_study/program_logic/weakestpre.v`                         | `wp_frame_l`                                             |
 | Context-local Weakest Precondition (Page 11)     | `case_study/program_logic/cl_weakestpre.v`                      | `clwp`                                                   |
-| Invariants and the Nextgen modality              | `lib/invariants`, `lib/wsat` and `case_study/rules_unary.v`     | `own_inv_alloc` and Section `heapG_nextgen_updates`      |
+| ClSalloc | `case_study/program_logic/cl_weakestpre.v` | `clwp_stack_alloc` |
+| Return | `case_study/rules_unary.v` | `wp_return` |
+| inv-alloc              | `lib/invariants`     | `own_inv_alloc`    |
+| cut-inv-intro | `case_study/rules_unary.v` | `next_state_stack_inv_intro` |
+| ind-inv-intro | `case_study/rules_unary.v` | `next_state_stack_inv_ind_intro` |
 
