@@ -53,31 +53,45 @@ make -jN  # replace N with the number of CPU cores of your machine
 
 #### Below is a lookup table for the definitions in the paper.
 
-| Paper                                            | File or Folder                                                  | Name                                                     |
-|--------------------------------------------------|-----------------------------------------------------------------|----------------------------------------------------------|
-| StackLang syntax (Fig 3)                         | `case_study/stack_lang.v`                                       | `expr`                                                   |
-| StackLang step relation (Page 9, Fig 4)          | `case_study/stack_lang.v`                                       | `head_step`                                              |
-| Points-to predicates (Page 9)                    | `case_study/rules_unary.v`                                      | `l ↦ v`, `i @@ l ↦ v`, `[size] n`                       |
-| Nextgen modality for stack (Page 10)             | `case_study/rules_unary.v`                                      | `next_state`                                             |
-| Rules about stack nextgen (Page 10)              | `case_study/rules_unary.v`                                      | `Section heapG_nextgen_updates`                          |
-| cut-heap-intro | `case_study/rules_unary.v` | `heap_stack_intro` |
-| cut-stack-intro | `case_study/rules_unary.v` | `stack_stack_pop_intro` |
-| cut-size-intro | `case_study/rules_unary.v` | `stack_size_frag_intro` |
-| Weakest Precondition definition (Fig 5)          | `case_study/program_logic/weakestpre.v`                         | `wp_pre`                                                 |
-| Adequacy (Theorem 4.1)                           | `case_study/program_logic/adequacy.v` and `nextgen_soundness.v` | `wp_adequacy_no_lc_single_thread`                        |
-| Independence modality (Page 11)                  | `nextgen_independent.v`            | `uPred_bnextgen_ind` |
-| ind-intro | `nextgen_independent.v` | `bnextgen_bounded_ind_GenIndependent_intro` |
-| cut-ind-intro | `nextgen_independent.v` | `bnextgen_bounded_ind_bnextgen_intro` |
-| ind-elim | `nextgen_independent.v` | `bnextgen_bounded_ind_elim` |
-| ind-weaken | `nextgen_independent.v` | `bnextgen_bounded_ind_weaken` |
-| ind-heap-intro | `case_study/rules_unary.v` | `heap_stack_ind_intro` |
-| ind-stack-intro | `case_study/rules_unary.v` | `stack_stack_ind_intro` |
-| ind-size-intro | `case_study/rules_unary.v` | `stack_size_frag_ind_intro` |
-| Frame rule (Page 11)                             | `case_study/program_logic/weakestpre.v`                         | `wp_frame_l`                                             |
-| Context-local Weakest Precondition (Page 11)     | `case_study/program_logic/cl_weakestpre.v`                      | `clwp`                                                   |
-| ClSalloc | `case_study/program_logic/cl_weakestpre.v` | `clwp_stack_alloc` |
-| Return | `case_study/rules_unary.v` | `wp_return` |
-| inv-alloc              | `lib/invariants`     | `own_inv_alloc`    |
-| cut-inv-intro | `case_study/rules_unary.v` | `next_state_stack_inv_intro` |
-| ind-inv-intro | `case_study/rules_unary.v` | `next_state_stack_inv_ind_intro` |
+| Paper                                        | File or Folder                                                  | Name                                        |
+|----------------------------------------------|-----------------------------------------------------------------|---------------------------------------------|
+| Definition 3.1 (Generational transformation) | `gen_trans.v`                                                   | `GenTrans`                                  |
+| bng-own (Fig 2)                              | `basic_nextgen.v`                                               | `bnextgen_ownM`                             |
+| bng-mono (Fig 2)                             | `basic_nextgen.v`                                               | `bnextgen_mono`                             |
+| bng-conj (Fig 2)                             | `basic_nextgen.v`                                               | `bnextgen_and`                              |
+| bng-disj (Fig 2)                             | `basic_nextgen.v`                                               | `bnextgen_or`                               |
+| bng-later (Fig 2)                            | `basic_nextgen.v`                                               | `bnextgen_later`                            |
+| bng-exists (Fig 2)                           | `basic_nextgen.v`                                               | `bnextgen_exist`                            |
+| bng-forall (Fig 2)                           | `basic_nextgen.v`                                               | `bnextgen_forall`                           |
+| bng-sep (Fig 2)                              | `basic_nextgen.v`                                               | `bnextgen_sep_2`                            |
+| bng-pers (Fig 2)                             | `basic_nextgen.v`                                               | `bnextgen_pers`                             |
+| bng-trans (Fig 2)                            | `basic_nextgen.v`                                               | `bnextgen_compose`                          |
+| bng-idemp (Fig 2)                            | `basic_nextgen.v`                                               | `bnextgen_idemp`                            |
+| bng-plainly (Fig 2)                          | `basic_nextgen.v`                                               | `bnextgen_plainly`                          |
+| bng-sound                                    | `basic_nextgen.v`                                               | `bnextgen_plain_soundness`                  |
+| StackLang syntax (Fig 3)                     | `case_study/stack_lang.v`                                       | `expr`                                      |
+| StackLang step relation (Page 9, Fig 4)      | `case_study/stack_lang.v`                                       | `head_step`                                 |
+| Points-to predicates (Page 9)                | `case_study/rules_unary.v`                                      | `l ↦ v`, `i @@ l ↦ v`, `[size] n`           |
+| Nextgen modality for stack (Page 10)         | `case_study/rules_unary.v`                                      | `next_state`                                |
+| Rules about stack nextgen (Page 10)          | `case_study/rules_unary.v`                                      | `Section heapG_nextgen_updates`             |
+| cut-heap-intro                               | `case_study/rules_unary.v`                                      | `heap_stack_intro`                          |
+| cut-stack-intro                              | `case_study/rules_unary.v`                                      | `stack_stack_pop_intro`                     |
+| cut-size-intro                               | `case_study/rules_unary.v`                                      | `stack_size_frag_intro`                     |
+| Weakest Precondition definition (Fig 5)      | `case_study/program_logic/weakestpre.v`                         | `wp_pre`                                    |
+| Adequacy (Theorem 4.1)                       | `case_study/program_logic/adequacy.v` and `nextgen_soundness.v` | `wp_adequacy_no_lc_single_thread`           |
+| Independence modality (Page 11)              | `nextgen_independent.v`                                         | `uPred_bnextgen_ind`                        |
+| ind-intro                                    | `nextgen_independent.v`                                         | `bnextgen_bounded_ind_GenIndependent_intro` |
+| cut-ind-intro                                | `nextgen_independent.v`                                         | `bnextgen_bounded_ind_bnextgen_intro`       |
+| ind-elim                                     | `nextgen_independent.v`                                         | `bnextgen_bounded_ind_elim`                 |
+| ind-weaken                                   | `nextgen_independent.v`                                         | `bnextgen_bounded_ind_weaken`               |
+| ind-heap-intro                               | `case_study/rules_unary.v`                                      | `heap_stack_ind_intro`                      |
+| ind-stack-intro                              | `case_study/rules_unary.v`                                      | `stack_stack_ind_intro`                     |
+| ind-size-intro                               | `case_study/rules_unary.v`                                      | `stack_size_frag_ind_intro`                 |
+| Frame rule (Page 11)                         | `case_study/program_logic/weakestpre.v`                         | `wp_frame_l`                                |
+| Context-local Weakest Precondition (Page 11) | `case_study/program_logic/cl_weakestpre.v`                      | `clwp`                                      |
+| ClSalloc                                     | `case_study/program_logic/cl_weakestpre.v`                      | `clwp_stack_alloc`                          |
+| Return                                       | `case_study/rules_unary.v`                                      | `wp_return`                                 |
+| inv-alloc                                    | `lib/invariants`                                                | `own_inv_alloc`                             |
+| cut-inv-intro                                | `case_study/rules_unary.v`                                      | `next_state_stack_inv_intro`                |
+| ind-inv-intro                                | `case_study/rules_unary.v`                                      | `next_state_stack_inv_ind_intro`            |
 
