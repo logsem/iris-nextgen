@@ -175,6 +175,10 @@ Section bnextgen_rules.
     ■ P ⊣⊢ ⚡={f}=> ■ P.
   Proof. unseal. split. done. Qed.
 
+  Lemma bnextgen_intro_plainly P :
+    ■ P ⊢ ⚡={f}=> ■ P.
+  Proof. unseal. split. done. Qed.
+
   Lemma bnextgen_plainly_1 P :
     ■ P ⊢ ⚡={f}=> ■ P.
   Proof. rewrite -bnextgen_plainly. done. Qed.
