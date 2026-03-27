@@ -3,7 +3,7 @@ From iris.algebra Require Export list excl_auth.
 From nextgen.case_study.program_logic Require Import CC_ectx_lifting
      CC_ectxi_language CC_ectx_lifting weakestpre gen_heap_lifting cl_weakestpre.
 From nextgen.case_study Require Export stack_lang stack_transform.
-From iris.proofmode Require Import tactics.
+From iris.proofmode Require Import ltac_tactics.
 From stdpp Require Import fin_maps.
 From nextgen Require Import nextgen_basic gen_trans gmap_view_transformation nextgen_id.
 From stdpp Require Import binders.

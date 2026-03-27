@@ -1,4 +1,4 @@
-From iris.proofmode Require Import classes tactics.
+From iris.proofmode Require Import classes ltac_tactics.
 From iris.base_logic.lib Require Export iprop own invariants.
 From iris.prelude Require Import options.
 
@@ -41,16 +41,17 @@ Class pick_transform_rel (A : cmra) : Type := TransRel {
   CR : relation C;
   C_bot : C;                                
   C_total : Trichotomy CR;
-  C_pre :> Transitive CR;
+  C_pre :: Transitive CR;
   C_pick : C -> (A -> A);
-  C_pick_cmramorphism :> ∀ (c : C), CmraMorphism (C_pick c);
-  C_pick_idemp :> ∀ (c : C), Idemp equiv (C_pick c);
-  C_indep :> ∀ (c1 c2 : C), Indep equiv (C_pick c1) (C_pick c2);
-  C_comp :> ComposeSubsume equiv CR C_pick;
-  C_dec :> ∀ (c1 c2 : C), Decision (CR c1 c2);
-  C_eq_dec :> EqDecision C; }.
+  C_pick_cmramorphism :: ∀ (c : C), CmraMorphism (C_pick c);
+  C_pick_idemp :: ∀ (c : C), Idemp equiv (C_pick c);
+  C_indep :: ∀ (c1 c2 : C), Indep equiv (C_pick c1) (C_pick c2);
+  C_comp :: ComposeSubsume equiv CR C_pick;
+  C_dec :: ∀ (c1 c2 : C), Decision (CR c1 c2);
+  C_eq_dec :: EqDecision C; }.
 
 Global Existing Instance C_pick_cmramorphism.
+
 (* #[global] Instance cmra_morphism_pick `{Hpre : pick_transform_rel A} : ∀ c', CmraMorphism (C_pick c') := *)
 (*   Hpre.(C_pick_cmramorphism). *)
 

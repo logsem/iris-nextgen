@@ -12,8 +12,8 @@ From nextgen Require Export utils nextgen_soundness nextgen_persistently
   nextgen_basic nextgen_pointwise nextgen_independent.
 
 Class irisGS_gen (hlc : has_lc) (Λ : language) (Σ : gFunctors) (Ω : gTransformations Σ) (A : cmra) := IrisG {
-  iris_pick :> pick_transform_rel A;
-  iris_invGS :> invGIndS_gen hlc Σ Ω A iris_pick;
+  #[global] iris_pick :: pick_transform_rel A;
+  #[global] iris_invGS :: invGIndS_gen hlc Σ Ω A iris_pick;
                                                                                                
   (** The state interpretation is an invariant that should hold in
   between each step of reduction. Here [Λstate] is the global state,
@@ -179,7 +179,7 @@ Proof.
   unfold bnextgen_option. case_match;
     [do 5 ((apply nextgen_basic.bnextgen_ne) || f_contractive || f_equiv)
     | do 3 (f_contractive || f_equiv)].
-  all: rewrite IH; [done|lia|]; intros v'; eapply dist_le; [apply HΦ|lia].
+  all: rewrite IH; [done|done|]; intros v'; eapply dist_le; [apply HΦ| by apply SIdx.lt_le_incl].
 Qed.
 Global Instance wp_proper s c E e :
   Proper (pointwise_relation _ (≡) ==> (≡)) (wp (PROP:=iProp Σ) (s,c) E e).

@@ -1,5 +1,5 @@
 From iris.algebra Require Import functions gmap view gmap_view agree excl csum coPset gset.
-From iris.proofmode Require Import classes tactics.
+From iris.proofmode Require Import classes ltac_tactics.
 From iris.base_logic.lib Require Export iprop own.
 From iris.prelude Require Import options.
 
@@ -291,7 +291,7 @@ Section nextgen_inG.
     eexists _.
     split.
     - rewrite map_lookup_imap.
-      rewrite lookup_singleton.
+      rewrite lookup_singleton_eq.
       simpl.
       f_equiv. reflexivity.
     - apply Some_included. left.
@@ -324,7 +324,7 @@ Section nextgen_inG.
     eexists _.
     split.
     - rewrite map_lookup_imap.
-      rewrite lookup_singleton.
+      rewrite lookup_singleton_eq.
       simpl.
       f_equiv. reflexivity.
     - apply Some_included. left.

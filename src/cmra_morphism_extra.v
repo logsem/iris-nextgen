@@ -6,7 +6,7 @@ From iris.prelude Require Import options.
 
 (* For this we require [CmraTotal A] and [CoreId b]. We could add weaker
  * requirements, but these are convenient as t.c. search can solver them. *)
-Global Instance cmra_morphism_const {A B : cmra} `{CmraTotal A}
+Global Instance cmra_morphism_const `{SI: sidx} {A B : cmra} `{!CmraTotal A}
     (b : B) `{!CoreId b} :
   b ⋅ b ≡ b →
   ✓ b →
@@ -128,7 +128,7 @@ End fmap_auth.
 
 (* NOTE: Neither [core] nor [pcore] is a [CmraMorphism]. *)
 #[global]
-Instance core_cmra_morphism `{CmraTotal A} : @CmraMorphism A _ core.
+Instance core_cmra_morphism `{SI: sidx} `{!CmraTotal A} : @CmraMorphism SI A _ core.
 Proof.
   split.
   - apply _.
@@ -140,7 +140,7 @@ Proof.
 Abort.
 
 #[global]
-Instance pcore_cmra_morphism {A : cmra} : @CmraMorphism A _ pcore.
+Instance pcore_cmra_morphism {SI: sidx} {A : cmra} : @CmraMorphism SI A _ pcore.
 Proof.
   split.
   - apply _.

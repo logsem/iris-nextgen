@@ -3,7 +3,7 @@ From iris.algebra Require Export list excl_auth.
 From nextgen.case_study.program_logic Require Import CC_ectx_lifting
      CC_ectxi_language CC_ectx_lifting weakestpre cl_weakestpre.
 From nextgen.case_study Require Export stack_lang stack_transform.
-From iris.proofmode Require Import tactics.
+From iris.proofmode Require Import ltac_tactics.
 From stdpp Require Import fin_maps.
 
 From nextgen Require Import nextgen_independent.
@@ -158,7 +158,7 @@ Section list_spec.
       iIntros "!> %l Hl /=".
       iApply clwp_value. rewrite /stack_fill_item /=.
       iApply clwp_value. simpl. iExists _. iFrame. do 2 (iSplit;[eauto|]).
-      iExists l,hd. iFrame. auto. }
+      auto. }
     iIntros "!> !> %v' (Hsize & Hlist) /=". iFrame.
   Qed.
   
@@ -235,9 +235,9 @@ Section list_spec.
         iIntros "!> %l2 Hl2 /=".
         iApply clwp_value. rewrite /stack_fill_item /=.
         iApply clwp_value. simpl. iExists _. iFrame. do 3 (iSplit;[eauto|]).
-        iExists l2,v. iFrame. auto. }
+        auto. }
       iIntros "!> !> %v' (Hsize & %Hshift2 & Hlist)". iExists _. iFrame. do 2 (iSplit;[eauto|]).
-      iExists (n' :: l'). iFrame. iPureIntro. apply Forall2_cons. split;auto.
+       iPureIntro. apply Forall2_cons. split;auto.
   Qed.
     
 End list_spec.
@@ -290,7 +290,7 @@ Section list_client.
     iIntros "/= !> !> %v (Hsize & ->)". prepare_ctx. simpl. rewrite -!/(heap_map_list _ _).
     iApply (clwp_call_global (λ v, ∃ l1' l2', ⌜v = (m,⟪l1',l2'⟫%V)⌝ ∗ is_heap_list_nat l1' xs1 ∗ is_heap_list_nat l2' (map (λ n, n + 1) xs2))%I);
       [eauto|apply rc_l|eauto|iFrame]. iSplitR.
-    { iIntros "!> !> %v (Hsize & %l1' & %l2' & -> & Hlist1 & Hlist2)". iFrame. iExists _,_. iFrame. auto. }
+    { iIntros "!> !> %v (Hsize & %l1' & %l2' & -> & Hlist1 & Hlist2)". iFrame. auto. }
     iIntros "!> /= Hsize". rewrite Hsubst1. prepare_ctx. peel_ctx. rewrite -!/(heap_map_list _ _).
     iApply clwp_bind.
     iApply (clwp_wand with "[Hlist1 Hsize]").
@@ -327,7 +327,7 @@ Section list_client.
     iExists _. simpl.
     iDestruct (is_heap_list_shift with "Hlist") as %->;simpl.
     iDestruct (is_heap_list_shift with "Hlist2") as %->;simpl.
-    do 2 (iSplitR;[eauto|]). iFrame. iExists _,_. iFrame. auto.
+    do 2 (iSplitR;[eauto|]). iFrame. auto.
   Qed.
   
 End list_client.

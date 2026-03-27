@@ -66,13 +66,12 @@ Section inv.
     iIntros "HP [Hw $] !> !>". iApply (ownI_close _ c P). by iFrame "∗ #".
   Qed.
 
-  Lemma fresh_inv_name (E : gset positive) N : ∃ i, i ∉ E ∧ i ∈ (↑N:coPset).
+  Lemma fresh_inv_name (E : gset positive) N : ∃ i, i ∉ E ∧ i ∈@{coPset} ↑N.
   Proof.
     exists (coPpick (↑ N ∖ gset_to_coPset E)).
-    rewrite -elem_of_gset_to_coPset (comm and) -elem_of_difference.
-    apply coPpick_elem_of=> Hfin.
-    eapply nclose_infinite, (difference_finite_inv _ _), Hfin.
-    apply gset_to_coPset_finite.
+    opose proof (coPpick_elem_of (↑ N ∖ gset_to_coPset E) _); last set_solver.
+    apply set_infinite_non_empty, difference_infinite, gset_to_coPset_finite.
+    apply nclose_infinite.
   Qed.
 
   Lemma own_inv_alloc N E c P : frame_cond P c -> ▷ P ={E}=∗ own_inv N c P.
@@ -220,12 +219,11 @@ Section inv.
     inv_sem N1 c P -∗ inv_sem N2 c Q -∗ inv_sem N c (P ∗ Q).
   Proof.
     rewrite inv_sem_unseal. iIntros (??) "#HinvP #HinvQ !>"; iIntros (E ?).
-    iMod ("HinvP" $! E with "[%]") as "[$ HcloseQ]";[set_solver|].
-    iMod ("HinvQ" $! (E ∖ ↑N1) with "[%]") as "[$ HcloseP]";[set_solver|].
+    iMod ("HinvP" with "[%]") as "[$ HcloseP]"; first set_solver.
+    iMod ("HinvQ" with "[%]") as "[$ HcloseQ]"; first set_solver.
     iApply fupd_mask_intro; first set_solver.
     iIntros "Hclose [HP HQ]".
-    iMod "Hclose" as %_. iMod ("HcloseP" with "HQ") as %_.
-    by iApply "HcloseQ".
+    iMod "Hclose" as % _. iMod ("HcloseQ" with "HQ") as % _. by iApply "HcloseP".
   Qed.
 
   Lemma inv_combine_dup_l N c P Q :
@@ -234,10 +232,9 @@ Section inv.
   Proof.
     rewrite inv_sem_unseal. iIntros "#HPdup #HinvP #HinvQ !>" (E ?).
     iMod ("HinvP" with "[//]") as "[HP HcloseP]".
-    iDestruct ("HinvQ" with "[//]") as "HQ". 
     iDestruct ("HPdup" with "HP") as "[$ HP]".
-    iMod ("HcloseP" with "HP") as %_.
-    iMod "HQ" as "[$ HcloseQ]".
+    iMod ("HcloseP" with "HP") as % _.
+    iMod ("HinvQ" with "[//]") as "[$ HcloseQ]".
     iIntros "!> [HP HQ]". by iApply "HcloseQ".
   Qed.
 

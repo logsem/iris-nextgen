@@ -102,7 +102,7 @@ Proof.
   - intros Hi. lia.
   - intros Hi. destruct i.
     + rewrite /= Nat.sub_0_r. auto.
-    + simpl. apply Arith_prebase.lt_S_n in Hi.
+    + simpl. apply PeanoNat.lt_S_n in Hi.
       apply IHn in Hi as Hi'. simpl.
       unfold alter in Hi'. rewrite Hi'.
       rewrite app_comm_cons -replicate_S.
@@ -224,7 +224,7 @@ Proof.
   iDestruct 1 as "(Hσ & Ht)"; simplify_eq/=.
   iDestruct (big_sepL2_length with "Ht") as %Hlen.
   destruct es2;try done. destruct es2;try done.
-  apply elem_of_list_singleton in Hel. subst e.
+  apply list_elem_of_singleton in Hel. subst e.
   simpl. iDestruct "Ht" as "[Ht _]".
   iApply (wp_not_stuck with "Hσ Ht").
 Qed.
@@ -253,7 +253,7 @@ Proof.
   intros Hwp ??. inversion invGIndpreS0.
   pose proof (@step_fupdN_nextgen_soundness_no_lc (expr Λ) Σ Ω T pick next_choose num_laters_per_step es' _
                 (⌜not_stuck e2 σ2⌝)%I _ 0 (steps_sum num_laters_per_step 0 n)) as Hsound.
-  eapply pure_soundness.
+  eapply (pure_soundness (PROP:=iPropI Σ)).
   apply Hsound.
   iIntros (Hinv) "Hn".
   iMod Hwp as (stateI Φ fork_post state_interp_mono) "(Hσ & Hwp)".
@@ -301,7 +301,7 @@ Lemma wp_strong_adequacy_no_lc_single_thread Σ (Ω : gTransformations Σ) Λ `{
   φ.
 Proof.
   intros Hwp ?.
-  eapply pure_soundness.
+  eapply (pure_soundness (PROP:=iPropI Σ)).
   eapply (@step_fupdN_nextgen_soundness_no_lc (expr Λ) Σ Ω T pick next_choose num_laters_per_step es' _
             (⌜φ⌝)%I _ 0 (steps_sum num_laters_per_step 0 n)).
   iIntros (Hinv) "Hcred". inversion invGIndpreS0.

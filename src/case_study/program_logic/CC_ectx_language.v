@@ -31,7 +31,7 @@ Class CCEctxLanguage (expr val ectx state observation : Type) := {
 
   CC_fill_empty e : fill empty_ectx e = e;
   CC_fill_comp K1 K2 e : fill K1 (fill K2 e) = fill (comp_ectx K1 K2) e;
-  CC_fill_inj K :> Inj (=) (=) (fill K);
+  CC_fill_inj K :: Inj (=) (=) (fill K);
   CC_fill_not_val K e : to_val e = None → to_val (fill K e) = None;
 
   (* Many axioms probably make sense here. In ectx_languages in Iris

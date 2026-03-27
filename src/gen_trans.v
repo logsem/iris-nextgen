@@ -3,11 +3,12 @@ From iris.prelude Require Import options.
 
 (** * Generational transformations *)
 Class GenTrans {A : cmra} (f : A → A) := {
-  gen_trans_ne :> NonExpansive f;
+  gen_trans_ne :: NonExpansive f;
   gen_trans_validN n x : ✓{n} x → ✓{n} f x;
   gen_trans_monoN n : Proper (includedN n ==> includedN n) f;
 }.
 Global Hint Mode GenTrans - ! : typeclass_instances.
+
 Global Arguments gen_trans_validN {_} _ {_} _ _ _.
 Global Arguments gen_trans_monoN {_} _ {_}.
 

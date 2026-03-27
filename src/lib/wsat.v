@@ -14,8 +14,8 @@ exception of what's in the [wsatGS] module. The module [wsatGS] is thus exported
 Module wsatGS.
   
 Class wsatGIndpreS (Σ : gFunctors) (Ω : gTransformations Σ) (A : cmra) (pick: pick_transform_rel A) : Set := WsatGIndpreS {
-  wsatGpreS_inv : genIndInG Σ Ω (gmap_viewR positive (laterO (iPropO Σ)));
-  wsatGpreS_func : noTwoTransInG Σ Ω (gmap_viewR positive (optionO (leibnizO C))) A;
+  wsatGpreS_inv : genIndInG Σ Ω (gmap_viewR positive (agreeR (laterO (iPropO Σ))));
+  wsatGpreS_func : noTwoTransInG Σ Ω (gmap_viewR positive (agreeR (optionO (leibnizO C)))) A;
   wsatGpreS_enabled : genIndInG Σ Ω coPset_disjR;
   wsatGpreS_disabled : genIndInG Σ Ω (gset_disjR positive);
 }.
@@ -71,12 +71,12 @@ Global Existing Instances noTransInG_A_inG noTransInG_B_inG noTransInG_inG wsatG
 Definition pick_coerce `{pick_transform_rel A} (c : option C) : optionO (leibnizO C) := c.
 
 Definition ownC `{pick: pick_transform_rel A} `{!wsatGIndS Σ Ω A pick} (i : positive) (c : C) : iProp Σ :=
-  own pick_name (gmap_view_frag i DfracDiscarded (pick_coerce (Some c))).
+  own pick_name (gmap_view_frag i DfracDiscarded (to_agree $ pick_coerce (Some c))).
 Global Typeclasses Opaque ownC.
 Global Instance: Params (@ownC) 2 := {}.
 
 Definition ownN `{pick: pick_transform_rel A} `{!wsatGIndS Σ Ω A pick} (i : positive) : iProp Σ :=
-  own pick_name (gmap_view_frag i DfracDiscarded None).
+  own pick_name (gmap_view_frag i DfracDiscarded (to_agree None)).
 Global Typeclasses Opaque ownN.
 Global Instance: Params (@ownN) 1 := {}.
 
@@ -90,8 +90,8 @@ Definition frame_cond {Σ Ω A} `{pick: pick_transform_rel A} {wsat: wsatGIndS �
 Definition wsat `{pick: pick_transform_rel A} `{!wsatGIndS Σ Ω A pick} : iProp Σ :=
   locked (∃ (I : gmap positive (iProp Σ)) (F : gmap positive (option C)),
     ⌜dom I = dom F⌝ ∗
-     own invariant_name (gmap_view_auth (DfracOwn 1) (invariant_unfold <$> I)) ∗
-     own pick_name (gmap_view_auth (DfracOwn 1) (pick_coerce <$> F)) ∗
+     own invariant_name (gmap_view_auth (DfracOwn 1) (to_agree <$> (invariant_unfold <$> I))) ∗
+     own pick_name (gmap_view_auth (DfracOwn 1) (to_agree <$> (pick_coerce <$> F))) ∗
     [∗ map] i ↦ Q ∈ I, (ownN i ∨ ∃ (c : C), ownC i c ∗ ⌜frame_cond Q c⌝ ∗ (▷ Q ∗ ownD {[i]} ∨ ownE {[i]})))%I.
 
 Section wsat.
@@ -101,14 +101,14 @@ Implicit Types P : iProp Σ.
 Lemma ownCN i c : (ownC i c ∗ ownN i) ⊢ False.
 Proof.
   rewrite /ownC /ownN.
-  rewrite -own_op own_valid gmap_view_frag_op_validI option_equivI.
+  rewrite -own_op own_valid gmap_view_frag_op_validI to_agree_op_validI option_equivI.
   rewrite /pick_coerce. iIntros "[? ?]". done.
 Qed.
 
 Lemma ownC_eq i c c' : (ownC i c ∗ ownC i c') ⊢ (⌜c = c'⌝).
 Proof.
   rewrite /ownC /ownN.
-  rewrite -own_op own_valid gmap_view_frag_op_validI option_equivI.
+  rewrite -own_op own_valid gmap_view_frag_op_validI to_agree_op_validI option_equivI.
   rewrite /pick_coerce. iIntros "[? %]". iPureIntro. auto.
 Qed.
 
@@ -120,8 +120,8 @@ Proof.
   iDestruct (big_sepM_delete _ _ i with "HI") as "[[Hnone|Hsome] HI]"; eauto.
   - by iDestruct (ownCN with "[$]") as "?".
   - iDestruct "Hsome" as (c') "[#Hc' [#Hcond [[HQ HD] | HiE']]]".
-    + iFrame. iSplitR "HQ"; last by iNext; iRewrite -"HPQ".
-      iExists I,F. iFrame "Hw HF". iSplit;auto. iApply (big_sepM_delete _ _ i); eauto.
+    + iFrame "Hw". iFrame. iSplitR "HQ"; last by iNext; iRewrite -"HPQ".
+      iSplit; auto. iApply (big_sepM_delete _ _ i); eauto.
       iFrame "HI". iRight. eauto.
     + iDestruct (ownE_singleton_twice with "[$HiE $HiE']") as %[].
 Qed.
@@ -134,10 +134,10 @@ Proof.
   - by iDestruct (ownCN with "[$]") as "?".
   - iDestruct "Hsome" as (c') "[#Hc' [#Hcond [[HQ HD] | HiE']]]".
     + iDestruct (ownD_singleton_twice with "[$]") as %[].
-    + iFrame. iExists I, F. iFrame "Hw HF". iSplit;auto. iApply (big_sepM_delete _ _ i); eauto.
-      iFrame "HI #". iRight. iExists _.
+    + iFrame "Hw". iFrame. iSplit;auto. iApply (big_sepM_delete _ _ i); eauto.
+      iFrame "HI #". iRight. 
       iDestruct (ownC_eq with "[$]") as %Heq. subst c'.
-      iFrame "Hc' Hcond". iLeft. iFrame "HiD". by iNext; iRewrite "HPQ".
+      iLeft. iFrame "HiD". by iNext; iRewrite "HPQ".
 Qed.
 
 Lemma ownI_alloc φ P c :
@@ -154,11 +154,11 @@ Proof.
       as (i & [? HIi%not_elem_of_dom]%not_elem_of_union & ?); eauto. }
   iDestruct "HE" as (X) "[Hi HE]"; iDestruct "Hi" as %(i & -> & HIi & ?).
   iMod (own_update with "Hw") as "[Hw HiP]".
-  { eapply (gmap_view_alloc _ i DfracDiscarded); last done.
-    by rewrite /= lookup_fmap HIi. }
+  { eapply (gmap_view_alloc _ i DfracDiscarded (to_agree (Next P))); try done.
+    by rewrite /= !lookup_fmap HIi. }
   iMod (own_update with "HF") as "[HF HiC]".
-  { eapply (gmap_view_alloc _ i DfracDiscarded); last done.
-    rewrite /= lookup_fmap. assert (F !! i = None) as -> =>//.
+  { eapply (gmap_view_alloc _ i DfracDiscarded (to_agree (pick_coerce (Some c)))); try done.
+    rewrite /= !lookup_fmap. assert (F !! i = None) as -> =>//.
     apply not_elem_of_dom. rewrite -Hdom.
     apply not_elem_of_dom =>//. }
   iModIntro; iExists i;  iSplit; [done|].
@@ -167,11 +167,11 @@ Proof.
   iExists (<[i:=P]>I),(<[i:=Some c]>F). iSplit.
   { iPureIntro. set_solver. }
   iSplitL "Hw".
-  { by rewrite fmap_insert. }
+  { by rewrite !fmap_insert. }
   iSplitL "HF".
-  { by rewrite fmap_insert. }
+  { by rewrite !fmap_insert. }
   iApply (big_sepM_insert _ I); first done.
-  iFrame "HI #". iRight. iExists c. rewrite /ownC. iFrame "HiC".
+  iFrame "HI #". iRight. rewrite /ownC.
   iFrame "%". iLeft. by rewrite /ownD; iFrame.
 Qed.
 
@@ -188,11 +188,11 @@ Proof.
       as (i & [? HIi%not_elem_of_dom]%not_elem_of_union & ?); eauto. }
   iDestruct "HD" as (X) "[Hi HD]"; iDestruct "Hi" as %(i & -> & HIi & ?).
   iMod (own_update with "Hw") as "[Hw HiP]".
-  { eapply (gmap_view_alloc _ i DfracDiscarded); last done.
-    by rewrite /= lookup_fmap HIi. }
+  { eapply (gmap_view_alloc _ i DfracDiscarded (to_agree (Next P))); try done.
+    by rewrite /= !lookup_fmap HIi. }
   iMod (own_update with "HF") as "[HF HiC]".
-  { eapply (gmap_view_alloc _ i DfracDiscarded); last done.
-    rewrite /= lookup_fmap. assert (F !! i = None) as -> =>//.
+  { eapply (gmap_view_alloc _ i DfracDiscarded (to_agree (pick_coerce (Some c)))); try done.
+    rewrite /= !lookup_fmap. assert (F !! i = None) as -> =>//.
     apply not_elem_of_dom. rewrite -Hdom.
     apply not_elem_of_dom =>//. }
   iModIntro; iExists i;  iSplit; [done|].
@@ -203,11 +203,11 @@ Proof.
   iIntros "HE". iExists (<[i:=P]>I),(<[i:=Some c]>F); iSplit.
   { iPureIntro. set_solver. }
   iSplitL "Hw".  
-  { by rewrite fmap_insert. }
+  { by rewrite !fmap_insert. }
   iSplitL "HF".  
-  { by rewrite fmap_insert. }  
+  { by rewrite !fmap_insert. }  
   iApply (big_sepM_insert _ I); first done.
-  iFrame "HI #". iRight. iExists _. rewrite /ownC. iFrame "HiC %". by iRight.
+  iFrame "HI #". iRight. iFrame "%". by iRight.
 Qed.
 End wsat.
 
@@ -215,9 +215,9 @@ End wsat.
 Lemma wsat_alloc `{pre: !wsatGIndpreS Σ Ω A pick} : ⊢ |==> ∃ (_ : wsatGIndS Σ Ω A pick) (_ : wsat_ind_inG = pre), wsat ∗ ownE ⊤.
 Proof.
   iIntros.
-  iMod (own_alloc (@gmap_view_auth _ _ _ (laterO (iPropO Σ)) (DfracOwn 1) ∅)) as (γI) "HI";
+  iMod (own_alloc (@gmap_view_auth _ _ _ _ (agreeR (laterO (iPropO Σ))) (DfracOwn 1) ∅)) as (γI) "HI";
     first by apply gmap_view_auth_valid.
-  iMod (own_alloc (@gmap_view_auth _ _ _ (optionO (leibnizO C)) (DfracOwn 1) ∅)) as (γI') "HI'";
+  iMod (own_alloc (@gmap_view_auth _ _ _ _ (agreeR (optionO (leibnizO C))) (DfracOwn 1) ∅)) as (γI') "HI'";
     first by apply gmap_view_auth_valid.
   iMod (own_alloc (CoPset ⊤)) as (γE) "HE"; first done.
   iMod (own_alloc (GSet ∅)) as (γD) "HD"; first done.
@@ -355,8 +355,8 @@ Qed.
 
 Lemma auth_invariant_insert_intro `{!wsatGIndS Σ Ω A pick} `{i : noTransInG Σ Ω B}
   (I : gmap positive (laterO (iPropO Σ))) (t : B → B) `{!CmraMorphism t} `{!Idemp equiv t} :
-  own invariant_name (gmap_view_auth (DfracOwn 1) I)
-    ⊢ ⚡={transmap_insert_inG t Ω}=> own invariant_name (gmap_view_auth (DfracOwn 1) I).
+  own invariant_name (gmap_view_auth (DfracOwn 1) (to_agree <$> I))
+    ⊢ ⚡={transmap_insert_inG t Ω}=> own invariant_name (gmap_view_auth (DfracOwn 1) (to_agree <$> I)).
 Proof.
   iIntros "Hi".
   iModIntro.
@@ -365,8 +365,8 @@ Qed.
 
 Lemma auth_invariant_insert_two_intro `{!wsatGIndS Σ Ω A pick} `{i : noTwoTransInG Σ Ω B D}
   (I : gmap positive (laterO (iPropO Σ))) (t : B → B) (f : D -> D) `{!CmraMorphism t} `{!CmraMorphism f} `{!Idemp equiv t} `{!Idemp equiv f} :
-  own invariant_name (gmap_view_auth (DfracOwn 1) I)
-    ⊢ ⚡={transmap_insert_two_inG t f Ω}=> own invariant_name (gmap_view_auth (DfracOwn 1) I).
+  own invariant_name (gmap_view_auth (DfracOwn 1) (to_agree <$> I))
+    ⊢ ⚡={transmap_insert_two_inG t f Ω}=> own invariant_name (gmap_view_auth (DfracOwn 1) (to_agree <$> I)).
 Proof.
   iIntros "Hi".
   iDestruct (transmap_own_insert_two_other t f with "Hi") as "Ho".
@@ -407,16 +407,16 @@ Proof.
 Qed.
 
 Lemma auth_pick_map_transform_intro `{!wsatGIndS Σ Ω A pick} F (c : C) :
-  own pick_name (gmap_view_auth (DfracOwn 1) F) ⊢
-    ⚡={transmap_insert_inG (inv_pick_transform c) Ω}=> own pick_name (gmap_view_auth (DfracOwn 1) (map_imap (inv_pick_cut c) F)).
+  own pick_name (gmap_view_auth (DfracOwn 1) (to_agree <$> F)) ⊢
+    ⚡={transmap_insert_inG (inv_pick_transform c) Ω}=> own pick_name (gmap_view_auth (DfracOwn 1) (to_agree <$> (map_imap (inv_pick_cut c) F))).
 Proof.
   iIntros "Hc". rewrite -map_entry_lift_gmap_view_auth.
   iApply (@transmap_own_insert _ _ Ω noTransInG_A_inG). iFrame.
 Qed.
 
 Lemma auth_pick_map_transform_two_intro `{!wsatGIndS Σ Ω A pick} F (c : C) :
-  own pick_name (gmap_view_auth (DfracOwn 1) F) ⊢
-    ⚡={transmap_insert_two_inG (inv_pick_transform c) (C_pick c) Ω}=> own pick_name (gmap_view_auth (DfracOwn 1) (map_imap (inv_pick_cut c) F)).
+  own pick_name (gmap_view_auth (DfracOwn 1) (to_agree <$> F)) ⊢
+    ⚡={transmap_insert_two_inG (inv_pick_transform c) (C_pick c) Ω}=> own pick_name (gmap_view_auth (DfracOwn 1) (to_agree <$> (map_imap (inv_pick_cut c) F))).
 Proof.
   iIntros "Hc". rewrite -map_entry_lift_gmap_view_auth.
   iApply transmap_own_insert_two_left. iFrame.

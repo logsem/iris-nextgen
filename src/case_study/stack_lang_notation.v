@@ -3,7 +3,7 @@ From nextgen.case_study Require Export stack_lang.
 From iris.prelude Require Export options.
 From stdpp Require Export pretty strings binders.
 
-Global Instance pretty_loc : Pretty loc := string_of_pos.
+Global Instance pretty_loc : Pretty loc := strings.pos_to_string.
 
 Global Instance pretty_binder : Pretty binder :=
   λ b, match b with

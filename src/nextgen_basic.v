@@ -1,6 +1,6 @@
 (* The basic nextgen modality. *)
 
-From iris.proofmode Require Import classes tactics.
+From iris.proofmode Require Import classes ltac_tactics.
 From iris.base_logic.lib Require Export iprop own invariants.
 From iris.prelude Require Import options.
 
@@ -39,8 +39,8 @@ Class IntoBnextgen `{M : ucmra}
     f `{!GenTrans f}
     (P : uPred M) (Q : uPred M) :=
   into_bnextgen : P ⊢ ⚡={ f }=> Q.
-Global Arguments IntoBnextgen  {_} _%I {_} _%I _%I.
-Global Arguments into_bnextgen {_} _%I _%I {_}.
+Global Arguments IntoBnextgen  {_} _%_I {_} _%_I _%_I.
+Global Arguments into_bnextgen {_} _%_I _%_I {_}.
 Global Hint Mode IntoBnextgen + + + ! - : typeclass_instances.
 
 Section bnextgen_rules.
@@ -52,7 +52,11 @@ Section bnextgen_rules.
 
   Local Arguments uPred_holds {_} !_ _ _ /.
 
-  Ltac unseal := try uPred.unseal; rewrite ?uPred_bnextgen_unseal !/uPred_holds /=.
+  Ltac unseal :=
+    rewrite /plainly /si_pure /si_emp_valid /sbi_si_pure /sbi_si_emp_valid;
+    try uPred.unseal;
+    rewrite ?uPred_bnextgen_unseal !/uPred_holds /=;
+    try uPred_primitive.unseal.
 
   Lemma bnextgen_ownM (a : M) :
     uPred_ownM a ⊢ ⚡={f}=> uPred_ownM (f a).
@@ -171,6 +175,10 @@ Section bnextgen_rules.
       apply Hmono. apply cmra_includedN_r.
   Qed.
 
+  Lemma bnextgen_pure P :
+    ⌜ P ⌝ ⊣⊢ ⚡={f}=> ⌜ P ⌝.
+  Proof. unseal. split. done. Qed.
+  
   Lemma bnextgen_plainly P :
     ■ P ⊣⊢ ⚡={f}=> ■ P.
   Proof. unseal. split. done. Qed.

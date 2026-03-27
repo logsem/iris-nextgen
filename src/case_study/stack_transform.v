@@ -4,26 +4,28 @@ From nextgen Require Import nextgen_basic gen_trans gmap_view_transformation.
 From nextgen.case_study Require Export stack_lang.
 Set Default Proof Using "Type".
 
+Lemma gmap_uncurry_insert_empty `{FinMap K1 M1, FinMap K2 M2, FinMap (K1 * K2) MC} {V : Type} 
+  (m : M1 (M2 V)) (k : K1) :
+  m !! k = None ->
+  map_uncurry (M1 := M1) (M2 := M2) (M12 := MC) (<[k := ∅]> m) = map_uncurry (M1 := M1) (M2 := M2) (M12 := MC) m.
+Proof.
+  intros Hnone. apply map_eq. intros [k1 k2].
+  rewrite !lookup_map_uncurry.
+  destruct (decide (k1 = k)).
+  - subst. rewrite lookup_insert_eq Hnone /= lookup_empty //.
+  - rewrite lookup_insert_ne//.
+Qed.
+
+#[local] Notation map_uncurry := (map_uncurry (M1 := gmap nat) (M2 := gmap loc)).
 
 Fixpoint list_to_gmap_stack_fix (s : list (gmap loc val)) (i : nat) : gmap nat (gmap loc val) :=
   match s with
   | [] => ∅
   | si :: s' => <[i:=si]> (list_to_gmap_stack_fix s' (S i))
   end.
-Definition list_to_gmap_stack (s : list (gmap loc val)) : gmap (nat * loc) val :=
-  gmap_uncurry (list_to_gmap_stack_fix s 0).
 
-Lemma gmap_uncurry_insert_empty {K1 K2 V : Type} `{EqDecision K1,Countable K1,EqDecision K2,Countable K2}
-  (m : gmap K1 (gmap K2 V)) (k : K1) :
-  m !! k = None ->
-  gmap_uncurry (<[k := ∅]> m) = gmap_uncurry m.
-Proof.
-  intros Hnone. apply map_eq. intros [k1 k2].
-  rewrite !lookup_gmap_uncurry.
-  destruct (decide (k1 = k)).
-  - subst. rewrite lookup_insert Hnone. simpl. auto.
-  - rewrite lookup_insert_ne//.
-Qed.
+Definition list_to_gmap_stack (s : list (gmap loc val)) : gmap (nat * loc) val :=
+  map_uncurry (list_to_gmap_stack_fix s 0).
 
 Lemma list_to_gmap_stack_push_stack s :
   list_to_gmap_stack (push_stack s) = list_to_gmap_stack s.
@@ -34,12 +36,12 @@ Proof.
   - rewrite -/list_to_gmap_stack_fix.
     rewrite -/list_to_gmap_stack_fix in IHs.
     apply map_eq. intros [i l].
-    rewrite !lookup_gmap_uncurry.
+    rewrite !lookup_map_uncurry.
     destruct (decide (i = n)).
-    + subst. rewrite !lookup_insert. auto.
+    + subst. rewrite !lookup_insert_eq. auto.
     + rewrite !lookup_insert_ne//.
       specialize (IHs (S n)).
-      rewrite - lookup_gmap_uncurry IHs lookup_gmap_uncurry //.
+      rewrite - lookup_map_uncurry IHs lookup_map_uncurry //.
 Qed.
 
 Lemma push_stack_length s :
@@ -73,7 +75,7 @@ Lemma list_to_gmap_stack_lookup_is_Some s m l :
 Proof.
   intros [x Hx].
   unfold list_to_gmap_stack in Hx.
-  rewrite lookup_gmap_uncurry in Hx.
+  rewrite lookup_map_uncurry in Hx.
   destruct (list_to_gmap_stack_fix s 0 !! m) eqn:Hsome;try done.
   apply list_to_gmap_stack_fix_lookup_Some in Hsome. lia.
 Qed.
@@ -90,7 +92,7 @@ Lemma list_to_gmap_stack_fix_snoc_mid s x n :
 Proof.
   revert n. induction s;intros n.
   - rewrite app_nil_l /= PeanoNat.Nat.add_0_r. auto.
-  - simpl.  rewrite IHs. rewrite insert_commute;[|lia].
+  - simpl.  rewrite IHs. rewrite insert_insert_ne;[|lia].
     assert (S n + length s = n + S (length s)) as ->;[lia|].
     auto.
 Qed.
@@ -109,15 +111,15 @@ Proof.
   revert m. induction s using rev_ind;intros m Hle.
   - simpl in *. destruct m;lia.
   - destruct (decide (m = length s)).
-    + subst. rewrite /list_to_gmap_stack /= !lookup_gmap_uncurry.
-      rewrite list_to_gmap_stack_fix_snoc. rewrite app_length /=.
+    + subst. rewrite /list_to_gmap_stack /= !lookup_map_uncurry.
+      rewrite list_to_gmap_stack_fix_snoc. rewrite length_app /=.
       rewrite lookup_insert_ne//. lia.
-    + rewrite app_length /= in Hle. assert (m < length s) as Hlt;[lia|].
+    + rewrite length_app /= in Hle. assert (m < length s) as Hlt;[lia|].
       apply IHs in Hlt.
-      rewrite /list_to_gmap_stack /= !lookup_gmap_uncurry.
+      rewrite /list_to_gmap_stack /= !lookup_map_uncurry.
       rewrite list_to_gmap_stack_fix_snoc.
-      rewrite lookup_insert_ne;[|rewrite app_length;lia].
-      rewrite /list_to_gmap_stack /= !lookup_gmap_uncurry in Hlt.
+      rewrite lookup_insert_ne;[|rewrite length_app;lia].
+      rewrite /list_to_gmap_stack /= !lookup_map_uncurry in Hlt.
       auto.
 Qed.
 
@@ -128,7 +130,7 @@ Proof.
   revert n. induction s;intros n Hle.
   - simpl. auto.
   - simpl. destruct (decide (n = m)).
-    + subst. rewrite lookup_insert Nat.sub_diag /= //.
+    + subst. rewrite lookup_insert_eq Nat.sub_diag /= //.
     + assert (S n <= m);[lia|].
       rewrite lookup_insert_ne // IHs //.
       assert (m - n = S (m - S n)) as ->;[lia|].
@@ -139,7 +141,7 @@ Lemma list_to_gmap_stack_lookup (s : list (gmap loc val)) (m : nat) (l : loc) :
   (list_to_gmap_stack s) !! (m, l) = s !! m ≫= λ σ, σ !! l.
 Proof.
   rewrite /list_to_gmap_stack.
-  rewrite lookup_gmap_uncurry.
+  rewrite lookup_map_uncurry.
   rewrite list_to_gmap_stack_fix_lookup;[|lia].
   rewrite Nat.sub_0_r. auto.
 Qed.
@@ -154,19 +156,19 @@ Proof.
   apply lookup_lt_Some in Hl as Hlt.
   destruct (decide ((n',l') = (n, l))).
   - simplify_eq.
-    rewrite lookup_insert list_lookup_insert// /=.
-    rewrite lookup_insert //.
+    rewrite lookup_insert_eq list_lookup_insert_eq // /=.
+    rewrite lookup_insert_eq //.
   - rewrite lookup_insert_ne//.
     rewrite list_to_gmap_stack_lookup.
     destruct (decide (n' = n)).
-    + subst. rewrite list_lookup_insert// Hl /=.
+    + subst. rewrite list_lookup_insert_eq // Hl /=.
       rewrite lookup_insert_ne//. intros Hcontr;subst. done.
     + rewrite list_lookup_insert_ne//.
 Qed.
 
 Section pop_func.
 
-  Definition stackM := gmap_view.gmap_viewUR (nat * loc) (leibnizO val).
+  Definition stackM := gmap_view.gmap_viewUR (nat * loc) (agreeR (leibnizO val)).
 
   Definition stack_cond (n : nat) : ((nat * loc) * (leibnizO val)) -> Prop := (λ kv : ((nat * loc) * (leibnizO val)), kv.1.1 < n).
   Global Instance stack_cut_cond_dec (n : nat) : forall (x : ((nat * loc) * (leibnizO val))), Decision (stack_cond n x).
@@ -183,10 +185,10 @@ Section pop_func.
   Proof.
     intros l v m Hl.
     destruct (stack_cut n m !! l) eqn:Hm;unfold stack_cut in Hm.
-    - rewrite map_filter_lookup_Some in Hm.
+    - rewrite map_lookup_filter_Some in Hm.
       destruct Hm as [Ho Hcond].
       rewrite /stack_location_cut bool_decide_true // -Hl -Ho //.
-    - rewrite map_filter_lookup_None in Hm. destruct Hm as [Hcontr | Hcond].
+    - rewrite map_lookup_filter_None in Hm. destruct Hm as [Hcontr | Hcond].
       + rewrite Hl in Hcontr. done.
       + apply Hcond in Hl.
         rewrite /stack_location_cut bool_decide_false //.
@@ -208,7 +210,7 @@ Section pop_func.
   Proof. 
     unfold stack_cut. intros i m1 m2 Hi.
     assert (LeibnizEquiv (leibnizO val)) as Hleib;[apply _|].
-    pose proof (@gmapO_leibniz (nat * loc) _ _ (leibnizO val) Hleib).
+    pose proof (@gmapO_leibniz _ (nat * loc) _ _ (leibnizO val) Hleib).
     apply H in Hi as -> =>//.
   Qed.
 
@@ -248,7 +250,7 @@ Section pop_func.
   Lemma stack_cut_0 s : stack_cut 0 s = ∅.
   Proof.
     rewrite /stack_cut /stack_cond.
-    rewrite map_filter_empty_iff. apply map_Forall_lookup.
+    rewrite map_empty_filter. apply map_Forall_lookup.
     intros. simpl. lia.
   Qed.
   
@@ -301,7 +303,7 @@ Section pop_func.
       rewrite IHi. rewrite /pop_stack.
       destruct s using rev_ind;simpl;[lia|].
       rewrite reverse_snoc reverse_involutive.
-      rewrite app_length /=. lia.
+      rewrite length_app /=. lia.
   Qed.      
 
   Lemma popN_stack_lookup_lt s1 i n g :
@@ -324,13 +326,13 @@ Section pop_func.
       clear IHs1. rewrite reverse_snoc reverse_involutive in Hs.
       apply IHi in Hs as [Hnone | Hge].
       + destruct (decide (n = length s1)).
-        * subst. right. rewrite app_length /=.
+        * subst. right. rewrite length_app /=.
           lia.
         * apply lookup_ge_None_1 in Hnone as Hge.
           assert (length s1 < n);[lia|].
           rewrite lookup_ge_None_2;auto.
-          rewrite app_length /=. lia.
-      + right. rewrite app_length /=. lia.
+          rewrite length_app /=. lia.
+      + right. rewrite length_app /=. lia.
   Qed.
 
   Lemma stack_location_cut_popN_stack s1 i :

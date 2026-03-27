@@ -1,4 +1,4 @@
-From iris.proofmode Require Import classes tactics.
+From iris.proofmode Require Import classes ltac_tactics.
 (* From iris.base_logic.lib Require Export iprop own invariants. *)
 From iris.prelude Require Import options.
 
@@ -51,14 +51,14 @@ Local Program Definition uPred_restr_bupd_def {M : ucmra}
                                             /\ Q k x' |}.
 Next Obligation.
   intros M t Htrans Htransextra Q n1 n2 x1 x2 HQ [x3 Hx] Hn k yf Hk (* [x1' [x2' [Heq1 Ht]]] *).
-  rewrite {1}(dist_le _ _ _ _ Hx); last lia. intros Hxy.
+  rewrite {1}(dist_le _ _ _ _ Hx); last done. intros Hxy.
   simpl in *.
   destruct (HQ k (x3 ⋅ yf)) as (x'&x1'&x2'&Heq'&Heq2&(x2''&Hx2'&Himpl)&Hv&HQ'); [lia|auto|..].
   { by rewrite assoc. (* rewrite -assoc (comm _ x3 yf) assoc in Hxy. apply cmra_validN_op_l in Hxy; auto.  *)}
   exists (x' ⋅ x3),x1',(x2' ⋅ x3). rewrite (assoc op) -Heq'.
   split;[|split];auto. rewrite assoc in Hv. split;[|split];auto.
   - exists (x2'').
-    rewrite (dist_le _ _ _ _ Hx); last lia. rewrite assoc Hx2' //.
+    rewrite (dist_le _ _ _ _ Hx); last done. rewrite assoc Hx2' //.
     split;auto.
     intros x0 x2''0 yf' HH Heqx2'' Heqyf.
     symmetry in Heqx2''.
@@ -144,7 +144,7 @@ Section restr_bupd_rules.
   Proof.
     unseal. split.
     intros n x Hx [x1 [x2 [Heq [Hop HR]]]].
-    intros k yf Hk. rewrite {1}(dist_le _ _ _ _ Heq); last lia. intros Hv. simpl in *.
+    intros k yf Hk. rewrite {1}(dist_le _ _ _ _ Heq); last done. intros Hv. simpl in *.
     edestruct (Hop k (x2 ⋅ yf)) as [x' [x1' [x2' [Heq1 [Heq2 [[x3 [Hx3 Hcond2]] [Hv' HP']]]]]]];auto.
     { by rewrite assoc. (* rewrite -assoc (comm _ x2 yf) assoc in Hv. by apply cmra_validN_op_l in Hv.  *)}
     (* rewrite assoc in Hx'. *)

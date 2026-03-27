@@ -6,7 +6,7 @@
 From nextgen.case_study.program_logic Require Export weakestpre.
 From nextgen.case_study.program_logic Require Import CC_ectx_language CC_ectxi_language CC_ectx_lifting.
 From nextgen Require Import nextgen_independent.
-From iris.proofmode Require Import tactics.
+From iris.proofmode Require Import ltac_tactics.
 Set Default Proof Using "Type".
 Import uPred.
 

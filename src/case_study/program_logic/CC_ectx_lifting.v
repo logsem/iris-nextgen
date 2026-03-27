@@ -8,7 +8,7 @@ From nextgen.case_study.program_logic Require Export weakestpre.
 From nextgen.case_study.program_logic Require Export lifting.
 From nextgen.case_study Require Export CC_ectx_language.
 (* From nextgen Require Import nextgen_basic gmap_view_transformation. *)
-From iris.proofmode Require Import tactics.
+From iris.proofmode Require Import ltac_tactics.
 Set Default Proof Using "Type".
 
 Class NextMonotone {expr val ectx state observation} {Λ : CCEctxLanguage expr val ectx state observation}
@@ -66,7 +66,9 @@ Lemma wp_lift_nonthrow_head_step_fupdN {s c E Φ} K e1 :
       [∗ list] ef ∈ efs, WP ef @ s; ↑C_bot; ⊤ {{ v, fork_post v }})
   ⊢ WP fill K e1 @ s; ↑c; E {{ Φ }}.
 Proof using Hmono.
-  iIntros (?) "H". iApply wp_lift_step_fupdN=>//; eauto using CC_fill_not_val.
+  iIntros (?) "H". iApply wp_lift_step_fupdN=>//.
+  (* FIXME: why [eauto using CC_fill_not_val] no longer works? *)
+  { apply CC_fill_not_val. auto. }
   iIntros (σ1 ns κ κs nt) "Hσ".
   iMod ("H" $! σ1 with "Hσ") as "[% H]"; iModIntro.
   simpl. iSplit; first destruct s;[eauto..|]. iIntros (e2 σ2 efs) "H1 Ht".
@@ -91,7 +93,9 @@ Lemma wp_lift_nonthrow_head_step {s c E Φ} K e1 :
        [∗ list] ef ∈ efs, WP ef @ s; ↑C_bot; ⊤ {{ v, fork_post v }})
   ⊢ WP fill K e1 @ s; ↑c; E {{ Φ }}.
 Proof using Hmono.
-  iIntros (?) "H". iApply wp_lift_step=>//; eauto using CC_fill_not_val.
+  iIntros (?) "H". iApply wp_lift_step=>//.
+  (* FIXME: why [eauto using CC_fill_not_val] no longer works? *)
+  { apply CC_fill_not_val. auto. }
   iIntros (σ1 ns κ κs nt) "Hσ".
   iMod ("H" $! σ1 with "Hσ") as "[% H]"; iModIntro.
   iSplit; first by destruct s; eauto. iNext. iIntros (e2 σ2 efs) "H1 Ht".
@@ -117,7 +121,9 @@ Lemma wp_lift_throw_head_step_fupdN {s c E Φ} K e1 :
       [∗ list] ef ∈ efs, WP ef @ s; ↑C_bot; ⊤ {{ v, fork_post v }})
   ⊢ WP fill K e1 @ s; ↑c; E {{ Φ }}.
 Proof using Hmono.
-  iIntros (?) "H". iApply wp_lift_step_fupdN=>//; eauto using CC_fill_not_val.
+  iIntros (?) "H". iApply wp_lift_step_fupdN=>//.
+  (* FIXME: why [eauto using CC_fill_not_val] no longer works? *)
+  { apply CC_fill_not_val. auto. }
   iIntros (σ1 ns κ κs nt) "Hσ".
   iMod ("H" $! σ1 with "Hσ") as "[% H]"; iModIntro.
   iSplit; first by destruct s; eauto. iIntros (e2 σ2 efs) "H1 Ht".
@@ -139,7 +145,9 @@ Lemma wp_lift_throw_head_step {s c E Φ} K e1 :
        [∗ list] ef ∈ efs, WP ef @ s; ↑C_bot; ⊤ {{ v, fork_post v }})
   ⊢ WP fill K e1 @ s; ↑c; E {{ Φ }}.
 Proof using Hmono.
-  iIntros (?) "H". iApply wp_lift_step=>//; eauto using CC_fill_not_val.
+  iIntros (?) "H". iApply wp_lift_step=>//.
+  (* FIXME: why [eauto using CC_fill_not_val] no longer works? *)
+  { apply CC_fill_not_val. auto. }
   iIntros (σ1 ns κ κs nt) "Hσ".
   iMod ("H" $! σ1 with "Hσ") as "[% H]"; iModIntro.
   iSplit; first by destruct s; eauto. iNext. iIntros (e2 σ2 efs) "H1 Ht".

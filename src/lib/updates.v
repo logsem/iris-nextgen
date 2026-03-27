@@ -21,15 +21,14 @@ From iris.prelude Require Import options.
 (*                                             /\ ✓{k} (x' ⋅ yf) *)
 (*               /\ Q k x' *)
 
-
-Definition upd_img_rel {A : cmra} (t : A → A) `{!CmraMorphism t} (x1 y1 y2 : A) (mz : option A) (k : nat) :=
+Definition upd_img_rel {SI: sidx} {A : cmra} (t : A → A) `{!CmraMorphism t} (x1 y1 y2 : A) (mz : option A) (k : SI) :=
   (∀ x1' y2' mz', x1 ≡{k}≡ t x1' -> y2 ≡{k}≡ t y2' -> (from_option (λ a, mz' ≡{k}≡ Some (t a)) (mz' ≡{k}≡ None) mz) ->
                   ✓{k} (x1' ⋅ y2' ⋅? mz') -> ✓{k} (y1 ⋅ y2' ⋅? mz')).
-Definition upd_rel {A : cmra} (t : A → A) `{!CmraMorphism t} (x : A) (y : A) (k : nat) (mz : option A) :=
+Definition upd_rel {SI: sidx} {A : cmra} (t : A → A) `{!CmraMorphism t} (x : A) (y : A) (k : SI) (mz : option A) :=
   ∃ (y1 y2 x1: A), (y ≡{k}≡ y1 ⋅ y2 /\ t y1 ≡{k}≡ y1 /\ x ≡{k}≡ x1 ⋅ y2) /\ upd_img_rel t x1 y1 y2 mz k.
   
 
-Definition cmra_updateP {A : cmra} (t : A → A) `{!CmraMorphism t} (x : A) (P : A → Prop) := ∀ n (mz : option A),
+Definition cmra_updateP {SI: sidx} {A : cmra} (t : A → A) `{!CmraMorphism t} (x : A) (P : A → Prop) := ∀ n (mz : option A),
     ✓{n} (x ⋅? mz) -> ∃ y, P (y) /\ ✓{n} (y ⋅? mz) /\ upd_rel t x y n mz.
 Global Instance: Params (@cmra_updateP) 1 := {}.
 Global Instance: Params (@cmra_updateP) 3 := {}.
@@ -41,7 +40,7 @@ Infix "~~>:{  t  }" := (cmra_updateP t) (at level 70).
 (* Global Instance: Params (@cmra_update) 1 := {}. *)
 (* Global Instance: Params (@cmra_update) 3 := {}. *)
 
-Definition cmra_update {A : cmra} (t : A → A) `{!CmraMorphism t} (x y : A) := ∀ n mz,
+Definition cmra_update {SI: sidx} {A : cmra} (t : A → A) `{!CmraMorphism t} (x y : A) := ∀ n mz,
   ✓{n} (x ⋅? mz) -> ✓{n} (y ⋅? mz) /\ upd_rel t x y n mz.
 Infix "~~>{  t  }" := (cmra_update t) (at level 70).
 Global Instance: Params (@cmra_update) 1 := {}.
@@ -56,16 +55,16 @@ Global Instance: Params (@cmra_update) 3 := {}.
 (*   inversion Hc;subst;eauto. *)
 (* Qed. *)
 
-Class GenTransContractive {A : cmra} (f : A -> A) := {
+Class GenTransContractive {SI: sidx} {A : cmra} (f : A -> A) := {
     gen_trans_contr n a : (f a ≼{n} a)
 }.
 
 Section updates.
-Context {A : ucmra} (t : A -> A) `{morph: !CmraMorphism t} `{!GenTransContractive t}.
+Context {SI: sidx} {A : ucmra} (t : A -> A) `{morph: !CmraMorphism t} `{!GenTransContractive t}.
 Implicit Types x y : A.
 
 Global Instance upd_img_rel_proper :
-  Proper ((≡) ==> (≡) ==> (≡) ==> (≡) ==> (=) ==> iff) (@upd_img_rel A t morph).
+  Proper ((≡) ==> (≡) ==> (≡) ==> (≡) ==> (=) ==> iff) (@upd_img_rel SI A t morph).
 Proof.
   intros ??? y1 y2 Hy ??? mz mz' Hmz ???;subst.
   rewrite /upd_img_rel. split=> Hyp???????;[rewrite -Hy|rewrite Hy]; eapply Hyp;eauto;
@@ -73,7 +72,7 @@ Proof.
 Qed.
   
 Global Instance upd_rel_proper :
-  Proper ((≡) ==> (≡) ==> (=) ==> (≡) ==> iff) (@upd_rel A t morph).
+  Proper ((≡) ==> (≡) ==> (=) ==> (≡) ==> iff) (@upd_rel SI A t morph).
 Proof.
   intros x x' Hx y y' Hy n1 n2 Heq mz mz' Hmz;subst.
   split=> [[x1[x2[x3[HH Hyp]]]]|[x1[x2[x3[HH Hyp]]]]]; exists x1,x2,x3;split;[rewrite -Hx -Hy//| |rewrite Hx Hy//|];
@@ -82,14 +81,14 @@ Proof.
 Qed.
 
 Global Instance cmra_updateP_proper :
-  Proper ((≡) ==> pointwise_relation _ iff ==> iff) (@cmra_updateP A t morph).
+  Proper ((≡) ==> pointwise_relation _ iff ==> iff) (@cmra_updateP SI A t morph).
 Proof.
   rewrite /pointwise_relation /cmra_updateP=> x x' Hx P P' HP;
     split=> Hyp n mz;[erewrite <- Hx|erewrite Hx];intros HH;
     apply Hyp in HH as [y [??]];exists y; setoid_subst; naive_solver.
 Qed.
 Global Instance cmra_update_proper :
-  Proper ((≡) ==> (≡) ==> iff) (@cmra_update A t morph).
+  Proper ((≡) ==> (≡) ==> iff) (@cmra_update SI A t morph).
 Proof.
   rewrite /cmra_update=> x x' Hx y y' Hy; split=> BB n mz E; setoid_subst;auto.
 Qed.

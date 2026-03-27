@@ -3,7 +3,7 @@ From iris.algebra Require Export list excl_auth.
 From nextgen.case_study.program_logic Require Import CC_ectx_lifting
      CC_ectxi_language CC_ectx_lifting weakestpre gen_heap_lifting.
 From nextgen.case_study Require Export stack_lang stack_transform.
-From iris.proofmode Require Import tactics.
+From iris.proofmode Require Import ltac_tactics.
 From stdpp Require Import fin_maps.
 From nextgen Require Import nextgen_basic gen_trans gmap_view_transformation nextgen_id.
 Set Default Proof Using "Type".
@@ -17,7 +17,7 @@ From nextgen Require Export nextgen_pointwise.
 (* CMRA for size *)
 Class stacksizeGS (Σ : gFunctors) (Ω : gTransformations Σ) := StackSizeGS {
   heapG_stacksize_name : gname;
-  heapG_excl_nat_stacksizeGS :> genIndInG Σ Ω (excl_authUR natR)
+  heapG_excl_nat_stacksizeGS :: genIndInG Σ Ω (excl_authUR natR)
 }.
 
 
@@ -42,7 +42,7 @@ Definition locality_pick (l : locality_lifetime) :=
   | lifetime_stack n => state_trans n
   end.
 
-Lemma pick_state_trans_eq (Σ : gFunctors) (Ω : gTransformations Σ) `{!inG Σ (gmap_view.gmap_viewR (nat * loc) (leibnizO val))} (n : nat) :
+Lemma pick_state_trans_eq (Σ : gFunctors) (Ω : gTransformations Σ) `{!inG Σ (gmap_view.gmap_viewR (nat * loc) (agreeR (leibnizO val)))} (n : nat) :
   transmap_insert_inG (state_trans n) Ω = transmap_insert_inG (locality_pick (lifetime_stack n)) Ω.
 Proof. auto. Qed.
 
@@ -68,7 +68,7 @@ Proof.
   - right. intros Hcontr. inversion Hcontr.
 Qed.
 
-Global Instance id_stack_idemp : Idemp equiv (id : gmap_view.gmap_viewR (nat * loc) (leibnizO val) -> gmap_view.gmap_viewR (nat * loc) (leibnizO val)).
+Global Instance id_stack_idemp : Idemp equiv (id : gmap_view.gmap_viewR (nat * loc) (agreeR (leibnizO val)) -> gmap_view.gmap_viewR (nat * loc) (agreeR (leibnizO val))).
 Proof. intros c. simpl. auto. Qed.
 Global Instance locality_pick_idemp (c : locality_lifetime) : Idemp equiv (locality_pick c) :=
   match c with
@@ -162,7 +162,7 @@ Proof.
 Qed.
 
 Global Instance locality_lifetime_pick
-  : pick_transform_rel (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) :=
+  : pick_transform_rel (gmap_view.gmap_viewR (nat * loc) (agreeR (leibnizO val))) :=
   { C := locality_lifetime;
     C_bot := lifetime_heap;
     CR := locality_lifetime_rel;
@@ -175,9 +175,9 @@ Notation inv_pick_transform := (@inv_pick_transform _ locality_lifetime_pick).
 Class heapGS (Σ : gFunctors) (Ω : gTransformations Σ) := HeapGS {
   heapG_invGS : invGIndS_gen HasNoLc Σ Ω _ locality_lifetime_pick;
   (* heapG_no_trans :> noTransInG Σ Ω (gmap_view.gmap_viewR (nat * loc) (leibnizO val)); *)
-  heapG_gen_heapGS :> gen_heapIndGS loc val Σ Ω;
-  heapG_gen_stackGS :> gen_heapNoGS (nat * loc) val Σ Ω; (* gen_heapNoMetaGS (nat * loc) val Σ Ω ; *)
-  heapG_stacksizeGS :> stacksizeGS Σ Ω
+  heapG_gen_heapGS :: gen_heapIndGS loc val Σ Ω;
+  heapG_gen_stackGS :: gen_heapNoGS (nat * loc) val Σ Ω; (* gen_heapNoMetaGS (nat * loc) val Σ Ω ; *)
+  heapG_stacksizeGS :: stacksizeGS Σ Ω
 }.
 
 Notation "^ n" := (lifetime_stack n) (at level 70, format "^ n").
@@ -224,7 +224,7 @@ Local Existing Instances heapG_gen_heapGS heapG_gen_stackGS.
 (*   @GhostMapNoG Σ Ω (nat * loc) (leibnizO val) _ _ *)
 (*     (((heapG_invGS.(invGS_wsat)).(wsat_inG)).(wsatGpreS_func)).(noTransInG_B_inG). *)
 
-#[global] Instance gmap_view_inG `{H:invGIndS_gen fancy_updates.HasNoLc Σ Ω (gmap_view.gmap_viewR (nat * loc) (leibnizO val))} : ghost_mapNoG Σ Ω (nat * loc) (leibnizO val) :=
+#[global] Instance gmap_view_inG `{H:invGIndS_gen fancy_updates.HasNoLc Σ Ω (gmap_view.gmap_viewR (nat * loc) (agreeR (leibnizO val)))} : ghost_mapNoG Σ Ω (nat * loc) (leibnizO val) :=
   @GhostMapNoG Σ Ω (nat * loc) (leibnizO val) _ _ _.
     (* ((invGS_wsat.(wsat_inG)).(wsatGpreS_func)).(noTransInG_B_inG). *)
 
@@ -274,7 +274,7 @@ Definition next_choose_f (e : stack_expr) : option locality_lifetime :=
 Definition gen_stack_interp `{H : heapGS Σ Ω} s :=
   @ghost_map.ghost_map_auth Σ _ _ _ _ _ (stack_gname) 1 (list_to_gmap_stack s).
 
-Instance heapG_irisGS `{heapGS Σ Ω} : irisGS_gen _ lang Σ Ω (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) := {
+Instance heapG_irisGS `{heapGS Σ Ω} : irisGS_gen _ lang Σ Ω (gmap_view.gmap_viewR (nat * loc) (agreeR (leibnizO val))) := {
     iris_invGS := heapG_invGS;
     state_interp σ _ _ _ :=
       let '(h,s) := σ in
@@ -288,7 +288,7 @@ Instance heapG_irisGS `{heapGS Σ Ω} : irisGS_gen _ lang Σ Ω (gmap_view.gmap_
   }.
 Global Opaque iris_invGS.
 
-Definition id := (id : (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) -> (gmap_view.gmap_viewR (nat * loc) (leibnizO val))).
+Definition id := (id : (gmap_view.gmap_viewR (nat * loc) (agreeR (leibnizO val))) -> (gmap_view.gmap_viewR (nat * loc) (agreeR (leibnizO val)))).
 
 #[global]
 Instance option_state_trans_cmra_morphism `{H : heapGS Σ Ω} (n : option locality_lifetime) : CmraMorphism (from_option (λ n, locality_pick n) id n) 
@@ -335,18 +335,18 @@ Proof.
 Qed.    
 
 (** Override the notations so that scopes and coercions work out *)
-Notation "l ↦{ q } v" := (mapsto (L:=loc) (V:=val) l q v%V)
+Notation "l ↦{ q } v" := (pointsto (L:=loc) (V:=val) l q v%V)
   (at level 20, q at level 50, format "l  ↦{ q }  v") : bi_scope.
 Notation "l ↦ v" :=
-  (mapsto (L:=loc) (V:=val) l (DfracOwn 1) v%V) (at level 20) : bi_scope.
+  (pointsto (L:=loc) (V:=val) l (DfracOwn 1) v%V) (at level 20) : bi_scope.
 Notation "l ↦{ q } -" := (∃ v, l ↦{q} v)%I
   (at level 20, q at level 50, format "l  ↦{ q }  -") : bi_scope.
 Notation "l ↦ -" := (l ↦{DfracOwn 1} -)%I (at level 20) : bi_scope.
 
-Notation "i @@ l ↦{ q } v" := (mapsto (L:=nat * loc) (V:=val) (i,l) q v%V)
+Notation "i @@ l ↦{ q } v" := (pointsto (L:=nat * loc) (V:=val) (i,l) q v%V)
   (at level 20, l at next level, q at next level, format "i  @@  l  ↦{ q }  v") : bi_scope.
 Notation "i @@ l ↦ v" :=
-  (mapsto (L:=nat*loc) (V:=val) (i,l) (DfracOwn 1) v%V) (at level 20, l at next level, v at next level) : bi_scope.
+  (pointsto (L:=nat*loc) (V:=val) (i,l) (DfracOwn 1) v%V) (at level 20, l at next level, v at next level) : bi_scope.
 Notation "i @@ l ↦{ q } -" := (∃ v, i @@ l ↦{q} v)%I
   (at level 20, l at next level, q at next level, format "i  @@  l  ↦{ q }  -") : bi_scope.
 (* Notation "i @@ l ↦ -" := (i @@ l ↦{DfracOwn 1} -)%I (at level 20) : bi_scope. *)
@@ -378,8 +378,8 @@ Section heapG_nextgen_updates.
     iDestruct (ghost_map.ghost_map_insert _ v with "Hstk") as ">[Hstk Hl]";[eauto|].
     rewrite (list_to_gmap_stack_insert _ s0)//.
     simpl. rewrite /insert /insert_state_Insert /=.
-    rewrite PeanoNat.Nat.sub_0_r Hs0 insert_length. iFrame.
-    rewrite /mapsto seal_eq /gen_heap.mapsto_def /=. rewrite /stack_gname. simpl. iFrame. simpl. iFrame.
+    rewrite PeanoNat.Nat.sub_0_r Hs0 length_insert. iFrame.
+    rewrite /pointsto seal_eq /gen_heap.pointsto_def /=. rewrite /stack_gname. simpl. iFrame. simpl. iFrame.
     done.
   Qed.
 
@@ -387,7 +387,7 @@ Section heapG_nextgen_updates.
     (length s - 1 - j) @@ l ↦ w -∗ gen_stack_interp s -∗ ⌜[[ (h,s) @ j ]] !! l = Some w ⌝.
   Proof.
     iIntros "Hl Hs".
-    rewrite /mapsto seal_eq /=.
+    rewrite /pointsto seal_eq /=.
     iDestruct (ghost_map.ghost_map_lookup with "Hs Hl") as %Hlookup.
     rewrite list_to_gmap_stack_lookup in Hlookup.
     rewrite /lookup /lookup_state_Lookup /lookup_state /lookup_stack /=.
@@ -399,7 +399,7 @@ Section heapG_nextgen_updates.
      (length s - 1 - j) @@ l ↦ w -∗ gen_stack_interp s ==∗ (length s - 1 - j) @@ l ↦ w' ∗ gen_stack_interp (<[length s - 1 - j:=<[l:=w']> s0]> s).
   Proof.
     iIntros (Hs0) "Hl Hs".
-    rewrite /mapsto seal_eq /=.
+    rewrite /pointsto seal_eq /=.
     iMod (ghost_map.ghost_map_update with "Hs Hl") as "[Hs Hl]". iFrame.
     erewrite list_to_gmap_stack_insert =>//.
   Qed.
@@ -415,11 +415,8 @@ Section heapG_nextgen_updates.
     iDestruct (transmap_own_insert_two_right (inv_pick_transform (lifetime_stack (length s1 - i)))
                  (state_trans (length s1 - i)) with "Hs") as "Hs".
     iApply (bnextgen_mono with "Hs").
-    rewrite /state_trans
-      /map_entry_lift_gmap_view /= /cmra_morphism_extra.fmap_view /= /cmra_morphism_extra.fmap_pair /=.
-    rewrite /gMapTrans_frag_lift map_imap_empty /=.
-    rewrite /gmap_view.gmap_view_auth /view_auth.
-    rewrite agree_map_to_agree.
+    rewrite /state_trans.
+    rewrite map_entry_lift_gmap_view_auth.
     rewrite stack_location_cut_popN_stack. iIntros "Hs". iFrame.
   Qed.
 
@@ -452,7 +449,7 @@ Section heapG_nextgen_updates.
     l ↦{q} v ⊢ ⚡={next_state Ω n}=> l ↦{q} v.
   Proof.
     iIntros "Hl".
-    rewrite /mapsto seal_eq /gen_heap.mapsto_def
+    rewrite /pointsto seal_eq /gen_heap.pointsto_def
       /ghost_map.ghost_map_elem seal_eq /ghost_map.ghost_map_elem_def
       next_state_unseal /next_state_def.
     iDestruct (transmap_own_insert_two_other with "Hl") as "Hl".
@@ -499,7 +496,7 @@ Section heapG_nextgen_updates.
     i @@ l ↦{q} v ⊢ ⚡={next_state Ω (lifetime_stack n)}=> i @@ l ↦{q} v.
   Proof.
     iIntros (Hlt) "Hl".
-    rewrite /mapsto seal_eq /gen_heap.mapsto_def
+    rewrite /pointsto seal_eq /gen_heap.pointsto_def
       /ghost_map.ghost_map_elem seal_eq /ghost_map.ghost_map_elem_def
       next_state_unseal /next_state_def.
     rewrite -/stack_gname.
@@ -821,14 +818,14 @@ Section lifting.
       simpl. apply salloc_fresh;eauto. }
     iNext. iIntros (rm r0 σ2 efs Hstep) "Hp".
     resolve_next_state. iMod "Hcls".
-    rewrite /insert /= PeanoNat.Nat.sub_0_r Hs' /state_trans_state insert_length /=.
+    rewrite /insert /= PeanoNat.Nat.sub_0_r Hs' /state_trans_state length_insert /=.
     rewrite -/(state_trans_state (h1,s1)). (* rewrite -/(state_interp (h1,s1) ns κs nt). *)
     iDestruct (gen_heap_alloc_stack_ng (h1,s1) ns κs nt l v0 with "Hstate") as ">[Hstate Hl]".
     { simpl. eauto. }
     { simpl. rewrite list_to_gmap_stack_lookup. rewrite /lookup_stack /= in H10.
       rewrite PeanoNat.Nat.sub_0_r in H10. auto. }
     rewrite /insert /insert_state_Insert /insert_state /= PeanoNat.Nat.sub_0_r /= Hs' /=.
-    iDestruct "Hstate" as "[? [? ?]]". rewrite insert_length. iFrame.
+    iDestruct "Hstate" as "[? [? ?]]". rewrite length_insert. iFrame.
     iModIntro.
     iSplit;[iPureIntro;by resolve_next_state|]. iApply "HΦ". iFrame.
   Qed.
@@ -956,7 +953,7 @@ Section lifting.
     iMod (gen_stack_update _ _ _ _ _ (v') with "Hl Hs") as "[Hl Hs]";eauto.
     rewrite /insert /insert_state_Insert /insert_state /insert_stack /= Hs0.
     iModIntro. iDestruct ("HΦ" with "[$]") as "Hwp".
-    rewrite insert_length. iFrame. iPureIntro. by resolve_next_state.
+    rewrite length_insert. iFrame. iPureIntro. by resolve_next_state.
   Qed.
 
   (** ------------------------------------------------------------ *)

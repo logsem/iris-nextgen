@@ -1,4 +1,4 @@
-From iris.proofmode Require Import classes tactics.
+From iris.proofmode Require Import classes ltac_tactics.
 From iris.base_logic.lib Require Export iprop own invariants.
 From iris.algebra Require Import gmap_view.
 From iris.prelude Require Import options.
@@ -321,8 +321,8 @@ End bnextgen_ind_rules.
 (** * Class for iProps that are independent from a specific nextgen transformation *)
 
 Class GenIndependent {M : ucmra} {C : Type} (R : relation C) (pick : C -> M -> M) `{!∀ c, GenTrans (pick c)} (c : C) (P : uPred M) := gen_independent : ∀ c', rc R c c' -> P ⊢ ⚡={ pick c' }=> P.
-Global Arguments GenIndependent {_ _} _ _ {_} _ _%I : simpl never.
-Global Arguments gen_independent {_ _} _ _ {_} _ _%I {_}.
+Global Arguments GenIndependent {_ _} _ _ {_} _ _%_I : simpl never.
+Global Arguments gen_independent {_ _} _ _ {_} _ _%_I {_}.
 Global Hint Mode GenIndependent + + + + ! ! ! : typeclass_instances.
 Global Instance: Params (@GenIndependent) 4 := {}.
 
@@ -425,20 +425,20 @@ Notation "⚡={ M }=> P" := (nextgen_omega M P)
 Local Existing Instances noTransInG_A_inG noTransInG_B_inG noTransInG_inG.
 
 Definition bnextgen_bounded_ind {Σ : gFunctors} {A : cmra} {pick : pick_transform_rel A}
-  (Ω : gTransformations Σ) `{!noTwoTransInG Σ Ω (gmap_viewR positive (optionO (leibnizO C))) A} (c : C) (P : iProp Σ) : iProp Σ :=
+  (Ω : gTransformations Σ) `{!noTwoTransInG Σ Ω (gmap_viewR positive (agreeR (optionO (leibnizO C)))) A} (c : C) (P : iProp Σ) : iProp Σ :=
   ⚡◻{ (CR,λ c, build_trans (gT_map (transmap_insert_two_inG (inv_pick_transform c) (C_pick c) Ω))) ↑ c} P.
 
 Notation "⚡◻{ Ω ↑ c } P" := (bnextgen_bounded_ind Ω c P)
                                (at level 99, Ω at level 50, c at level 20, P at level 200, format "⚡◻{ Ω  ↑  c }  P") : bi_scope.
 
 Class IntoInextgen {Σ : gFunctors} {A : cmra} {pick : pick_transform_rel A}
-  (Ω : gTransformations Σ) `{!noTwoTransInG Σ Ω (gmap_viewR positive (optionO (leibnizO C))) A} (c : C) (P : iProp Σ) (Q : iProp Σ) :=
+  (Ω : gTransformations Σ) `{!noTwoTransInG Σ Ω (gmap_viewR positive (agreeR (optionO (leibnizO C)))) A} (c : C) (P : iProp Σ) (Q : iProp Σ) :=
   into_inextgen : P ⊢ ⚡◻{ Ω ↑ c } Q.
 Global Hint Mode IntoInextgen + + + + ! ! - - : typeclass_instances.
 
 Section bnextgen_bounded_ind_rules.
   Context {Σ : gFunctors} {A : cmra} {pick : pick_transform_rel A}
-    `{!noTwoTransInG Σ Ω (gmap_viewR positive (optionO (leibnizO C))) A}.
+    `{!noTwoTransInG Σ Ω (gmap_viewR positive (agreeR (optionO (leibnizO C)))) A}.
 
   Lemma bnextgen_bounded_ind_elim P c :
     (⚡◻{ Ω ↑ c } P) ⊢ P.
@@ -680,7 +680,7 @@ Notation GenIndependent2Ω Ω c P := (IntoInextgen Ω c P P).
 
 Section bnextgen_bounded_ind_rules.
   Context {Σ : gFunctors} {A : cmra} {pick : pick_transform_rel A}
-    `{!noTwoTransInG Σ Ω (gmap_viewR positive (optionO (leibnizO C))) A}.
+    `{!noTwoTransInG Σ Ω (gmap_viewR positive (agreeR (optionO (leibnizO C)))) A}.
 
   Lemma gen_ind_insert2_intro P c c' :
     GenIndependent2Ω Ω c P ->

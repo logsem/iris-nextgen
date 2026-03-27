@@ -1,5 +1,5 @@
 From iris.algebra Require Import functions gmap agree excl csum.
-From iris.proofmode Require Import classes tactics.
+From iris.proofmode Require Import classes ltac_tactics.
 From iris.base_logic.lib Require Export iprop own invariants.
 From iris.prelude Require Import options.
 From iris.bi Require Import plainly.

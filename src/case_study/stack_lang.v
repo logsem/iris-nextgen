@@ -1,4 +1,4 @@
-Require Export Logic.FunctionalExtensionality.
+From Stdlib Require Export Logic.FunctionalExtensionality.
 From iris.program_logic Require Import language.
 From nextgen.case_study.program_logic Require Import CC_ectx_lifting CC_ectxi_language.
 From nextgen.case_study Require Import prelude.
@@ -886,7 +886,7 @@ Module lang.
   Proof.
     revert s n m; induction l using rev_ind; intros s n m Hl; simpl in *;eauto.
     - subst. simpl. rewrite app_nil_r;auto.
-    - rewrite app_length in Hl. rewrite Nat.add_1_r in Hl.
+    - rewrite length_app in Hl. rewrite Nat.add_1_r in Hl.
       destruct m;[done|].
       rewrite app_assoc.
       assert (n + S m = S (n + m)) as ->;[lia|].
@@ -1157,7 +1157,7 @@ Module lang.
 End lang.
 
 (** Language *)
-Program Instance stack_lambda_ectxi_lang :
+#[global] Program Instance stack_lambda_ectxi_lang :
   CCEctxiLanguage
     (lang.stack_expr) lang.stack_val lang.ectx_item lang.state lang.observation :=
   {|
@@ -1171,7 +1171,8 @@ Solve Obligations with simpl; eauto using lang.stack_to_of_val, lang.stack_of_to
   lang.val_stuck, lang.fill_item_val, lang.fill_item_no_val_inj,
   lang.head_ctx_step_val, lang.red_mode_det, lang.ectxi_capture_captures,
   lang.ectxi_normal_reduciblity, lang.ectxi_throw_reduciblity,
-  lang.ectxi_capture_reduciblity.
+  (* FIXME: for some reason the [fill_item_inj] instance is not in scope *)    
+  lang.ectxi_capture_reduciblity, lang.fill_item_inj.
 
 Canonical Structure lang := CC_ectx_lang (lang.stack_expr).
 

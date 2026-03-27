@@ -10,7 +10,7 @@ Class stacksizePreGS (Σ : gFunctors) (Ω : gTransformations Σ) := StackSizePre
                                                                    }.
 
 Class heapPreGS (Σ : gFunctors) (Ω : gTransformations Σ) := HeapPreGS {
-  heap_preG_invGS :: invGIndpreS Σ Ω (gmap_view.gmap_viewR (nat * loc) (leibnizO val)) locality_lifetime_pick;
+  heap_preG_invGS :: invGIndpreS Σ Ω (gmap_view.gmap_viewR (nat * loc) (agreeR (leibnizO val))) locality_lifetime_pick;
   heap_preG_heap  :: gen_heapIndGpreS loc val Σ Ω;
   heap_preG_stack :: gen_heapNoGpreS (nat * loc) val Σ Ω;
   heap_preG_size  :: stacksizePreGS Σ Ω
@@ -22,7 +22,7 @@ Lemma stacksize_init `{!stacksizePreGS Σ Ω} (n : nat) :
       @own Σ _ (H.(heapG_excl_nat_stacksizeGS)).(genInG_inG) H.(heapG_stacksize_name) (excl_auth_frag n).
               (* [size] n. *)
 Proof.
-  iMod own_alloc as (γ) "HH".
+  iMod (own_alloc (A := (excl_authUR natR))) as (γ) "HH".
   { apply @excl_auth_valid with (a:=n). }
   iDestruct "HH" as "[H1 H2]".
   iExists (StackSizeGS Σ Ω γ _).

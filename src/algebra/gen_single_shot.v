@@ -32,7 +32,7 @@ Definition GTS_floor {A} (a : GTS A) : GTS A :=
   match a with
     (Excl' (), _) => (Excl' (), Some $ Cinl $ Excl ())
   | (None, _) => (None, None)
-  | (ExclBot', _) => (ExclBot', Some $ Cinl $ ExclBot)
+  | (ExclInvalid', _) => (ExclInvalid', Some $ Cinl $ ExclInvalid)
   end.
 
 Global Instance GTS_floor_generation A : CmraMorphism (GTS_floor (A := A) : GTSR A → GTSR A).
@@ -62,7 +62,7 @@ Proof.
   rewrite csum_validI.
   rewrite left_id.
   rewrite to_agree_op_validI.
-  rewrite -leibniz_equiv_iff.
+  rewrite -(leibniz_equiv_iff (A := leibnizO A)).
   apply (anti_symm _); naive_solver.
 Qed.
 

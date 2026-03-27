@@ -4,7 +4,7 @@ From iris.algebra Require Import csum excl auth dfrac.
 From iris.algebra Require Import csum excl auth dfrac.
 
 (** A good core is one that returns the largest local unit. *)
-Definition pcore_good (A : cmra) :=
+Definition pcore_good {SI: sidx} (A : cmra) :=
   ∀ (a : A),
     match pcore a with
     | None =>
@@ -22,10 +22,10 @@ Definition pcore_good (A : cmra) :=
     (*   (∀ a', ✓ (a ⋅ a') → (a ⋅ a' ≡ a) → a' ≡ pa ∨ a' ≼ pa)). *)
 
 (** When the core is total we can simplify the requirement. *)
-Definition core_good (A : cmra) :=
+Definition core_good {SI: sidx} (A : cmra) :=
   ∀ (a : A), (∀ a', ✓ (a ⋅ a') → a ⋅ a' ≡ a → a' ≼ core a).
 
-Lemma pcore_good_to_core_good {A : cmra} `{CmraTotal A} :
+Lemma pcore_good_to_core_good {SI: sidx} {A : cmra} `{!CmraTotal A} :
   pcore_good A ↔ core_good A.
 Proof.
   split.
@@ -43,7 +43,7 @@ Proof.
   intros Heq. eapply (Qp.not_add_le_l q p). rewrite Heq //.
 Qed.
 
-Lemma dfrac_pcore_good : pcore_good dfrac.
+Lemma dfrac_pcore_good {SI: sidx} : pcore_good dfrac.
 Proof.
   intros [?| |?]; simpl.
   - intros [?| |?] ?; try done.
@@ -56,14 +56,14 @@ Proof.
     + inversion 1. apply qp_add_neq in H2. done.
 Qed.
 
-Lemma excl_pcore_good {A} : pcore_good (exclR A).
+Lemma excl_pcore_good {SI: sidx} {A} : pcore_good (exclR A).
 Proof.
   intros [?|].
   - intros [?|] ?; inversion 1.
   - intros [?|]; inversion 1.
 Qed.
 
-Lemma option_pcore_good {A} : pcore_good A → pcore_good (option A).
+Lemma option_pcore_good {SI: sidx} {A} : pcore_good A → pcore_good (option A).
 Proof.
   intros Hi.
   apply pcore_good_to_core_good.
@@ -82,14 +82,14 @@ Proof.
   - inversion eq.
 Qed.
 
-Lemma agree_pcore_good {A} : pcore_good (agreeR A).
+Lemma agree_pcore_good {SI: sidx} {A} : pcore_good (agreeR A).
 Proof.
   intros a. simpl.
   intros a' val eq1.
   apply agree_included. rewrite -{1}eq1 comm. done.
 Qed.
 
-Lemma prod_pcore_good {A B} :
+Lemma prod_pcore_good {SI: sidx} {A B} :
   pcore_good A → pcore_good B → pcore_good (prodR A B).
 Proof.
   unfold pcore_good.
@@ -109,11 +109,11 @@ Proof.
   - apply Hb; try done.
 Qed.
 
-Lemma prod_core_good {A B} `{CmraTotal A, CmraTotal B} :
+Lemma prod_core_good {SI: sidx} {A B} `{!CmraTotal A, !CmraTotal B} :
   core_good A → core_good B → core_good (prodR A B).
 Proof. rewrite -!pcore_good_to_core_good. apply prod_pcore_good. Qed.
 
-Lemma view_valid {A : ofe} {B : ucmra} a (f : B) (rel : view_rel A B) :
+Lemma view_valid {SI: sidx} {A : ofe} {B : ucmra} a (f : B) (rel : view_rel (SI := SI) A B) :
   ✓ (View a f : view rel) → ✓ a ∧ ✓ f.
 Proof.
   rewrite view.view_valid_eq. simpl.
@@ -138,7 +138,7 @@ Proof.
     apply H.
 Qed.
 
-Lemma view_pcore_good A (B : ucmra) rel : pcore_good B → pcore_good (@viewR A B rel).
+Lemma view_pcore_good {SI: sidx} A (B : ucmra) rel : @pcore_good SI B → pcore_good (@viewR SI A B rel).
 Proof.
   intros Hg%pcore_good_to_core_good.
   apply pcore_good_to_core_good.
@@ -146,7 +146,7 @@ Proof.
   inversion 1 as [eq ?]. simpl in *.
   rewrite view.view_core_eq. simpl.
   destruct (Hg f1 f2) as [fp2 ->]; [done|done| ].
-  specialize (option_pcore_good (prod_pcore_good dfrac_pcore_good (agree_pcore_good (A := A)))) as Hg2.
+  specialize (option_pcore_good (prod_pcore_good dfrac_pcore_good (agree_pcore_good (SI := SI) (A := A)))) as Hg2.
   apply pcore_good_to_core_good in Hg2.
   destruct (Hg2 a1 a2) as [ap2 ->]; [done|done| ].
   exists (View ap2 fp2).
@@ -155,12 +155,12 @@ Qed.
 
 (** A good cmra is one where every element has either no local unit or one
  * greatest local unit. *)
-Definition good_cmra (A : cmra) : Prop :=
+Definition good_cmra {SI: sidx} (A : cmra) : Prop :=
   ∀ (a : A) (au1 au2 : A),
     a ⋅ au1 ≡ a → a ⋅ au2 ≡ a → (* [au1] and [au2] are two local units *)
     (au1 ≡ au2 ∨ au1 ≼ au2 ∨ au2 ≼ au1).
 
-Class SaneCmra (A : cmra) := {
+Class SaneCmra {SI: sidx} (A : cmra) := {
   has_largest_core :
     ∀ (a : A),
       (* [a] has one largest local unit *)
@@ -172,14 +172,14 @@ Class SaneCmra (A : cmra) := {
       {∀ a', ✓ (a ⋅ a') → a ⋅ a' ≢ a}
 }.
 
-Definition ucore `{!SaneCmra A} (a : A) : option A :=
+Definition ucore {SI: sidx} `{!SaneCmra A} (a : A) : option A :=
   match has_largest_core a with
   | inleft (exist _ pa _) => Some pa
   | inright _ => None
   end.
 
 Section ucore.
-  Context `{!SaneCmra A}.
+  Context `{SI: sidx, !SaneCmra A}.
 
   Lemma ucore_unit (x : A) cx :
     ucore x = Some cx → cx ⋅ x ≡ x.

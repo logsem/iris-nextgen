@@ -1,6 +1,6 @@
 From iris.base_logic Require Export gen_heap.
 From iris.algebra Require Export list excl_auth.
-From iris.proofmode Require Import tactics.
+From iris.proofmode Require Import ltac_tactics.
 From stdpp Require Import fin_maps.
 From nextgen Require Import nextgen_basic nextgen_pointwise.
 Set Default Proof Using "Type".
@@ -9,43 +9,43 @@ Import uPred.
 (** Some useful typeclasses for using IndInG/NoInG with gen_heaps and ghost_map *)
 
 Class ghost_mapIndG (Σ : gFunctors) (Ω : gTransformations Σ) (K V : Type) (eqdec: EqDecision K) (count: @Countable K eqdec) : Set := GhostMapIndG
-  { ghost_map_inIndG : genIndInG Σ Ω (gmap_view.gmap_viewR K (leibnizO V)) }.
-Arguments ghost_mapIndG Σ Ω (K V)%type_scope {_ _}.
-Arguments GhostMapIndG Σ Ω (K V)%type_scope {_ _ _}.
+  { #[local] ghost_map_inIndG :: genIndInG Σ Ω (gmap_view.gmap_viewR K (agreeR (leibnizO V))) }.
+Arguments ghost_mapIndG Σ Ω (K V)%_type_scope {_ _}.
+Arguments GhostMapIndG Σ Ω (K V)%_type_scope {_ _ _}.
 
 Class ghost_mapNoG (Σ : gFunctors) (Ω : gTransformations Σ) (K V : Type)  (eqdec: EqDecision K) (count: @Countable K eqdec) : Set := GhostMapNoG
-  { ghost_map_inNoG : noTransInG Σ Ω (gmap_view.gmap_viewR K (leibnizO V)) }.
-Arguments ghost_mapNoG Σ Ω (K V)%type_scope {_ _}.
-Arguments GhostMapNoG Σ Ω (K V)%type_scope {_ _ _}.
+  { ghost_map_inNoG : noTransInG Σ Ω (gmap_view.gmap_viewR K (agreeR (leibnizO V))) }.
+Arguments ghost_mapNoG Σ Ω (K V)%_type_scope {_ _}.
+Arguments GhostMapNoG Σ Ω (K V)%_type_scope {_ _ _}.
 
 Class gen_heapNoGpreS (L V : Type) (Σ : gFunctors) (Ω : gTransformations Σ) (eqdec: EqDecision L) (count: Countable L) : Set := Build_gen_heapNoGpreS
   { (* gen_heapNoGpreS_heap : ghost_mapNoG Σ Ω L V; *)
-    gen_heapNoGpreS_meta : ghost_mapIndG Σ Ω L gname;
+    #[local] gen_heapNoGpreS_meta :: ghost_mapIndG Σ Ω L gname;
     gen_heapNoGpreS_meta_data : genIndInG Σ Ω (reservation_map.reservation_mapR (agreeR positiveO)) }.
-Arguments gen_heapNoGpreS (L V)%type_scope Σ Ω {_ _}.
-Arguments Build_gen_heapNoGpreS (L V)%type_scope Σ Ω {_ _ _ _}.
+Arguments gen_heapNoGpreS (L V)%_type_scope Σ Ω {_ _}.
+Arguments Build_gen_heapNoGpreS (L V)%_type_scope Σ Ω {_ _ _ _}.
 
 Class gen_heapIndGpreS (L V : Type) (Σ : gFunctors) (Ω : gTransformations Σ) (eqdec: EqDecision L) (count: Countable L) : Set := Build_gen_heapIndGpreS
   { gen_heapIndGpreS_heap : ghost_mapIndG Σ Ω L V;
     gen_heapIndGpreS_meta : ghost_mapIndG Σ Ω L gname;
     gen_heapIndGpreS_meta_data : genIndInG Σ Ω (reservation_map.reservation_mapR (agreeR positiveO)) }.
-Arguments gen_heapIndGpreS (L V)%type_scope Σ Ω {_ _}.
-Arguments Build_gen_heapIndGpreS (L V)%type_scope Σ Ω {_ _ _ _ _}.
+Arguments gen_heapIndGpreS (L V)%_type_scope Σ Ω {_ _}.
+Arguments Build_gen_heapIndGpreS (L V)%_type_scope Σ Ω {_ _ _ _ _}.
 
 Class gen_heapNoGS (L V : Type) (Σ : gFunctors) (Ω : gTransformations Σ) (eqdec: EqDecision L) (count: Countable L) : Set := GenHeapNoGS
   { gen_heap_inNoG : gen_heapNoGpreS L V Σ Ω;  no_gen_heap_name : gname;  no_gen_meta_name : gname }.
-Arguments gen_heapNoGS (L V)%type_scope Σ Ω {_ _}.
-Arguments GenHeapNoGS (L V)%type_scope Σ Ω {_ _ _} no_gen_heap_name no_gen_meta_name.
+Arguments gen_heapNoGS (L V)%_type_scope Σ Ω {_ _}.
+Arguments GenHeapNoGS (L V)%_type_scope Σ Ω {_ _ _} no_gen_heap_name no_gen_meta_name.
 
 Class gen_heapIndGS (L V : Type) (Σ : gFunctors) (Ω : gTransformations Σ) (eqdec: EqDecision L) (count: Countable L) : Set := GenHeapIndGS
 { gen_heap_inIndG : gen_heapIndGpreS L V Σ Ω;  ind_gen_heap_name : gname;  ind_gen_meta_name : gname }.
-Arguments gen_heapIndGS (L V)%type_scope Σ Ω {_ _}.
-Arguments GenHeapIndGS (L V)%type_scope Σ Ω {_ _ _} ind_gen_heap_name ind_gen_meta_name.
+Arguments gen_heapIndGS (L V)%_type_scope Σ Ω {_ _}.
+Arguments GenHeapIndGS (L V)%_type_scope Σ Ω {_ _ _} ind_gen_heap_name ind_gen_meta_name.
 
 Class gen_heapNoMetaGS (L V : Type) (Σ : gFunctors) (Ω : gTransformations Σ) (eqdec: EqDecision L) (count: Countable L) : Set := GenHeapNoMetaGS
   { gen_heap_inNoMetaG : ghost_mapNoG Σ Ω L V;  no_meta_gen_heap_name : gname; }.
-Arguments gen_heapNoMetaGS (L V)%type_scope Σ Ω {_ _}.
-Arguments GenHeapNoMetaGS (L V)%type_scope Σ Ω {_ _ _} no_meta_gen_heap_name.
+Arguments gen_heapNoMetaGS (L V)%_type_scope Σ Ω {_ _}.
+Arguments GenHeapNoMetaGS (L V)%_type_scope Σ Ω {_ _ _} no_meta_gen_heap_name.
 
 
 (** Some coersions from above classes to gen_heap/ghost_map *)
@@ -75,7 +75,7 @@ Arguments GenHeapNoMetaGS (L V)%type_scope Σ Ω {_ _ _} no_meta_gen_heap_name.
 Lemma gen_heap_init_no_names `{Countable L, !ghost_mapNoG Σ Ω L V, !gen_heapNoGpreS L V Σ Ω} σ :
   ⊢ |==> ∃ γh γm : gname,
     let hG := GenHeapNoGS L V Σ Ω γh γm in
-    gen_heap_interp σ ∗ ([∗ map] l ↦ v ∈ σ, mapsto l (DfracOwn 1) v) ∗ ([∗ map] l ↦ _ ∈ σ, meta_token l ⊤).
+    gen_heap_interp σ ∗ ([∗ map] l ↦ v ∈ σ, pointsto l (DfracOwn 1) v) ∗ ([∗ map] l ↦ _ ∈ σ, meta_token l ⊤).
 Proof.
   iMod (ghost_map.ghost_map_alloc_empty (K:=L) (V:=V)) as (γh) "Hh".
   iMod (ghost_map.ghost_map_alloc_empty (K:=L) (V:=gname)) as (γm) "Hm".
@@ -89,7 +89,7 @@ Qed.
 
 Lemma gen_heap_init_no `{Countable L, ghost_mapNoG Σ Ω L V, !gen_heapNoGpreS L V Σ Ω} σ :
   ⊢ |==> ∃ _ : gen_heapNoGS L V Σ Ω,
-    gen_heap_interp σ ∗ ([∗ map] l ↦ v ∈ σ, mapsto l (DfracOwn 1) v) ∗ ([∗ map] l ↦ _ ∈ σ, meta_token l ⊤).
+    gen_heap_interp σ ∗ ([∗ map] l ↦ v ∈ σ, pointsto l (DfracOwn 1) v) ∗ ([∗ map] l ↦ _ ∈ σ, meta_token l ⊤).
 Proof.
   iMod (gen_heap_init_names σ) as (γh γm) "Hinit".
   iExists (GenHeapNoGS _ _ _ _ γh γm).
@@ -98,7 +98,7 @@ Qed.
 
 Lemma gen_heap_init_ind `{Countable L, !gen_heapIndGpreS L V Σ Ω} σ :
   ⊢ |==> ∃ _ : gen_heapIndGS L V Σ Ω,
-    gen_heap_interp σ ∗ ([∗ map] l ↦ v ∈ σ, mapsto l (DfracOwn 1) v) ∗ ([∗ map] l ↦ _ ∈ σ, meta_token l ⊤).
+    gen_heap_interp σ ∗ ([∗ map] l ↦ v ∈ σ, pointsto l (DfracOwn 1) v) ∗ ([∗ map] l ↦ _ ∈ σ, meta_token l ⊤).
 Proof.
   iMod (gen_heap_init_names σ) as (γh γm) "Hinit".
   iExists (GenHeapIndGS _ _ _ _ γh γm).

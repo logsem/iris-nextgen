@@ -1,5 +1,5 @@
 From Equations Require Import Equations.
-From stdpp Require Import pmap.
+From stdpp Require Import pmap list.
 From iris.base_logic Require Import ghost_map.
 From iris.base_logic.lib Require Export iprop own invariants.
 From iris.algebra Require Import gmap gmap_view view.
@@ -56,7 +56,7 @@ Qed.
 Existing Instance map_trans_frag_ne.
 
 Record ghost_mapGS (L V : Type) (Σ : gFunctors) (EqDecision0 : EqDecision L) (H : Countable L) : Set := GhostMapGS
-  { ghost_map_inG : inG Σ (gmap_viewR L (leibnizO V));  ghost_name : gname }.
+  { ghost_map_inG : inG Σ (gmap_viewR L (agreeR (leibnizO V)));  ghost_name : gname }.
 
 Fixpoint option_list_collapse_list {A : Type} (l : list (option A)) : list A :=
   match l with
@@ -395,20 +395,20 @@ Proof.
       apply agree_option_eq_none.
       apply option_list_collapse_none_construct.
       apply option_list_collapse_spec in Hf.
-      intros x' Hin. apply elem_of_list_fmap in Hin as [y [Heq Hin]].
+      intros x' Hin. apply list_elem_of_fmap in Hin as [y [Heq Hin]].
       destruct (f y) eqn:Hy;simpl in *;subst;auto.
-      eapply option_list_collapse_none_spec;eauto. apply elem_of_list_fmap.
+      eapply option_list_collapse_none_spec;eauto. apply list_elem_of_fmap.
       eexists;split;eauto.
       eapply collapse_rel_iff;eauto. rewrite -Hy.
-      apply elem_of_list_fmap. eexists;split;eauto.
+      apply list_elem_of_fmap. eexists;split;eauto.
   - apply agree_option_eq_none.
     apply agree_option_eq_none in Hf.
     apply option_list_collapse_none_construct.
-    intros x' [y [Heq Hin]]%elem_of_list_fmap.
+    intros x' [y [Heq Hin]]%list_elem_of_fmap.
     destruct (f y) eqn:Hy;simpl in *;auto.
     subst.
     eapply option_list_collapse_none_spec with (x:=f y) in Hf;eauto;simplify_eq.
-    apply elem_of_list_fmap;eauto.
+    apply list_elem_of_fmap;eauto.
 Qed.
 
 Lemma agree_option_map_to_agree {A B} (f : A → option B) (x : A) :
@@ -434,37 +434,37 @@ Section agree_option_map.
       pose proof (option_list_collapse_spec _ _ Hy) as Hspec2.
       apply option_list_collapse_length in Hx as Hlen.
       apply option_list_collapse_length in Hy as Hlen'.
-      rewrite fmap_length in Hlen; rewrite fmap_length in Hlen'.
-      split=> b /=; setoid_rewrite elem_of_list_lookup.
-      + rewrite -!elem_of_list_lookup. intros Hi.
+      rewrite length_fmap in Hlen; rewrite length_fmap in Hlen'.
+      split=> b /=; setoid_rewrite list_elem_of_lookup.
+      + rewrite -!list_elem_of_lookup. intros Hi.
         apply collapse_rel_iff with (x:=b) in Hspec1 as Hiff.
         apply Hiff in Hi.
-        apply elem_of_list_fmap in Hi as [c [Heq Hc]];simplify_eq.
+        apply list_elem_of_fmap in Hi as [c [Heq Hc]];simplify_eq.
         apply H in Hc as [c' [Hin Hc']].
         apply Hf in Hc'. rewrite -Heq in Hc'.
-        apply elem_of_list_fmap_1 with (f:=f) in Hin.
+        apply list_elem_of_fmap_2 with (f:=f) in Hin.
         destruct (f c') eqn:Hfc;inversion Hc'; subst.
         apply collapse_rel_iff with (x:=o) in Hspec2 as Hiff2.
-        apply Hiff2 in Hin. exists o. rewrite -elem_of_list_lookup. split;auto.
-      + rewrite -!elem_of_list_lookup. intros Hi.
+        apply Hiff2 in Hin. exists o. rewrite -list_elem_of_lookup. split;auto.
+      + rewrite -!list_elem_of_lookup. intros Hi.
         apply collapse_rel_iff with (x:=b) in Hspec2 as Hiff.
         apply Hiff in Hi.
-        apply elem_of_list_fmap in Hi as [c [Heq Hc]];simplify_eq.
+        apply list_elem_of_fmap in Hi as [c [Heq Hc]];simplify_eq.
         apply H' in Hc as [c' [Hin Hc']].
         apply Hf in Hc'. rewrite -Heq in Hc'.
-        apply elem_of_list_fmap_1 with (f:=f) in Hin.
+        apply list_elem_of_fmap_2 with (f:=f) in Hin.
         destruct (f c') eqn:Hfc;inversion Hc'; subst.
         apply collapse_rel_iff with (x:=o) in Hspec1 as Hiff1.
-        apply Hiff1 in Hin. exists o. rewrite -elem_of_list_lookup. split;auto.
+        apply Hiff1 in Hin. exists o. rewrite -list_elem_of_lookup. split;auto.
     - apply agree_option_eq_some in Hx.
       apply agree_option_eq_none in Hy.
       pose proof (option_list_collapse_spec _ _ Hx) as Hspec1.
       pose proof (option_list_collapse_none_spec _ Hy) as Hspec2.
       pose proof (collapse_rel_iff _ _ Hspec1) as Hiff.
       pose proof (elem_of_agree a) as [b Hb].
-      apply Hiff in Hb. apply elem_of_list_fmap in Hb as [b' [Heq Hb']].
+      apply Hiff in Hb. apply list_elem_of_fmap in Hb as [b' [Heq Hb']].
       apply H in Hb' as Hin. destruct Hin as [c [Hin Hne]].
-      apply Hf in Hne. apply elem_of_list_fmap_1 with (f:=f) in Hin.
+      apply Hf in Hne. apply list_elem_of_fmap_2 with (f:=f) in Hin.
       apply Hspec2 in Hin as Heq'. rewrite -Heq Heq' in Hne. inversion Hne.
     - apply agree_option_eq_none in Hx.
       apply agree_option_eq_some in Hy.
@@ -472,9 +472,9 @@ Section agree_option_map.
       pose proof (option_list_collapse_none_spec _ Hx) as Hspec2.
       pose proof (collapse_rel_iff _ _ Hspec1) as Hiff.
       pose proof (elem_of_agree a) as [b Hb].
-      apply Hiff in Hb. apply elem_of_list_fmap in Hb as [b' [Heq Hb']].
+      apply Hiff in Hb. apply list_elem_of_fmap in Hb as [b' [Heq Hb']].
       apply H' in Hb' as Hin. destruct Hin as [c [Hin Hne]].
-      apply Hf in Hne. apply elem_of_list_fmap_1 with (f:=f) in Hin.
+      apply Hf in Hne. apply list_elem_of_fmap_2 with (f:=f) in Hin.
       apply Hspec2 in Hin as Heq'. rewrite -Heq Heq' in Hne. inversion Hne.
   Qed.
   Local Instance agree_option_map_proper : Proper ((≡) ==> (≡)) (agree_option_map f) := ne_proper _.
@@ -491,24 +491,24 @@ Section agree_option_map.
       pose proof (collapse_rel_iff _ _ Hspec1) as Hiff1.
       pose proof (collapse_rel_iff _ _ Hspec2) as Hiff2.
       intros n.
-      split=> b /=; setoid_rewrite elem_of_list_lookup.
-      + rewrite -elem_of_list_lookup.
+      split=> b /=; setoid_rewrite list_elem_of_lookup.
+      + rewrite -list_elem_of_lookup.
         intros Hb.
         apply Hiff1 in Hb as Hin.
-        apply elem_of_list_fmap in Hin as [c [Heq Hc]].
-        apply elem_of_list_fmap_1 with (f:=g) in Hc as Hc'.
+        apply list_elem_of_fmap in Hin as [c [Heq Hc]].
+        apply list_elem_of_fmap_2 with (f:=g) in Hc as Hc'.
         pose proof (Hfg c) as Hequiv. rewrite -Heq in Hequiv.
         destruct (g c) eqn:Hsome;[|inversion Hequiv].
-        apply Hiff2 in Hc'. exists o. rewrite -elem_of_list_lookup. split;eauto.
+        apply Hiff2 in Hc'. exists o. rewrite -list_elem_of_lookup. split;eauto.
         inversion Hequiv;subst;auto.
-      + rewrite -elem_of_list_lookup.
+      + rewrite -list_elem_of_lookup.
         intros Hb.
         apply Hiff2 in Hb as Hin.
-        apply elem_of_list_fmap in Hin as [c [Heq Hc]].
-        apply elem_of_list_fmap_1 with (f:=f) in Hc as Hc'.
+        apply list_elem_of_fmap in Hin as [c [Heq Hc]].
+        apply list_elem_of_fmap_2 with (f:=f) in Hc as Hc'.
         pose proof (Hfg c) as Hequiv. rewrite -Heq in Hequiv.
         destruct (f c) eqn:Hsome;[|inversion Hequiv].
-        apply Hiff1 in Hc'. exists o. rewrite -elem_of_list_lookup. split;eauto.
+        apply Hiff1 in Hc'. exists o. rewrite -list_elem_of_lookup. split;eauto.
         inversion Hequiv;subst;auto.
     - apply agree_option_eq_some in Hx.
       apply agree_option_eq_none in Hy.
@@ -517,8 +517,8 @@ Section agree_option_map.
       pose proof (collapse_rel_iff _ _ Hspec1) as Hiff1.
       pose proof (elem_of_agree a) as [b Hb].
       apply Hiff1 in Hb.
-      apply elem_of_list_fmap in Hb as [y [Heq Hin]].
-      apply elem_of_list_fmap_1 with (f:=g) in Hin.
+      apply list_elem_of_fmap in Hb as [y [Heq Hin]].
+      apply list_elem_of_fmap_2 with (f:=g) in Hin.
       apply Hspec2 in Hin. specialize (Hfg y).
       rewrite -Heq Hin in Hfg. inversion Hfg.
     - apply agree_option_eq_some in Hy.
@@ -528,8 +528,8 @@ Section agree_option_map.
       pose proof (collapse_rel_iff _ _ Hspec1) as Hiff1.
       pose proof (elem_of_agree a) as [b Hb].
       apply Hiff1 in Hb.
-      apply elem_of_list_fmap in Hb as [y [Heq Hin]].
-      apply elem_of_list_fmap_1 with (f:=f) in Hin.
+      apply list_elem_of_fmap in Hb as [y [Heq Hin]].
+      apply list_elem_of_fmap_2 with (f:=f) in Hin.
       apply Hspec2 in Hin. specialize (Hfg y).
       rewrite -Heq Hin in Hfg. inversion Hfg.
   Qed.
@@ -549,12 +549,16 @@ Section agree_option_map.
     pose proof (collapse_rel_iff _ _ Hspec1) as Hiff1.
     apply Hiff1 in Ha as Ha'.
     apply Hiff1 in Hb as Hb'.
-    apply elem_of_list_fmap in Ha' as [a' [Heq1 Ha']].
-    apply elem_of_list_fmap in Hb' as [b' [Heq2 Hb']].
+    apply list_elem_of_fmap in Ha' as [a' [Heq1 Ha']].
+    apply list_elem_of_fmap in Hb' as [b' [Heq2 Hb']].
     eapply Hv in Ha';eauto. apply Hf in Ha'. rewrite -Heq1 -Heq2 in Ha'.
     inversion Ha';auto.
   Qed.
 
+  Lemma agree_option_map_valid_includedN x y n:
+    ✓{n} y -> x ≼{n} y -> agree_option_map f x ≼{n} agree_option_map f y.
+  Proof. intros. rewrite (agree_valid_includedN _ x y) //. Qed.
+  
   Lemma agree_option_map_op v1 v2 :
     agree_option_map f (v1 ⋅ v2) = agree_option_map f v1 ⋅ agree_option_map f v2.
   Proof.
@@ -599,17 +603,25 @@ Section agree_option_map.
 
 End agree_option_map.
 
+Definition map_trans_auth_lift {L : Type} {V : ofe} `{EqDecision L, Countable L} (f : L -> V -> option V) :
+  L -> agreeR V -> option (agreeR V) :=
+  λ l v, agree_option_map (f l) v.
+
+Definition gMapTrans_auth_lift {K : Type} {V : ofe} {eqK : EqDecision K} {countK : Countable K}
+  map_entry : gmapO K (agreeR V) → gmapO K (agreeR V) :=
+  map_imap (map_trans_auth_lift map_entry).
+
 Definition map_trans_frag_lift {L : Type} {V : ofe} `{EqDecision L, Countable L} (f : L -> V -> option V) :
   L -> prodR dfracR (agreeR V) -> option (prodR dfracR (agreeR V)) :=
   λ l dv, let '(d,v) := dv in agree_option_map (f l) v ≫= λ v', Some (d,v').
 
 Definition gMapTrans_frag_lift {K : Type} {V : ofe} {eqK : EqDecision K} {countK : Countable K}
-  map_entry : (gmap_view.gmap_view_fragUR K V) → (gmap_view.gmap_view_fragUR K V) :=
+  map_entry : (gmap_view.gmap_view_fragUR K (agreeR V)) → (gmap_view.gmap_view_fragUR K (agreeR V)) :=
   λ frag_view, map_imap (map_trans_frag_lift map_entry) frag_view.
 
 Definition map_entry_lift_gmap_view {K : Type} {V : ofe} {eqK : EqDecision K} {countK : Countable K}
-    map_entry : gmap_viewR K (V) -> gmap_viewR K (V) :=
-  fmap_view (map_imap map_entry) (gMapTrans_frag_lift map_entry).
+  (map_entry: K → V → option V) : gmap_viewR K (agreeR V) -> gmap_viewR K (agreeR V) :=
+  fmap_view (gMapTrans_auth_lift map_entry) (gMapTrans_frag_lift map_entry).
 
 Global Instance gmap_map_imap_ne {K : Type} {A B : ofe} `{Countable K}
   (f : K -> A -> option B) :
@@ -619,7 +631,6 @@ Proof.
   rewrite !map_lookup_imap. pose proof (Hne k) as Hlook. rewrite Hlook. auto.
 Qed.
 
-
 Lemma to_agree_dist {V : ofe} n (w' : agree V) (w : V) :
   w' ≡{n}≡ to_agree w <-> forall a, a ∈ agree_car w' -> a ≡{n}≡ w.
 Proof.
@@ -627,13 +638,13 @@ Proof.
   - intros Hne. inversion Hne as [Hin1 Hin2].
     intros a Hin. apply Hin1 in Hin as [b [Hb Heq]].
     unfold to_agree in Hb. simpl in *.
-    apply elem_of_list_singleton in Hb;subst.
+    apply list_elem_of_singleton in Hb;subst.
     auto.
   - intros Hcond. split.
     + intros.
       apply Hcond in H. exists w. split;auto.
       rewrite /to_agree /=. constructor.
-    + rewrite /to_agree /=. intros v H%elem_of_list_singleton;subst.
+    + rewrite /to_agree /=. intros v H%list_elem_of_singleton;subst.
       pose proof (elem_of_agree w') as [a Ha].
       exists a. split;auto.
 Qed.
@@ -647,28 +658,30 @@ Proof.
 Qed.
 
 Definition map_entry_lift_gmap_view_no_auth {K : Type} {V : ofe} {eqK : EqDecision K} {countK : Countable K}
-    map_entry : gmap_viewR K (V) -> gmap_viewR K (V) :=
-    λ (x : gmap_viewR K (V)), View None (gMapTrans_frag_lift map_entry (view_frag_proj x)).
+    map_entry : gmap_viewR K (agreeR V) -> gmap_viewR K (agreeR V) :=
+    λ (x : gmap_viewR K (agreeR V)), View None (gMapTrans_frag_lift map_entry (view_frag_proj x)).
 
 Section map_entry.
   Context {K : Type} {V : ofe}.
   Context `{Countable K, !LeibnizEquiv V, !OfeDiscrete V}.
   Implicit Types (map_entry : K → V → option V).
-
+  
   Lemma map_trans_auth_frag_rel
     map_entry `{!MapTrans map_entry} (n : nat)
-    (m1 : gmap K V) (view_frag_proj : gmap_view.gmap_view_fragUR K V) :
-    gmap_view.gmap_view_rel_raw K V n m1 view_frag_proj ->
-    gmap_view.gmap_view_rel_raw K V n (map_imap map_entry m1) (map_imap (map_trans_frag_lift map_entry) view_frag_proj).
+    (m1 : gmap K V) (view_frag_proj : gmap_view.gmap_view_fragUR K (agreeR V)) :
+    gmap_view.gmap_view_rel_raw K (agree V) n (to_agree <$> m1) view_frag_proj ->
+    gmap_view.gmap_view_rel_raw K (agree V) n (to_agree <$> map_imap map_entry m1) (map_imap (map_trans_frag_lift map_entry) view_frag_proj).
   Proof.
     intros Hv2. intros i [d' a'] Hlook1. simpl.
     rewrite map_lookup_imap in Hlook1.
     destruct (view_frag_proj !! i) eqn:Hlook2;rewrite Hlook2 /= in Hlook1;[|done].
     destruct c as [q w'];simpl in *.
     destruct (agree_option_map (map_entry i) w') eqn:Hsome;simpl in *;simplify_eq.
-    destruct (Hv2 i (d',w') Hlook2) as [w [Hag [Hd Hw]]];simpl in *.
-    apply dist_to_agree_validN in Hag as Hval.
-    apply agree_option_map_validN with (f:=map_entry i) in Hval as Hval'; [|apply _].
+    destruct (Hv2 i (d',w') Hlook2) as (? & d & (w & <- & Hw)%lookup_fmap_Some & [Hd Hval] & Hincl);simpl in *.
+    apply Some_pair_includedN_r in Hincl as Hag.
+    rewrite Some_includedN_total in Hag.
+    pose proof (cmra_validN_includedN _ w' _ Hval ltac:(done)) as Hval'.
+    apply agree_option_map_validN with (f:=map_entry i) in Hval'; [|apply _].
     rewrite Hsome in Hval'. rewrite Some_validN in Hval'.
     apply agree_option_eq_some in Hsome.
     apply option_list_collapse_spec in Hsome as Hspec.
@@ -677,29 +690,74 @@ Section map_entry.
     { rewrite map_lookup_imap. rewrite Hw. done. }
     pose proof (elem_of_agree w') as [e Hin].
     assert (e = w) as ->.
-    { rewrite to_agree_dist in Hag. apply Hag in Hin. eauto.
+    { (* TODO: is there a better proof? *)
+      destruct w' as [w' ?]. simpl in *.
+      rewrite /to_agree agree_includedN /op /agree_op_instance /= in Hag.
+      destruct Hag as [_ Hag]. simpl in Hag.
+      odestruct (Hag e _) as (e' & ->%list_elem_of_singleton & Hequiv); first set_solver.
       apply leibniz_equiv.
-      apply discrete_iff in Hin; auto. }
-    apply elem_of_list_fmap_1 with (f:=map_entry i) in Hin.
+      apply discrete_iff in Hequiv; auto.
+      apply _. }
+    apply list_elem_of_fmap_2 with (f:=map_entry i) in Hin.
     destruct (map_imap map_entry m1 !! i) eqn:Hres.
     - rewrite Heq in Hin.
       apply Hiff in Hin.
       apply to_agree_uninjN in Hval' as Hb; destruct Hb as [b Hb].
       symmetry in Hb. rewrite to_agree_dist in Hb.
-      apply Hb in Hin. exists o. split;auto.
-      apply to_agree_dist. intros. rewrite Hin. auto.
+      apply Hb in Hin. exists (to_agree o), d'. repeat split.
+      + rewrite lookup_fmap Hres /= //.
+      + eapply cmra_validN_Some_includedN; first done.
+        apply Some_pair_includedN_l in Hincl as Hdincl'.
+        done.
+      + apply: Some_includedN_refl. f_equiv.
+        apply to_agree_dist. intros. rewrite Hin. auto.
     - apply option_list_collapse_some_exists in Hsome as Ha.
       destruct Ha as [a [Hina HH]].
-      apply elem_of_list_fmap in HH as [y [Heq' Hy]].
+      apply list_elem_of_fmap in HH as [y [Heq' Hy]].
       rewrite Heq in Hin.
-      apply elem_of_list_fmap in Hin as [y' [Heq'' Hnone]].
-      rewrite agree_validN_def in Hval.
-      eapply Hval in Hnone;[|apply Hy].
+      apply list_elem_of_fmap in Hin as [y' [Heq'' Hnone]].
+      pose proof (cmra_validN_includedN _ w' _ Hval ltac:(done)) as Hval''.
+      rewrite agree_validN_def in Hval''.
+      eapply Hval'' in Hnone; [|apply Hy].
       assert (y = y') as ->.
-      { apply leibniz_equiv. apply discrete_iff in Hnone;auto. }
+      { apply leibniz_equiv. apply discrete_iff in Hnone;auto.  apply _. }
       rewrite -Heq' in Heq''. done.
   Qed.
-
+  
+  Lemma map_trans_auth_frag_rel'
+    map_entry `{!MapTrans map_entry} (n : nat)
+    (view_auth_proj : gmap K (agree V)) (view_frag_proj : gmap_view.gmap_view_fragUR K (agreeR V)) :
+    gmap_view.gmap_view_rel_raw K (agree V) n view_auth_proj view_frag_proj ->
+    gmap_view.gmap_view_rel_raw K (agree V) n (map_imap (map_trans_auth_lift map_entry) view_auth_proj) (map_imap (map_trans_frag_lift map_entry) view_frag_proj).
+  Proof.
+    intros Hv2. intros i [d' a'] Hlook1. simpl.
+    rewrite map_lookup_imap in Hlook1.
+    destruct (view_frag_proj !! i) eqn:Hlook2;rewrite Hlook2 /= in Hlook1;[|done].
+    destruct c as [q w'];simpl in *.
+    destruct (agree_option_map (map_entry i) w') eqn:Hsome'; simpl in *; simplify_eq.
+    destruct (Hv2 i (d',w') Hlook2) as (w & d & Hw & [Hd Hval] & Hincl);simpl in *.
+    apply Some_pair_includedN_r in Hincl as Hag.
+    rewrite Some_includedN_total in Hag.
+    pose proof (cmra_validN_includedN _ w' _ Hval ltac:(done)) as Hval'.
+    opose proof (agree_option_map_valid_includedN (map_entry i) w' w n _ _) as Hincl'; [ done | done | ].
+    rewrite Hsome' in Hincl'.
+    pose proof Hincl' as Hsome.
+    apply Some_includedN_is_Some in Hsome as [a Hsome].
+    rewrite Hsome in Hincl'.
+    exists a, d'.
+    rewrite map_lookup_imap Hw /= /map_trans_auth_lift Hsome.
+    apply agree_option_map_validN with (f:=map_entry i) in Hval'; [|apply _].
+    apply agree_option_map_validN with (f:=map_entry i) in Hval; [|apply _].
+    rewrite Hsome in Hval. rewrite Hsome' in Hval'.
+    repeat split; try done.
+    - eapply cmra_validN_Some_includedN; first done.
+      apply Some_pair_includedN_l in Hincl as Hdincl'.
+      done.
+    - apply: Some_includedN_refl. f_equiv.
+      apply Some_includedN_total in Hincl'.
+      rewrite Some_validN in Hval'.
+      apply agree_valid_includedN; done.
+  Qed.
 
   Lemma agree_option_map_discard_all map_entry `{!MapTrans map_entry}
     (i : K) (v1 v2 a : agree V):
@@ -712,13 +770,13 @@ Section map_entry.
     pose proof (elem_of_agree v2) as [v Hv].
     pose proof (map_trans_frag_discard_all i v) as Hn.
     pose proof (option_list_collapse_none_spec _ Hag2) as Hspec2.
-    apply elem_of_list_fmap_1 with (f:=map_entry i) in Hv.
+    apply list_elem_of_fmap_2 with (f:=map_entry i) in Hv.
     apply Hspec2 in Hv. pose proof (Hn Hv).
     pose proof (option_list_collapse_spec _ _ Hag1) as Hspec1.
     pose proof (collapse_rel_iff _ _ Hspec1) as Hiff1.
     pose proof (elem_of_agree a) as [a0 Ha0].
     apply Hiff1 in Ha0.
-    apply elem_of_list_fmap in Ha0 as [? [Hcontr ?]].
+    apply list_elem_of_fmap in Ha0 as [? [Hcontr ?]].
     rewrite H0 in Hcontr. done.
   Qed.
   
@@ -737,15 +795,14 @@ Section map_entry.
     eapply collapse_rel_idemp;[|eauto].
     intros. eapply map_trans_idemp;eauto.
   Qed.
-      
-
+  
   Global Instance gMapTrans_frag_lift_CmraMorphism
     map_entry `{!MapTrans map_entry} : CmraMorphism (gMapTrans_frag_lift map_entry).
   Proof.
     split.
     - intros n x y Hne.
-      destruct x,y =>/=.
       apply gmap_map_imap_ne =>//.
+      destruct x,y =>/=.
       intros k m [d1 v1] [d2 v2] Hne2. simpl. inversion Hne2 as [Hne1 Hne2'];simpl in *; simplify_eq.
       apply option_mbind_ne.
       + intros a1 a2 Ha. constructor. split;auto.
@@ -794,6 +851,51 @@ Section map_entry.
       * rewrite op_None_left_id. auto.
   Qed.
 
+  
+  #[global] Instance gMapTrans_auth_lift_CmraMorphism
+    map_entry `{!MapTrans map_entry} : CmraMorphism (gMapTrans_auth_lift map_entry).
+  Proof.
+    split.
+    - intros n x y Hne.
+      apply gmap_map_imap_ne =>//.
+      destruct x,y =>/=.
+      intros k m v1 v2 Hne2. simpl. inversion Hne2 as [Hne1 Hne2'];simpl in *; simplify_eq.
+      apply: agree_option_map_ne =>//.
+    - intros n x Hx i.
+      specialize (Hx i).
+      rewrite /gMapTrans_auth_lift /map_trans_auth_lift map_lookup_imap.
+      destruct (x !! i) eqn:Hsome;[|rewrite Hsome //].
+      rewrite Hsome in Hx. rewrite Hsome /=.
+      rewrite Some_validN in Hx.
+      destruct (agree_option_map (map_entry i) c) eqn:Hv =>// /=.
+      apply Some_validN. rewrite -Some_validN -Hv.
+      apply: agree_option_map_validN => //.
+    - intros view_frag_proj. rewrite /gMapTrans_auth_lift /=.
+      rewrite !cmra_pcore_core. f_equiv.
+      intros i.
+      rewrite map_lookup_imap.
+      destruct (core view_frag_proj !! i) eqn:Hlook;rewrite Hlook => /=.
+      * rewrite lookup_core in Hlook. rewrite lookup_core.
+        unfold map_trans_frag_lift.
+        destruct (view_frag_proj !! i) as [c' | ] eqn:Hi; rewrite Hi in Hlook;[|inversion Hlook].
+        rewrite map_lookup_imap Hi /=.
+        assert (c = c') as <-.
+        { inversion Hlook;auto. }
+        rewrite /map_trans_auth_lift.
+        destruct (agree_option_map (map_entry i) c) eqn:Hv1 => /= //.
+      * rewrite lookup_core in Hlook.
+        destruct (view_frag_proj !! i) eqn:Hi;rewrite Hi in Hlook; inversion Hlook.
+        rewrite lookup_core map_lookup_imap Hi /= //.
+    - intros view_auth_proj view_auth_proj0.
+      intros i.
+      rewrite !lookup_op !map_lookup_imap. rewrite lookup_op.
+      rewrite /map_trans_auth_lift.
+      destruct (view_auth_proj !! i) eqn:Hlook1,(view_auth_proj0 !! i) eqn:Hlook2;rewrite Hlook1 Hlook2; simpl in *=>//.
+      * rewrite agree_option_map_op //.
+      * rewrite op_None_right_id. auto.
+      * rewrite op_None_left_id. auto.
+  Qed.
+  
   (* Lemma test `{!MapTrans map_entry}  x : core ((map_entry_lift_gmap_view map_entry) x) = core x. *)
   (* Proof. *)
   (*   rewrite view.view_core_eq. f_equiv. *)
@@ -817,7 +919,7 @@ Section map_entry.
     CmraMorphism (map_entry_lift_gmap_view map_entry).
   Proof.
     apply fmap_view_cmra_morphism; [apply _|apply _|].
-    intros. apply: map_trans_auth_frag_rel. auto.
+    intros. apply: map_trans_auth_frag_rel'. auto.
   Qed.
 
   Global Instance gMapTrans_lift_IdemP map_entry `{!MapTrans map_entry} :
@@ -830,13 +932,15 @@ Section map_entry.
         rewrite -agree_map_compose.
         destruct p;simpl.
         intros n. symmetry.
-        apply agree_map_ext;[apply gmap_map_imap_ne;apply _|].
+        apply agree_map_ext; first apply _.
         intros m. intros i. simpl.
+        rewrite /gMapTrans_auth_lift /=.
         rewrite map_imap_compose.
         rewrite /= !map_lookup_imap.
         destruct (m !! i) eqn:Hm;rewrite Hm;auto;simpl.
-        destruct (map_entry i o) eqn:Hsome;simpl;auto.
-        apply map_trans_idemp in Hsome. rewrite Hsome//.        
+        destruct (map_trans_auth_lift map_entry i o) eqn:Hsome;simpl;auto.
+        apply agree_option_map_idemp in Hsome; last done.
+        rewrite -Hsome //.
       + rewrite /gMapTrans_frag_lift /=.
         rewrite map_imap_compose.
         intros i.
@@ -874,15 +978,16 @@ Section map_entry.
       + f_equiv. split;simpl;auto.
         destruct p;simpl. intros n.
         rewrite -!agree_map_compose.
-        apply agree_map_ext; simpl.
-        { intros ????. simpl. rewrite !map_imap_compose.
-          apply gmap_map_imap_ne=>//.
-          intros. intros ??->. auto. }
+        apply agree_map_ext; simpl; first apply _.
         intros m. intros i. simpl.
+        rewrite /gMapTrans_auth_lift /=.
         rewrite map_imap_compose.
         rewrite /= !map_lookup_imap.
         destruct (m !! i) eqn:Hm;rewrite Hm;auto;simpl.
-        rewrite Hind. auto.
+        rewrite /map_trans_auth_lift. rewrite -?agree_option_map_compose.
+        apply agree_option_map_ext.
+        { intros ??? ->. auto. }
+        intros ?. rewrite Hind. auto.
       + rewrite /gMapTrans_frag_lift /=.
         rewrite !map_imap_compose.
         intros i.
@@ -916,18 +1021,30 @@ Section map_entry.
       intros ?. rewrite Hind. auto.
   Qed.
         
-        
   Lemma map_entry_lift_gmap_view_auth dq m map_entry :
-    map_entry_lift_gmap_view map_entry (gmap_view_auth dq m) =
-    gmap_view_auth dq (map_imap map_entry m).
+    map_entry_lift_gmap_view map_entry (gmap_view_auth dq (to_agree <$> m)) =
+    gmap_view_auth dq (to_agree <$> map_imap map_entry m).
   Proof.
-    unfold map_entry_lift_gmap_view, fmap_view, fmap_pair. simpl.
-    rewrite agree_map_to_agree. done.
+    rewrite /map_entry_lift_gmap_view /fmap_view /fmap_pair /=.
+    rewrite agree_map_to_agree.
+    rewrite /gmap_view_auth /view_auth.
+    f_equiv; last done.
+    f_equiv.
+    f_equiv.
+    f_equiv.
+    rewrite /gMapTrans_auth_lift ?map_fmap_imap.
+    apply: map_imap_ext.
+    intros i.
+    rewrite lookup_fmap.
+    destruct (m !! i); simpl; simplify_eq; last done.
+    rewrite /map_trans_auth_lift agree_option_map_to_agree /=.
+    f_equiv.
+    done.
   Qed.
 
   Lemma map_entry_lift_gmap_view_frag k dq v map_entry :
-    map_entry_lift_gmap_view map_entry (gmap_view_frag k dq v) =
-    from_option (λ v', gmap_view_frag k dq v') (◯V ∅) (map_entry k v).
+    map_entry_lift_gmap_view map_entry (gmap_view_frag k dq (to_agree v)) =
+    from_option (λ v', gmap_view_frag k dq (to_agree v')) (◯V ∅) (map_entry k v).
   Proof.
     unfold map_entry_lift_gmap_view, fmap_view, fmap_pair. simpl.
     unfold from_option. rewrite /gMapTrans_frag_lift.
@@ -950,11 +1067,13 @@ Section map_entry.
       split;simpl;auto.
       rewrite -!agree_map_compose.
       apply agree_map_ext.
-      { intros ????. simpl. rewrite !map_imap_compose.
-        apply gmap_map_imap_ne=>//. intros k m x' y' Heq.
-        rewrite Heq. auto. }
+      { apply _. }
       intros m. simpl.
-      rewrite map_imap_compose. auto.
+      rewrite /gMapTrans_auth_lift map_imap_compose.
+      apply: utils.map_imap_ext => i.
+      rewrite /map_trans_auth_lift /=.
+      destruct (m !! i) eqn:Heq; rewrite Heq /=; auto.
+      rewrite -!agree_option_map_compose //.
     - rewrite /gMapTrans_frag_lift.
       rewrite map_imap_compose. intros k.
       rewrite !map_lookup_imap.
@@ -981,6 +1100,8 @@ Section map_entry.
       intros a0. intros i.
       rewrite !map_lookup_imap.
       destruct (a0 !! i) eqn:Ha;rewrite Ha;simpl;auto.
+      apply agree_option_map_ext;[apply _|].
+      auto.
     - rewrite /gMapTrans_frag_lift.
       intros i. rewrite !map_lookup_imap.
       destruct (view_frag_proj !! i) eqn:Ha;rewrite Ha;simpl;auto.
@@ -990,7 +1111,7 @@ Section map_entry.
       apply agree_option_map_ext;[apply _|].
       auto.
   Qed.
-      
+
   Definition map_entry_flip {K : Type} {V : ofe}
     (map_entry : K -> V -> option V) `{@MapTrans K V map_entry} : K -> V -> option V :=
     λ l v, match map_entry l v with
@@ -1018,8 +1139,6 @@ Section map_entry.
       destruct (map_entry k v1) eqn:Hv1,(map_entry k v2) eqn:Hv2;auto;inversion Hne'.
       rewrite Hne. auto.
   Qed.
-
-  
   
   (* Lemma map_entry_lift_gmap_contractive map_entry `{!MapTrans map_entry} : *)
   (*   ∀ x, map_entry_lift_gmap_view map_entry x ≼ x. *)

@@ -26,7 +26,7 @@ Class CCEctxiLanguage (expr val ectx_item state observation : Type) := {
   val_stuck K e1 σ1 κ e2 σ2 efs rm :
     head_step K e1 σ1 κ e2 σ2 efs rm → to_val e1 = None;
 
-  fill_item_inj Ki :> Inj (=) (=) (fill_item Ki);
+  fill_item_inj Ki :: Inj (=) (=) (fill_item Ki);
   fill_item_val Ki e : is_Some (to_val (fill_item Ki e)) → is_Some (to_val e);
   fill_item_no_val_inj Ki1 Ki2 e1 e2 :
     to_val e1 = None → to_val e2 = None →

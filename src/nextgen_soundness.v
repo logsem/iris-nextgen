@@ -1,4 +1,4 @@
-From iris.proofmode Require Import classes tactics proofmode.
+From iris.proofmode Require Import classes ltac_tactics proofmode.
 From iris.base_logic.lib Require Export iprop own later_credits.
 From iris.prelude Require Import options.
 From stdpp Require Export coPset.
@@ -182,7 +182,7 @@ Proof.
   apply (laterN_soundness _  (S n)); simpl.
   apply (fupd_soundness_no_lc ⊤ ⊤ _ m)=> Hinv. iIntros "Hc".
   iPoseProof (Hiter Hinv) as "H". clear Hiter.
-  iApply fupd_plainly_mask_empty. iSpecialize ("H" with "Hc").
+  iApply (fupd_plainly_mask _ ∅). iSpecialize ("H" with "Hc").
   iMod (step_fupdN_plain with "H") as "H";[by apply plain_bnextgen_plain|]. iMod "H". iModIntro.
   rewrite -later_plainly -laterN_plainly -later_laterN laterN_later.
   iNext. iDestruct "H" as ">H". iNext.
@@ -477,25 +477,25 @@ Section bnextgen_pred_imod.
 End bnextgen_pred_imod.
 
 Lemma bupd_laterN_plain_interweave :
-  ∀ {PROP : bi} {BiBUpd0 : BiBUpd PROP} {BiPlainly0 : BiPlainly PROP},
-    BiBUpdPlainly PROP → ∀ (P : PROP) (n : nat), Plain P → (Nat.iter n (λ P, |==> ▷ |==> ▷ P) P) ⊢ ▷^(n + n) P.
+  ∀ {PROP : bi} {BiBUpd0 : BiBUpd PROP} {BiSbi : Sbi PROP},
+    BiBUpdSbi PROP → ∀ (P : PROP) (n : nat), Plain P → Absorbing P → (Nat.iter n (λ P, |==> ▷ |==> ▷ P) P) ⊢ ▷^(n + n) P.
 Proof.
   intros. iIntros "Hn".
   iInduction n as [|n] "IH".
   - simpl;auto.
-  - simpl. iApply bupd_plain. iMod "Hn". iModIntro. iNext.
-    iApply bupd_plain. iMod "Hn". iModIntro.
+  - simpl. iApply bupd_elim. iMod "Hn". iModIntro. iNext.
+    iApply bupd_elim. iMod "Hn". iModIntro.
     rewrite Nat.add_succ_r /=. iNext. iApply "IH". iFrame.
 Qed.
 
 Lemma bupd_laterN_plain :
-  ∀ {PROP : bi} {BiBUpd0 : BiBUpd PROP} {BiPlainly0 : BiPlainly PROP},
-    BiBUpdPlainly PROP → ∀ (P : PROP) (n : nat), Plain P → (Nat.iter n (λ P, |==> ▷ P) P) ⊢ ▷^(n) P.
+  ∀ {PROP : bi} {BiBUpd0 : BiBUpd PROP} {BiSbi : Sbi PROP},
+    BiBUpdSbi PROP → ∀ (P : PROP) (n : nat), Plain P → Absorbing P → (Nat.iter n (λ P, |==> ▷ P) P) ⊢ ▷^(n) P.
 Proof.
   intros. iIntros "Hn".
   iInduction n as [|n] "IH".
   - simpl;auto.
-  - simpl. iApply bupd_plain. iMod "Hn". iModIntro. iNext.
+  - simpl. iApply bupd_elim. iMod "Hn". iModIntro. iNext.
     iApply "IH". iFrame.
 Qed.
 
@@ -579,7 +579,7 @@ Section bnextgen_n_open_soundness.
       simpl. rewrite /= -Nat.add_succ_r.
       iDestruct "Hn" as "[Hone [Hm Hn]]".
       rewrite (fupd_trans ⊤ ⊤).
-      iApply bupd_plain.
+      iApply bupd_elim.
       iMod ("H" with "HH Hω") as "[>Hω >HH]".
       iModIntro.
       iAssert (|={∅}▷=>^(S $ num_laters_per_step n) |={∅,⊤}=> ?={a}=> ⚡={[l]}▷=>^(S n) |={⊤,∅}=> P)%I with "HH" as "HH".
@@ -595,7 +595,7 @@ Section bnextgen_n_open_soundness.
       { intros. iIntros "J H". iMod "H". iIntros "!>!>".
         iMod "H". iIntros "!>!>". iApply "J". iFrame. }
       iIntros "[Hω HP]".
-      iApply bupd_plain.
+      iApply bupd_elim.
       iMod ("H" with "HP Hω") as "[>Hω >HP]".
       iModIntro.
       unfold bnextgen_option. destruct (f a).
@@ -670,7 +670,7 @@ Section bnextgen_n_open_soundness.
     iApply (iter_modal_mono with "[-HH] HH").
     { intros. iIntros "J H". iMod "H". iIntros "!>!>".
       iApply "J". iFrame. }
-    iIntros "HH". iApply bupd_plain. iMod "HH". rewrite (Nat.add_comm m 3).
+    iIntros "HH". iApply bupd_elim. iMod "HH". rewrite (Nat.add_comm m 3).
     rewrite -Nat.add_assoc. (* iSimpl. *) iMod "HH" as (m0 Hm0) "[Hsupply [Hwsat [HE HP]]]".
     rewrite -(Nat.add_comm m 3). iModIntro.
     iStopProof. revert n m0 Hm0. induction l;intros n m0 Hm0;iIntros "[Hone [Hlc [Hsupply [Hwsat [HE HP]]]]]".
@@ -687,7 +687,7 @@ Section bnextgen_n_open_soundness.
       { intros. iIntros "J H". iMod "H". iIntros "!>!>".
         iApply "J". iFrame. }
       iIntros "H". simpl. rewrite laterN_add /= -laterN_later /=.
-      iApply bupd_plain. iMod "H" as ">H".
+      iApply bupd_elim. iMod "H" as ">H".
       iDestruct "H" as (m1 Hm1) "[Hsupply [? [? ?]]]".
       iModIntro. iNext. iNext. iNext. iFrame.
     - Abort.
