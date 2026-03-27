@@ -1,0 +1,13 @@
+opam-version: "2.0"
+version: "dev"
+
+synopsis: "Next generation modality for Iris"
+
+depends: [
+  "rocq-core" {>= "8.19"}
+  "rocq-iris" {= "4.5.0"}
+  "rocq-equations"
+]
+
+build: ["./make-package" "nextgen" "-j%{jobs}%"]
+install: ["./make-package" "nextgen" "install"]
