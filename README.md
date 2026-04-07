@@ -8,30 +8,33 @@ Separation Logic".
 
 ## Development
 
-The `main` branch is currently developed using Coq version 8.17.1. and coq-equations version 1.3+8.17
-
-### Clone
-
-The project uses submodules for its dependencies. To clone it and the
-associated submodules use the following command:
-
-```
-git submodule update --init --recursive
-```
+The `dev` branch is currently developed using Rocq 9.1.1, rocq-equations
+1.3.1+9.1, and Iris 4.5.0.
 
 ### Updating dependencies
 
-The following git command updates all the submodules:
+This version of `iris-nextgen` uses opam to manage dependencies. To install
+dependencies, we recommend create a local switch at project root using the
+following command:
 
 ```
-git submodule update --remote --merge
+opam switch create . --deps-only
 ```
+
+Alternatively, one can install the dependencies to the current opam switch using
+the following command,
+
+```
+opam install . --deps-only
+```
+
 ### Building the proofs 
 
-We recommend installing the dependencies using [opam](https://opam.ocaml.org/)
+Make sure you are in the correct opam switch and execute the following commands
+to build the proofs:
 
-Once you have installed `Coq 8.17.1` and `coq-equations 1.3+8.17`, you can build the project by running:
 ```
+eval $(opam env)
 make -jN  # replace N with the number of CPU cores of your machine
 ```
 
@@ -43,13 +46,13 @@ make -jN  # replace N with the number of CPU cores of your machine
 
 - `case_study/program_logic`: contains language generic files related to the construction of a program logics that use the nextgen modality.
 
-- `lib`: contains the construction of invariants in the presence of the nextgen modality.
+- `nextgen/lib`: contains the construction of invariants in the presence of the nextgen modality.
 
-- `gmap_view_transformation.v`: provides a generic methodology to define transformations over the map resource algebra.
+- `nextgen/gmap_view_transformation.v`: provides a generic methodology to define transformations over the map resource algebra.
 
-- `nextgen_soundness.v`: proves soundness of the nextgen modality as it occurs in the weakest precondition.
+- `nextgen/nextgen_soundness.v`: proves soundness of the nextgen modality as it occurs in the weakest precondition.
 
-- `nextgen_independent.v`: defines the independence modality
+- `nextgen/nextgen_independent.v`: defines the independence modality
 
 #### Below is a lookup table for the definitions in the paper.
 
